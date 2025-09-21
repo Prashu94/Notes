@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "fb915dd132b70e67",
+        "id": "cbba758d2f5daf71",
         "type": "tabs",
         "children": [
           {
-            "id": "e9eb63fe9aa99b5a",
+            "id": "d63af785a4786722",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -177,7 +178,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e9eb63fe9aa99b5a",
+  "active": "d63af785a4786722",
   "lastOpenFiles": [
     "Amazon EC2 - Observability,  Monitoring and Troubleshooting.md",
     "Untitled.canvas",
