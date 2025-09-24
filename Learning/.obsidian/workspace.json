@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Amazon EC2 - Observability,  Monitoring and Troubleshooting.md",
+                "file": "dynamic-programming-guide.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Amazon EC2 - Observability,  Monitoring and Troubleshooting"
+              "title": "dynamic-programming-guide"
             }
           }
         ]
@@ -180,7 +180,11 @@
   },
   "active": "d63af785a4786722",
   "lastOpenFiles": [
+    "dynamic-programming-competitive-programming.md",
     "Amazon EC2 - Observability,  Monitoring and Troubleshooting.md",
+    "bit-manipulation-competitive-programming.md",
+    "comprehensive-sqlalchemy-guide.md",
+    "commands.md",
     "Untitled.canvas",
     "Welcome.md"
   ]
