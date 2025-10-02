@@ -1,3004 +1,425 @@
-# AWS Systems Manager - SAA-C03 Certification Guide
+# AWS Systems Manager (SSM) – SAA-C03 Exam Comprehensive Guide
 
-## Table of Contents
-1. [Introduction to AWS Systems Manager](#introduction-to-aws-systems-manager)
-2. [Core Components Overview](#core-components-overview)
-3. [Parameter Store](#parameter-store)
-4. [Session Manager](#session-manager)
-5. [Run Command](#run-command)
-6. [Patch Manager](#patch-manager)
-7. [Maintenance Windows](#maintenance-windows)
-8. [Automation](#automation)
-9. [Inventory](#inventory)
-10. [State Manager](#state-manager)
-11. [Compliance](#compliance)
-12. [OpsCenter](#opscenter)
-13. [Application Manager](#application-manager)
-14. [Fleet Manager](#fleet-manager)
-15. [Systems Manager Agent (SSM Agent)](#systems-manager-agent-ssm-agent)
-16. [IAM Roles and Permissions](#iam-roles-and-permissions)
-17. [Integration with Other AWS Services](#integration-with-other-aws-services)
-18. [Security and Compliance](#security-and-compliance)
-19. [Cost Optimization](#cost-optimization)
-20. [Best Practices](#best-practices)
-21. [Troubleshooting](#troubleshooting)
-22. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+AWS Systems Manager is a unified interface that helps you view operational data from multiple AWS services and automate operational tasks across your AWS resources at scale. For the SAA-C03 (Solutions Architect Associate) exam, you must understand the major Systems Manager capabilities, their use cases, integrations, security boundaries, and how they help implement operational excellence, cost optimization, reliability, performance efficiency, and security.
 
 ---
+## 1. Core Value Proposition
+Systems Manager provides: 
+- Centralized operational tooling for hybrid and multi-account environments
+- Secure, auditable, agent-based + agentless operations
+- Automation at scale for patching, configuration, remediation
+- Inventory, governance, and change control
+- Parameter and secret configuration management
+- Secure shell/session replacement (no inbound ports, no bastions)
 
-## Introduction to AWS Systems Manager
-
-AWS Systems Manager is a comprehensive management service that provides a unified interface for managing your AWS resources at scale. It offers operational insights and automated management capabilities for EC2 instances, on-premises servers, and other AWS resources.
-
-### Key Benefits
-- **Centralized Management**: Single pane of glass for resource management
-- **Operational Insights**: Comprehensive visibility into resource health and performance
-- **Automation**: Reduce manual tasks and human error
-- **Security**: Secure remote access without bastion hosts or SSH keys
-- **Compliance**: Track and maintain configuration compliance
-- **Cost Efficiency**: Optimize resource utilization and reduce operational overhead
-
-### Systems Manager vs Other AWS Management Services
-
-| Service | Primary Purpose | Key Capabilities |
-|---------|----------------|------------------|
-| Systems Manager | Operational management | Parameter store, patching, automation, remote access |
-| CloudFormation | Infrastructure provisioning | Infrastructure as Code, stack management |
-| Config | Configuration compliance | Resource configuration tracking, compliance rules |
-| CloudTrail | API auditing | API call logging, governance |
-| OpsWorks | Application management | Chef/Puppet-based configuration management |
-
-### When to Use Systems Manager
-- **Hybrid environments**: Managing both AWS and on-premises resources
-- **Patch management**: Automated patching across fleets
-- **Configuration management**: Standardizing configurations at scale
-- **Remote access**: Secure shell access without bastion hosts
-- **Parameter management**: Centralized configuration and secrets management
-- **Operational automation**: Automating routine maintenance tasks
+Key identity concept: Least privilege via IAM roles (instance profile + user permissions). Many capabilities depend on the SSM Agent installed on managed nodes (EC2, on-premise servers, edge devices, some container/VM form factors) plus the `AmazonSSMManagedInstanceCore` policy attached to the instance role.
 
 ---
-
-## Core Components Overview
-
-AWS Systems Manager consists of multiple capabilities organized into four main categories:
-
-### 1. Operations Management
-- **OpsCenter**: Central location for operational issues
-- **CloudWatch Dashboards**: Integrated monitoring dashboards
-- **PHD Integration**: Personal Health Dashboard integration
-
-### 2. Application Management
-- **Application Manager**: Application-centric view of resources
-- **AppConfig**: Feature flag and configuration management
-- **Parameter Store**: Hierarchical parameter management
-
-### 3. Change Management
-- **Change Calendar**: Track and approve changes
-- **Maintenance Windows**: Schedule maintenance activities
-- **Automation**: Workflow automation and orchestration
-
-### 4. Node Management
-- **Fleet Manager**: Remote desktop and file management
-- **Session Manager**: Browser-based shell access
-- **Run Command**: Execute commands across instances
-- **State Manager**: Desired state configuration
-- **Patch Manager**: Automated patch management
-- **Inventory**: Collect system metadata
-- **Compliance**: Track compliance status
+## 2. High-Level Architecture Components
+| Component | Purpose | Exam Focus |
+|-----------|---------|------------|
+| SSM Agent | Runs on managed instances to execute commands, collect inventory, send/receive messages | Must be installed + instance needs IAM role |
+| Parameter Store | Hierarchical, versioned, encrypted (KMS) configuration + plain text storage | Secure config, decouple secrets; Standard vs Advanced params |
+| Session Manager | Secure shell/PowerShell/port forwarding without opening inbound ports or bastions | No SSH keys, logs to CloudWatch Logs & S3 |
+| Automation | Define runbooks (YAML/JSON) to orchestrate actions (patch, AMI creation, remediation) | Managed vs custom runbooks, approval steps |
+| Run Command | Execute ad hoc or scheduled commands across fleets | No SSH needed; rate limiting & concurrency controls |
+| Patch Manager | Automate patch baseline application & maintenance windows | Baselines: Predefined vs custom; compliance reporting |
+| State Manager | Enforce and maintain desired state (document association) | Drift correction |
+| Inventory | Collect metadata (apps, network configs, files, registry, etc.) | Query via SSM + Athena |
+| Incident Manager (integrated) | Respond to critical events | Not deep focus but know integration |
+| OpsCenter / OpsItems | Centralize operational issues with contextual data | Ties into CloudWatch/Config/Alarm events |
+| Change Manager | Standardize, approve, track operational changes | Change templates + approvals |
+| Explorer | Aggregated operational dashboard across accounts/regions | Governance & multi-account mgmt |
+| Maintenance Windows | Define scheduled windows to perform tasks | Used by Run Command, Automation, Patch |
+| Distributor | Package distribution and agent updates | Controlled binary delivery |
+| Hybrid Activations | Manage on-premise/other cloud servers | Activation code/id, becomes managed instance (mi-*) |
 
 ---
+## 3. Managed Instances & Hybrid Activations
+Managed Instance Requirements:
+- SSM Agent installed (Amazon Linux 2 + current Windows AMIs include it by default)
+- Instance profile with `AmazonSSMManagedInstanceCore` (includes SSM + EC2 messages + SSMMessages + KMS decrypt if needed)
+- Outbound internet or VPC endpoints: `ssm`, `ec2messages`, `ssmmessages`, `logs`, `s3`, `kms` as needed
+- Tags help target operations (Run Command/State Manager associations)
 
-## Parameter Store
+Hybrid Activations:
+- Register on-premises servers with an Activation (Activation Code + ID)
+- Each server appears with an `mi-` ID
+- IAM role linked to activation defines permissions
+- Use cases: central patching, inventory, remote management, parameterized configs
 
-AWS Systems Manager Parameter Store provides hierarchical storage for configuration data management and secrets management. It's a key service for the SAA-C03 exam.
-
-### Key Features
-- **Hierarchical Organization**: Parameters organized in tree-like structure
-- **Encryption**: Native integration with AWS KMS
-- **Versioning**: Track parameter changes over time
-- **Cross-Region Replication**: Replicate parameters across regions
-- **Fine-grained Access Control**: IAM-based permissions
-- **Integration**: Native integration with other AWS services
-
-### Parameter Types
-
-#### Standard Parameters
-- **Free tier**: Up to 10,000 parameters
-- **Size limit**: 4 KB per parameter
-- **No advanced features**: No policies or notifications
-- **Use cases**: Basic configuration data
-
-#### Advanced Parameters
-- **Cost**: $0.05 per 10,000 parameter operations
-- **Size limit**: 8 KB per parameter
-- **Advanced features**: Policies, notifications, parameter hierarchies
-- **Use cases**: Complex configurations, large values
-
-### Parameter Data Types
-
-```yaml
-# String Parameter
-/myapp/database/username: "dbuser"
-
-# StringList Parameter
-/myapp/allowed-regions: "us-east-1,us-west-2,eu-west-1"
-
-# SecureString Parameter (encrypted)
-/myapp/database/password: "encrypted-password-value"
-```
-
-### Hierarchical Organization
-
-```
-/myapp/
-  ├── prod/
-  │   ├── database/
-  │   │   ├── host
-  │   │   ├── port
-  │   │   └── password (SecureString)
-  │   └── api/
-  │       ├── endpoint
-  │       └── key (SecureString)
-  └── dev/
-      ├── database/
-      │   ├── host
-      │   ├── port
-      │   └── password (SecureString)
-      └── api/
-          ├── endpoint
-          └── key (SecureString)
-```
-
-### Parameter Policies (Advanced Parameters Only)
-
-#### Expiration Policy
-```json
-{
-  "Type": "Expiration",
-  "Version": "1.0",
-  "Attributes": {
-    "Timestamp": "2024-12-31T23:59:59.000Z"
-  }
-}
-```
-
-#### ExpirationNotification Policy
-```json
-{
-  "Type": "ExpirationNotification",
-  "Version": "1.0",
-  "Attributes": {
-    "Before": "30",
-    "Unit": "Days"
-  }
-}
-```
-
-#### NoChangeNotification Policy
-```json
-{
-  "Type": "NoChangeNotification",
-  "Version": "1.0",
-  "Attributes": {
-    "After": "60",
-    "Unit": "Days"
-  }
-}
-```
-
-### Integration Examples
-
-#### Lambda Function Access
-```python
-import boto3
-import json
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Get single parameter
-    response = ssm.get_parameter(
-        Name='/myapp/prod/database/host',
-        WithDecryption=True
-    )
-    db_host = response['Parameter']['Value']
-    
-    # Get multiple parameters by path
-    response = ssm.get_parameters_by_path(
-        Path='/myapp/prod/',
-        Recursive=True,
-        WithDecryption=True
-    )
-    
-    parameters = {param['Name']: param['Value'] for param in response['Parameters']}
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps('Parameters retrieved successfully')
-    }
-```
-
-#### EC2 Instance Access
-```bash
-#!/bin/bash
-# Get parameter value using AWS CLI
-DB_HOST=$(aws ssm get-parameter --name "/myapp/prod/database/host" --query "Parameter.Value" --output text)
-
-# Get encrypted parameter
-DB_PASSWORD=$(aws ssm get-parameter --name "/myapp/prod/database/password" --with-decryption --query "Parameter.Value" --output text)
-
-echo "Connecting to database at $DB_HOST"
-```
-
-### Parameter Store vs AWS Secrets Manager
-
-| Feature | Parameter Store | Secrets Manager |
-|---------|----------------|-----------------|
-| **Cost** | Free (Standard), $0.05 per 10K ops (Advanced) | $0.40 per secret per month + API calls |
-| **Size Limit** | 4KB (Standard), 8KB (Advanced) | 64KB |
-| **Rotation** | Manual | Automatic rotation support |
-| **Cross-region** | Manual replication | Automatic replication |
-| **Use Case** | Configuration data, simple secrets | Complex secrets, automatic rotation |
-
-### Common Use Cases
-
-#### 1. Application Configuration
-```
-/myapp/prod/config/
-├── api-timeout: "30"
-├── max-connections: "100"
-├── feature-flags: "feature1,feature2"
-└── log-level: "INFO"
-```
-
-#### 2. Database Connection Strings
-```
-/myapp/prod/database/
-├── host: "prod-db.example.com"
-├── port: "5432"
-├── database: "myapp_prod"
-├── username: "app_user"
-└── password: "encrypted-password" (SecureString)
-```
-
-#### 3. Third-party API Keys
-```
-/myapp/prod/integrations/
-├── stripe-api-key: "encrypted-key" (SecureString)
-├── sendgrid-api-key: "encrypted-key" (SecureString)
-└── slack-webhook-url: "encrypted-url" (SecureString)
-```
-
-### Best Practices for Parameter Store
-
-#### 1. Naming Conventions
-- Use hierarchical paths: `/app/environment/component/parameter`
-- Be consistent with naming patterns
-- Use lowercase with hyphens for readability
-
-#### 2. Security
-- Always use SecureString for sensitive data
-- Implement least privilege IAM policies
-- Use separate KMS keys for different environments
-- Enable CloudTrail for parameter access auditing
-
-#### 3. Organization
-- Group related parameters under common paths
-- Use environment-specific hierarchies
-- Implement parameter tagging for cost allocation
-
-#### 4. Monitoring
-- Set up CloudWatch alarms for parameter changes
-- Use parameter policies for lifecycle management
-- Monitor parameter usage with CloudWatch Insights
+Exam Tip: No inbound connectivity required; operations are agent-initiated (poll model). This is a security differentiator vs SSH/RDP.
 
 ---
+## 4. Parameter Store
+Features:
+- Hierarchical paths: `/app/env/component/key`
+- Standard vs Advanced parameters (Advanced adds >4KB size, policies, higher throughput, costs)
+- Data types: String, StringList, SecureString
+- Versioning & history
+- KMS encryption for SecureString (custom or AWS managed key)
+- Parameter policies: Expiration, no-change alert, compliance (Advanced only)
+- Integration: Lambda env retrieval, CloudFormation dynamic references (`{{resolve:ssm:/path}}` or `{{resolve:ssm-secure:/path:version}}`), ECS task definitions, CodeBuild, AppConfig, EC2 user data scripts
 
-## Session Manager
+Performance Considerations:
+- Standard throughput: 40 req/s (shared) | Advanced: higher (1000 req/s with caching)
+- Caching via SSM Agent or SDK local caching libs reduces API costs + throttling
 
-AWS Systems Manager Session Manager provides secure and auditable instance management without the need for bastion hosts, SSH keys, or opening inbound ports.
+When to use Parameter Store vs Secrets Manager:
+- Use Parameter Store for general configuration, less-rotated values; Secrets Manager for credential rotation workflows (RDS/Redshift/DocumentDB credentials) & secret rotation automation
+- Exam scenario: If rotation required every 30 days automatically -> Secrets Manager
 
-### Key Features
-- **Browser-based Access**: Shell access through AWS Console
-- **No Inbound Ports**: No need to open SSH/RDP ports
-- **Audit Logging**: Complete session logging to CloudWatch/S3
-- **IAM Integration**: Fine-grained access control
-- **Cross-platform**: Supports Linux, Windows, and macOS
-- **Port Forwarding**: Secure tunneling for applications
+Security:
+- Enforce encryption via IAM condition `ssm:Tier` or `ssm:ResourceTag`
+- Restrict path hierarchy with IAM resource ARNs (e.g., `arn:aws:ssm:region:acct:parameter/myapp/prod/*`)
 
-### Architecture and Components
-
-#### Requirements
-1. **SSM Agent**: Must be installed and running on instances
-2. **IAM Instance Profile**: EC2 instances need appropriate IAM role
-3. **Network Connectivity**: Instances must reach Systems Manager endpoints
-4. **User Permissions**: Users need Session Manager permissions
-
-#### Network Flow
-```
-User → AWS Console/CLI → Session Manager Service → SSM Agent → Instance
-```
-
-### IAM Permissions
-
-#### Instance Role (EC2InstanceProfile)
-```json
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:UpdateInstanceInformation",
-                "ssmmessages:CreateControlChannel",
-                "ssmmessages:CreateDataChannel",
-                "ssmmessages:OpenControlChannel",
-                "ssmmessages:OpenDataChannel"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-```
-
-#### User Policy for Session Access
-```json
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:StartSession"
-            ],
-            "Resource": [
-                "arn:aws:ec2:*:*:instance/*"
-            ],
-            "Condition": {
-                "StringEquals": {
-                    "ssm:resourceTag/Environment": ["dev", "staging"]
-                }
-            }
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:DescribeInstanceInformation",
-                "ssm:DescribeSessions",
-                "ssm:GetConnectionStatus"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-```
-
-### Session Manager Configuration
-
-#### Session Preferences
-```json
-{
-    "sessionType": "Standard",
-    "properties": {
-        "maxSessionDuration": "60",
-        "allowPortForwardingForManagedNodes": true,
-        "shellProfile": {
-            "linux": "cd /home/ec2-user && pwd",
-            "windows": "cd C:\\ && dir"
-        },
-        "idleSessionTimeout": "20",
-        "cloudWatchLogGroupName": "/aws/ssm/sessions",
-        "cloudWatchEncryptionEnabled": true,
-        "cloudWatchStreamingEnabled": true,
-        "kmsKeyId": "alias/session-manager-logs",
-        "runAsEnabled": false,
-        "runAsDefaultUser": "ec2-user"
-    }
-}
-```
-
-### Logging and Auditing
-
-#### CloudWatch Logs Integration
-```yaml
-# Session Manager preferences for CloudWatch logging
-CloudWatchLogGroupName: "/aws/ssm/sessions"
-CloudWatchEncryptionEnabled: true
-CloudWatchStreamingEnabled: true
-```
-
-#### S3 Logging Configuration
-```yaml
-# Session Manager preferences for S3 logging
-S3BucketName: "my-session-logs-bucket"
-S3KeyPrefix: "session-logs/"
-S3EncryptionEnabled: true
-```
-
-#### Sample Log Entry
-```json
-{
-    "version": "1.0",
-    "sessionId": "session-0123456789abcdef0",
-    "startTime": "2024-01-15T10:30:00Z",
-    "endTime": "2024-01-15T10:45:00Z",
-    "target": "i-0123456789abcdef0",
-    "owner": "arn:aws:iam::123456789012:user/alice",
-    "status": "Success",
-    "sessionData": "base64-encoded-session-transcript"
-}
-```
-
-### Port Forwarding
-
-#### Local Port Forwarding Example
-```bash
-# Forward local port 8080 to instance port 80
-aws ssm start-session \
-    --target i-0123456789abcdef0 \
-    --document-name AWS-StartPortForwardingSession \
-    --parameters '{"portNumber":["80"],"localPortNumber":["8080"]}'
-```
-
-#### Remote Port Forwarding Example
-```bash
-# Forward instance port 3306 to local port 3307
-aws ssm start-session \
-    --target i-0123456789abcdef0 \
-    --document-name AWS-StartPortForwardingSessionToRemoteHost \
-    --parameters '{"host":["rds-instance.region.rds.amazonaws.com"],"portNumber":["3306"],"localPortNumber":["3307"]}'
-```
-
-### Use Cases
-
-#### 1. Secure Administrative Access
-- Replace bastion hosts for administrative tasks
-- Eliminate SSH key management
-- Centralized access control through IAM
-
-#### 2. Troubleshooting and Debugging
-- Quick shell access for troubleshooting
-- No need to modify security groups
-- Complete audit trail of activities
-
-#### 3. Database Access
-- Secure tunneling to RDS instances
-- Port forwarding for application debugging
-- Temporary access without permanent connections
-
-#### 4. Development and Testing
-- Access to private instances for development
-- Safe testing environment access
-- Temporary administrative access
-
-### Session Manager vs Traditional SSH
-
-| Feature | Session Manager | Traditional SSH |
-|---------|----------------|-----------------|
-| **Security Groups** | No inbound rules needed | SSH port (22) must be open |
-| **Key Management** | No SSH keys required | SSH key pair management |
-| **Audit Logging** | Complete session logging | Requires additional setup |
-| **Network Access** | Works through NAT/VPC endpoints | Direct network connectivity |
-| **User Management** | IAM-based permissions | OS-level user management |
-| **Bastion Hosts** | Not required | Often required for private instances |
-
-### Common Troubleshooting Issues
-
-#### 1. Instance Not Appearing in Console
-**Symptoms**: Instance not visible in Session Manager console
-**Causes**:
-- SSM Agent not installed/running
-- Incorrect IAM instance profile
-- Network connectivity issues
-- Instance not registered with Systems Manager
-
-**Solutions**:
-```bash
-# Check SSM Agent status (Amazon Linux 2)
-sudo systemctl status amazon-ssm-agent
-
-# Restart SSM Agent
-sudo systemctl restart amazon-ssm-agent
-
-# Check instance registration
-aws ssm describe-instance-information --instance-information-filter-list key=InstanceIds,valueSet=i-0123456789abcdef0
-```
-
-#### 2. Access Denied Errors
-**Symptoms**: "AccessDenied" when starting sessions
-**Causes**:
-- Missing user permissions
-- Incorrect resource tags
-- Session preferences restrictions
-
-**Solutions**:
-- Verify IAM permissions
-- Check resource-based conditions
-- Review session preferences
-
-#### 3. Session Disconnections
-**Symptoms**: Frequent session timeouts
-**Causes**:
-- Idle timeout settings
-- Network connectivity issues
-- Instance resource constraints
-
-**Solutions**:
-- Adjust session preferences
-- Monitor instance resources
-- Check network stability
-
-### Best Practices
-
-#### 1. Security
-- Use condition-based IAM policies
-- Enable session logging and monitoring
-- Implement least privilege access
-- Use KMS encryption for logs
-
-#### 2. Monitoring
-- Set up CloudWatch alarms for session activities
-- Monitor session duration and frequency
-- Track unusual access patterns
-- Implement automated response to suspicious activities
-
-#### 3. Network Design
-- Use VPC endpoints for private subnets
-- Implement proper security group configurations
-- Consider network ACLs for additional security
-- Plan for high availability and disaster recovery
+Common Exam Gotchas:
+- `SecureString` values are decrypted only for authorized principals
+- Use `kms:Decrypt` permissions on the key + SSM parameter permissions
+- CloudFormation dynamic reference resolves at deploy time (stored in template history unencrypted? No – resolved server-side, not persisted in plaintext in stack template body)
 
 ---
+## 5. Session Manager
+Use Cases:
+- Replace bastion hosts & SSH/RDP inbound rules
+- IAM + MFA + CloudTrail auditing for shell access
+- Port forwarding (e.g., access internal DB from dev laptop) without opening ports
 
-## Run Command
+Security & Compliance:
+- No inbound ports; agent establishes secure channel
+- Logging: Stream session logs & commands to S3 and/or CloudWatch Logs
+- KMS encryption for logs and data in transit + encryption at rest
+- Restrict access via IAM policies (`ssm:StartSession`, `ssm:DescribeSessions`)
+- SCPs can restrict session usage across org
 
-AWS Systems Manager Run Command allows you to remotely and securely execute commands on managed instances at scale without logging into each instance.
+Advanced:
+- Document-based session preferences (e.g., idle timeout)
+- Port forwarding vs SSH key injection (Session Manager can integrate with SSH via proxy command)
 
-### Key Features
-- **Scalable Execution**: Run commands on thousands of instances simultaneously
-- **Document-based**: Use pre-built or custom command documents
-- **Secure**: No SSH/RDP access required
-- **Auditable**: Complete execution history and logging
-- **Rate Control**: Manage execution speed and error thresholds
-- **Target Selection**: Flexible instance targeting options
-
-### Command Documents
-
-#### AWS-Managed Documents
-```yaml
-# Common AWS-provided documents
-AWS-RunShellScript          # Linux shell commands
-AWS-RunPowerShellScript     # Windows PowerShell commands
-AWS-UpdateSSMAgent          # Update SSM Agent
-AWS-ConfigureAWSPackage     # Install/uninstall AWS packages
-AWS-InstallApplication      # Install applications
-AWS-GatherSoftwareInventory # Collect software inventory
-```
-
-#### Custom Document Example
-```yaml
-# Custom document for application deployment
-schemaVersion: "2.2"
-description: "Deploy application from S3"
-parameters:
-  applicationUrl:
-    type: String
-    description: "S3 URL of application package"
-    default: "s3://my-bucket/app.tar.gz"
-  installPath:
-    type: String
-    description: "Installation directory"
-    default: "/opt/myapp"
-
-mainSteps:
-- action: "aws:runShellScript"
-  name: "downloadAndInstall"
-  inputs:
-    timeoutSeconds: "300"
-    runCommand:
-    - "#!/bin/bash"
-    - "mkdir -p {{ installPath }}"
-    - "cd {{ installPath }}"
-    - "aws s3 cp {{ applicationUrl }} ."
-    - "tar -xzf app.tar.gz"
-    - "chmod +x install.sh"
-    - "./install.sh"
-```
-
-### Targeting Options
-
-#### 1. Instance IDs
-```bash
-aws ssm send-command \
-    --instance-ids "i-0123456789abcdef0" "i-0987654321fedcba0" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["uptime","df -h"]'
-```
-
-#### 2. Tags
-```bash
-aws ssm send-command \
-    --targets "Key=tag:Environment,Values=production" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["systemctl status nginx"]'
-```
-
-#### 3. Resource Groups
-```bash
-aws ssm send-command \
-    --targets "Key=resource-groups:Name,Values=WebServerGroup" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["service httpd restart"]'
-```
-
-### Execution Control
-
-#### Rate Control Settings
-```bash
-aws ssm send-command \
-    --targets "Key=tag:Environment,Values=production" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["yum update -y"]' \
-    --max-concurrency "10" \
-    --max-errors "2"
-```
-
-#### Timeout Configuration
-```bash
-aws ssm send-command \
-    --instance-ids "i-0123456789abcdef0" \
-    --document-name "AWS-RunShellScript" \
-    --timeout-seconds 3600 \
-    --parameters 'commands=["#!/bin/bash","sleep 30","echo Done"],executionTimeout=["3600"]'
-```
-
-### Output and Logging
-
-#### Command Output Handling
-```bash
-# Send command with S3 output
-aws ssm send-command \
-    --instance-ids "i-0123456789abcdef0" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["ps aux"]' \
-    --output-s3-bucket-name "my-command-outputs" \
-    --output-s3-key-prefix "run-command-logs/"
-```
-
-#### CloudWatch Logs Integration
-```bash
-# Enable CloudWatch Logs for command execution
-aws ssm send-command \
-    --instance-ids "i-0123456789abcdef0" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["tail -f /var/log/messages"]' \
-    --cloud-watch-output-config '{"CloudWatchLogGroupName":"/aws/ssm/run-command","CloudWatchOutputEnabled":true}'
-```
-
-### Common Use Cases
-
-#### 1. System Administration
-```bash
-# Check system health across fleet
-aws ssm send-command \
-    --targets "Key=tag:Role,Values=webserver" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=[
-        "uptime",
-        "free -m",
-        "df -h",
-        "systemctl status nginx"
-    ]'
-```
-
-#### 2. Software Updates
-```bash
-# Update packages on Amazon Linux instances
-aws ssm send-command \
-    --targets "Key=tag:OS,Values=AmazonLinux" \
-    --document-name "AWS-RunShellScript" \
-    --max-concurrency "25%" \
-    --max-errors "10%" \
-    --parameters 'commands=[
-        "yum update -y",
-        "systemctl restart amazon-ssm-agent"
-    ]'
-```
-
-#### 3. Configuration Management
-```bash
-# Deploy configuration files
-aws ssm send-command \
-    --targets "Key=tag:Environment,Values=production" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=[
-        "aws s3 cp s3://my-config-bucket/nginx.conf /etc/nginx/",
-        "nginx -t",
-        "systemctl reload nginx"
-    ]'
-```
-
-#### 4. Log Collection
-```bash
-# Collect logs from multiple instances
-aws ssm send-command \
-    --targets "Key=tag:Application,Values=webapp" \
-    --document-name "AWS-RunShellScript" \
-    --output-s3-bucket-name "log-collection-bucket" \
-    --parameters 'commands=[
-        "tar -czf /tmp/logs-$(date +%Y%m%d).tar.gz /var/log/application/",
-        "aws s3 cp /tmp/logs-$(date +%Y%m%d).tar.gz s3://log-collection-bucket/"
-    ]'
-```
-
-### Command Execution States
-
-#### State Transitions
-```
-Pending → InProgress → Success/Failed/Cancelled/TimedOut
-         ↓
-      Cancelling → Cancelled
-```
-
-#### Monitoring Command Status
-```bash
-# Get command execution status
-aws ssm get-command-invocation \
-    --command-id "12345678-1234-1234-1234-123456789012" \
-    --instance-id "i-0123456789abcdef0"
-
-# List all commands
-aws ssm list-commands \
-    --filter "key=Status,value=Success"
-```
-
-### Error Handling and Troubleshooting
-
-#### Common Error Scenarios
-
-1. **Access Denied**
-   - Missing IAM permissions
-   - SSM Agent not properly configured
-   - Instance not managed by Systems Manager
-
-2. **Command Failed**
-   - Script syntax errors
-   - Missing dependencies
-   - Insufficient privileges
-
-3. **Timeout Issues**
-   - Long-running commands
-   - Network connectivity problems
-   - Resource constraints
-
-#### Debugging Commands
-```bash
-# Check SSM Agent logs
-sudo tail -f /var/log/amazon/ssm/amazon-ssm-agent.log
-
-# Verify instance registration
-aws ssm describe-instance-information \
-    --filters "Key=InstanceIds,Values=i-0123456789abcdef0"
-
-# Check command execution details
-aws ssm describe-instance-information \
-    --command-id "12345678-1234-1234-1234-123456789012" \
-    --instance-id "i-0123456789abcdef0" \
-    --details
-```
-
-### Integration with Other Services
-
-#### 1. EventBridge Integration
-```json
-{
-  "source": ["aws.ssm"],
-  "detail-type": ["EC2 Command Status-change Notification"],
-  "detail": {
-    "status": ["Success", "Failed"],
-    "command-id": ["12345678-1234-1234-1234-123456789012"]
-  }
-}
-```
-
-#### 2. SNS Notifications
-```bash
-# Send command with SNS notification
-aws ssm send-command \
-    --targets "Key=tag:Environment,Values=production" \
-    --document-name "AWS-RunShellScript" \
-    --parameters 'commands=["systemctl restart application"]' \
-    --notification-config "NotificationArn=arn:aws:sns:us-east-1:123456789012:command-notifications,NotificationEvents=All,NotificationType=Command"
-```
-
-#### 3. Lambda Integration
-```python
-import boto3
-import json
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Send command to instances
-    response = ssm.send_command(
-        Targets=[
-            {
-                'Key': 'tag:Environment',
-                'Values': ['production']
-            }
-        ],
-        DocumentName='AWS-RunShellScript',
-        Parameters={
-            'commands': [
-                'systemctl status nginx',
-                'curl -f http://localhost/health || exit 1'
-            ]
-        },
-        MaxConcurrency='10',
-        MaxErrors='1'
-    )
-    
-    command_id = response['Command']['CommandId']
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'commandId': command_id,
-            'message': 'Health check command sent'
-        })
-    }
-```
-
-### Best Practices
-
-#### 1. Security
-- Use least privilege IAM policies
-- Validate input parameters in custom documents
-- Avoid hardcoding secrets in commands
-- Use Parameter Store for sensitive data
-
-#### 2. Reliability
-- Implement proper error handling
-- Use appropriate timeouts
-- Test commands on small subsets first
-- Monitor command execution status
-
-#### 3. Performance
-- Use rate control for large deployments
-- Optimize command execution time
-- Consider network bandwidth limitations
-- Use parallel execution efficiently
-
-#### 4. Monitoring
-- Set up CloudWatch alarms for failed commands
-- Use CloudWatch Logs for detailed monitoring
-- Track command execution metrics
-- Implement automated remediation
+Exam Distinctions:
+- Need interactive shell with full audit trail -> Session Manager
+- Need just remote command execution, no interactive terminal -> Run Command
+- Avoid storing SSH keys, minimize attack surface -> Session Manager
 
 ---
+## 6. Run Command
+Run ad hoc or targeted commands across a fleet using SSM Documents.
 
-## Patch Manager
+Key Concepts:
+- Command Documents: JSON/YAML (AWS- prefixed = AWS managed)
+- Targeting: Instance IDs, tags, resource groups
+- Concurrency & error thresholds (e.g., 50% concurrency, halt if >10% errors)
+- Output Options: S3 bucket + CloudWatch Logs
+- Rate control protects from widespread impact / surge on dependencies
 
-AWS Systems Manager Patch Manager automates the process of patching managed instances with security-related and other types of updates. It's a critical component for maintaining security compliance across your infrastructure.
+Use Cases:
+- Install packages, patch point issues, gather diagnostics, bootstrap
+- Multi-account operations via AWS Organizations + Delegated Admin (Explorer/Run Command cross-account)
 
-### Key Features
-- **Automated Patching**: Schedule and automate patch deployment
-- **Patch Baselines**: Define approved and rejected patches
-- **Maintenance Windows**: Control when patching occurs
-- **Compliance Reporting**: Track patch compliance across instances
-- **Cross-Platform**: Supports Windows, Linux, and macOS
-- **Integration**: Works with other Systems Manager capabilities
-
-### Patch Baselines
-
-Patch baselines define which patches should be installed on instances. AWS provides predefined baselines, and you can create custom ones.
-
-#### AWS-Managed Baselines
-
-```yaml
-# Amazon Linux 2 Default Baseline
-AWS-AmazonLinux2DefaultPatchBaseline:
-  - Security updates: Auto-approved
-  - Bugfix updates: Auto-approved
-  - Enhancement updates: Not approved
-  - Other updates: Not approved
-
-# Windows Default Baseline  
-AWS-WindowsPredefinedPatchBaseline-OS:
-  - Critical updates: Auto-approved
-  - Security updates: Auto-approved
-  - Service packs: Auto-approved
-  - Updates: Auto-approved
-  - Update rollups: Auto-approved
-```
-
-#### Custom Patch Baseline Example
-```json
-{
-    "Name": "CustomLinuxBaseline",
-    "Description": "Custom baseline for production Linux servers",
-    "OperatingSystem": "AMAZON_LINUX_2",
-    "ApprovalRules": [
-        {
-            "PatchFilterGroup": {
-                "PatchFilters": [
-                    {
-                        "Key": "CLASSIFICATION",
-                        "Values": ["Security", "Bugfix"]
-                    },
-                    {
-                        "Key": "SEVERITY",
-                        "Values": ["Critical", "Important"]
-                    }
-                ]
-            },
-            "ApproveAfterDays": 7,
-            "ComplianceLevel": "HIGH"
-        }
-    ],
-    "ApprovedPatches": [
-        "kernel-4.14.123-*"
-    ],
-    "RejectedPatches": [
-        "kernel-4.14.111-*"
-    ],
-    "Sources": [
-        {
-            "Name": "MyCustomRepo",
-            "Products": ["MyProduct"],
-            "Configuration": "baseurl=https://my-repo.example.com/linux/"
-        }
-    ]
-}
-```
-
-### Patch Groups
-
-Patch groups allow you to organize instances for different patching strategies.
-
-#### Tagging for Patch Groups
-```bash
-# Tag instances for patch groups
-aws ec2 create-tags \
-    --resources i-0123456789abcdef0 \
-    --tags Key=Patch Group,Value=ProductionServers
-
-# Associate baseline with patch group
-aws ssm register-patch-baseline-for-patch-group \
-    --baseline-id pb-0123456789abcdef0 \
-    --patch-group ProductionServers
-```
-
-#### Patch Group Strategy
-```yaml
-Development:
-  - Patch Group: "Development"
-  - Baseline: More permissive, immediate updates
-  - Schedule: Daily during business hours
-
-Staging:
-  - Patch Group: "Staging"  
-  - Baseline: Production-like, 7-day delay
-  - Schedule: Weekly, off-hours
-
-Production:
-  - Patch Group: "Production"
-  - Baseline: Conservative, 14-day delay
-  - Schedule: Monthly, maintenance window
-```
-
-### Patch Operations
-
-#### 1. Scan Operation
-Scans instances to determine which patches are missing but doesn't install them.
-
-```bash
-# Scan instances for missing patches
-aws ssm send-command \
-    --targets "Key=tag:Patch Group,Values=ProductionServers" \
-    --document-name "AWS-RunPatchBaseline" \
-    --parameters "Operation=Scan"
-```
-
-#### 2. Install Operation
-Installs approved patches on instances.
-
-```bash
-# Install patches on instances
-aws ssm send-command \
-    --targets "Key=tag:Patch Group,Values=ProductionServers" \
-    --document-name "AWS-RunPatchBaseline" \
-    --parameters "Operation=Install,RebootOption=RebootIfNeeded"
-```
-
-### Maintenance Windows Integration
-
-#### Creating a Maintenance Window for Patching
-```bash
-# Create maintenance window
-aws ssm create-maintenance-window \
-    --name "ProductionPatchingWindow" \
-    --description "Monthly patching for production servers" \
-    --duration 4 \
-    --cutoff 1 \
-    --schedule "cron(0 2 ? * SUN#3 *)" \
-    --schedule-timezone "America/New_York" \
-    --allow-unassociated-targets
-
-# Register targets
-aws ssm register-target-with-maintenance-window \
-    --window-id mw-0123456789abcdef0 \
-    --resource-type "INSTANCE" \
-    --targets "Key=tag:Patch Group,Values=ProductionServers"
-
-# Register patch task
-aws ssm register-task-with-maintenance-window \
-    --window-id mw-0123456789abcdef0 \
-    --targets "Key=WindowTargetIds,Values=12345678-1234-1234-1234-123456789012" \
-    --task-arn "AWS-RunPatchBaseline" \
-    --task-type "RUN_COMMAND" \
-    --max-concurrency "25%" \
-    --max-errors "10%" \
-    --priority 1 \
-    --task-parameters '{
-        "Operation": {
-            "Values": ["Install"]
-        },
-        "RebootOption": {
-            "Values": ["RebootIfNeeded"]
-        }
-    }'
-```
-
-### Compliance Monitoring
-
-#### Patch Compliance Dashboard
-```bash
-# Get patch compliance summary
-aws ssm describe-patch-group-state \
-    --patch-group "ProductionServers"
-
-# Get detailed compliance info
-aws ssm list-compliance-items \
-    --resource-ids i-0123456789abcdef0 \
-    --resource-types "ManagedInstance" \
-    --filters "Key=ComplianceType,Values=Patch,Type=EQUAL"
-```
-
-#### CloudWatch Metrics for Compliance
-```yaml
-Metrics:
-  - AWS/SSM-PatchCompliance/ComplianceByCriticalNonCompliantResourceCount
-  - AWS/SSM-PatchCompliance/ComplianceByPatchGroup
-  - AWS/SSM-PatchCompliance/NonCompliantInstanceCount
-```
-
-### Advanced Patching Scenarios
-
-#### 1. Blue-Green Patching Strategy
-```yaml
-Strategy:
-  Phase 1:
-    - Target: Blue environment instances
-    - Action: Patch and test
-    - Validation: Automated testing
-  
-  Phase 2:
-    - Action: Switch traffic to Blue
-    - Target: Green environment instances  
-    - Action: Patch Green instances
-  
-  Phase 3:
-    - Action: Switch traffic to Green
-    - Result: Both environments patched
-```
-
-#### 2. Rolling Patch Deployment
-```bash
-# Patch instances in batches
-aws ssm send-command \
-    --targets "Key=tag:Patch Group,Values=WebServers" \
-    --document-name "AWS-RunPatchBaseline" \
-    --parameters "Operation=Install,RebootOption=RebootIfNeeded" \
-    --max-concurrency "2" \
-    --max-errors "0"
-```
-
-#### 3. Custom Patch Repository
-```json
-{
-    "Sources": [
-        {
-            "Name": "CorporateRepository",
-            "Products": ["Enterprise Linux"],
-            "Configuration": "baseurl=https://repo.company.com/centos/7/updates/"
-        }
-    ]
-}
-```
-
-### Integration Examples
-
-#### 1. EventBridge Integration
-```json
-{
-    "source": ["aws.ssm"],
-    "detail-type": ["EC2 Command Status-change Notification"],
-    "detail": {
-        "status": ["Success", "Failed"],
-        "document-name": ["AWS-RunPatchBaseline"]
-    }
-}
-```
-
-#### 2. Lambda Function for Custom Actions
-```python
-import boto3
-import json
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Get patch compliance status
-    response = ssm.describe_instance_patch-states(
-        Filters=[
-            {
-                'Key': 'PatchGroup',
-                'Values': ['ProductionServers']
-            }
-        ]
-    )
-    
-    non_compliant_instances = []
-    for instance in response['InstancePatchStates']:
-        if instance['MissingCount'] > 0:
-            non_compliant_instances.append(instance['InstanceId'])
-    
-    if non_compliant_instances:
-        # Send notification or trigger remediation
-        sns = boto3.client('sns')
-        sns.publish(
-            TopicArn='arn:aws:sns:us-east-1:123456789012:patch-compliance',
-            Message=f'Non-compliant instances found: {non_compliant_instances}',
-            Subject='Patch Compliance Alert'
-        )
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps('Compliance check completed')
-    }
-```
-
-### Patch Manager vs Other Solutions
-
-| Feature | Patch Manager | Traditional Tools |
-|---------|---------------|-------------------|
-| **Agent Management** | SSM Agent (built-in) | Separate agent installation |
-| **Scheduling** | Maintenance Windows | Cron jobs or task scheduler |
-| **Compliance** | Built-in reporting | Custom monitoring setup |
-| **Cross-platform** | Unified interface | Platform-specific tools |
-| **AWS Integration** | Native integration | Manual integration required |
-
-### Best Practices
-
-#### 1. Baseline Management
-- Use separate baselines for different environments
-- Test patches in development first
-- Implement approval workflows for critical patches
-- Regular review and update of patch baselines
-
-#### 2. Scheduling Strategy
-- Stagger patching across availability zones
-- Use maintenance windows for controlled patching
-- Plan for extended downtime during major updates
-- Coordinate with application teams
-
-#### 3. Monitoring and Compliance
-- Set up CloudWatch alarms for compliance metrics
-- Regular compliance reporting and review
-- Automated remediation for critical vulnerabilities
-- Track patch deployment success rates
-
-#### 4. Testing and Validation
-- Implement automated testing after patching
-- Use canary deployments for critical systems
-- Validate application functionality post-patch
-- Maintain rollback procedures
+Exam Tip: For repeated desired state apply -> Use State Manager; for one-off command -> Run Command.
 
 ---
+## 7. State Manager
+Maintains and enforces desired state via Associations (document + targets + schedule).
 
-## Maintenance Windows
+Capabilities:
+- Apply patches, join domain, configure CloudWatch Agent, baseline configs
+- Re-apply if drift detected (periodic or event-based schedule like cron or rate expressions)
+- Integrates with Maintenance Windows for controlled change periods
 
-AWS Systems Manager Maintenance Windows let you define a schedule for when to perform potentially disruptive actions on your instances, such as patching, updating drivers, or installing software.
-
-### Key Concepts
-
-#### Core Components
-- **Maintenance Window**: The scheduled time frame
-- **Targets**: Resources to be acted upon  
-- **Tasks**: Actions to be performed
-- **Task Invocations**: Individual executions of tasks
-
-#### Maintenance Window States
-```yaml
-States:
-  - ENABLED: Can execute scheduled tasks
-  - DISABLED: Will not execute tasks
-  - PENDING: Waiting for first execution
-  - RUNNING: Currently executing tasks
-```
-
-### Creating Maintenance Windows
-
-#### Basic Maintenance Window
-```bash
-aws ssm create-maintenance-window \
-    --name "WeeklyMaintenance" \
-    --description "Weekly maintenance window for web servers" \
-    --duration 2 \
-    --cutoff 0 \
-    --schedule "cron(0 2 ? * SUN *)" \
-    --schedule-timezone "America/New_York" \
-    --allow-unassociated-targets
-```
-
-#### Advanced Maintenance Window Configuration
-```json
-{
-    "Name": "ProductionMaintenanceWindow",
-    "Description": "Monthly maintenance for production systems",
-    "Duration": 4,
-    "Cutoff": 1,
-    "Schedule": "cron(0 2 ? * SUN#3 *)",
-    "ScheduleTimezone": "America/New_York",
-    "StartDate": "2024-01-01T00:00:00Z",
-    "EndDate": "2024-12-31T23:59:59Z",
-    "AllowUnassociatedTargets": false,
-    "Tags": [
-        {
-            "Key": "Environment",
-            "Value": "Production"
-        },
-        {
-            "Key": "Team",
-            "Value": "Operations"
-        }
-    ]
-}
-```
-
-### Schedule Expressions
-
-#### Cron Expression Format
-```bash
-# Format: cron(minutes hours day-of-month month day-of-week year)
-
-# Every Sunday at 2 AM
-cron(0 2 ? * SUN *)
-
-# Third Sunday of every month at 2 AM  
-cron(0 2 ? * SUN#3 *)
-
-# Every day at 3 AM
-cron(0 3 * * ? *)
-
-# Every 15 minutes during business hours
-cron(0/15 9-17 ? * MON-FRI *)
-
-# Last day of every month at 11 PM
-cron(0 23 L * ? *)
-```
-
-#### Rate Expression Format
-```bash
-# Every 30 minutes
-rate(30 minutes)
-
-# Every 2 hours
-rate(2 hours)
-
-# Every 7 days
-rate(7 days)
-```
-
-### Targets Configuration
-
-#### Instance Targets
-```bash
-# Register instance targets by ID
-aws ssm register-target-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --resource-type "INSTANCE" \
-    --targets "Key=InstanceIds,Values=i-0123456789abcdef0,i-0987654321fedcba0"
-
-# Register targets by tags
-aws ssm register-target-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --resource-type "INSTANCE" \
-    --targets "Key=tag:Environment,Values=Production" \
-    --owner-information "ProductionWebServers"
-```
-
-#### Resource Group Targets
-```bash
-# Register resource group as target
-aws ssm register-target-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --resource-type "RESOURCE_GROUP" \
-    --targets "Key=resource-groups:Name,Values=WebServerGroup"
-```
-
-### Task Types and Configuration
-
-#### 1. Run Command Tasks
-```bash
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --targets "Key=WindowTargetIds,Values=12345678-1234-1234-1234-123456789012" \
-    --task-arn "AWS-RunShellScript" \
-    --task-type "RUN_COMMAND" \
-    --max-concurrency "5" \
-    --max-errors "1" \
-    --priority 1 \
-    --task-parameters '{
-        "commands": {
-            "Values": [
-                "systemctl stop nginx",
-                "yum update nginx -y", 
-                "systemctl start nginx",
-                "systemctl status nginx"
-            ]
-        },
-        "executionTimeout": {
-            "Values": ["3600"]
-        }
-    }'
-```
-
-#### 2. Automation Tasks
-```bash
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --targets "Key=WindowTargetIds,Values=12345678-1234-1234-1234-123456789012" \
-    --task-arn "AWS-RestartEC2Instance" \
-    --task-type "AUTOMATION" \
-    --max-concurrency "1" \
-    --max-errors "0" \
-    --priority 2 \
-    --task-parameters '{
-        "InstanceId": {
-            "Values": ["{{ TARGET_ID }}"]
-        },
-        "AutomationAssumeRole": {
-            "Values": ["arn:aws:iam::123456789012:role/MaintenanceWindowRole"]
-        }
-    }'
-```
-
-#### 3. Lambda Tasks
-```bash
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --task-arn "arn:aws:lambda:us-east-1:123456789012:function:MaintenanceFunction" \
-    --task-type "LAMBDA" \
-    --max-concurrency "1" \
-    --max-errors "0" \
-    --priority 3 \
-    --task-parameters '{
-        "Payload": {
-            "Values": ["{\"windowId\": \"mw-0123456789abcdef0\", \"action\": \"maintenance\"}"]
-        }
-    }'
-```
-
-#### 4. Step Functions Tasks
-```bash
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --task-arn "arn:aws:states:us-east-1:123456789012:stateMachine:MaintenanceWorkflow" \
-    --task-type "STEP_FUNCTIONS" \
-    --max-concurrency "1" \
-    --max-errors "0" \
-    --priority 4 \
-    --task-parameters '{
-        "Input": {
-            "Values": ["{\"maintenanceWindow\": \"mw-0123456789abcdef0\"}"]
-        }
-    }'
-```
-
-### Execution Control
-
-#### Concurrency and Error Handling
-```yaml
-MaxConcurrency:
-  - Absolute number: "10"
-  - Percentage: "25%"
-  
-MaxErrors:
-  - Absolute number: "2"
-  - Percentage: "10%"
-
-Priority:
-  - Range: 0-5 (0 = highest priority)
-  - Execution: Higher priority tasks run first
-```
-
-#### Task Invocation Parameters
-```json
-{
-    "TaskParameters": {
-        "commands": {
-            "Values": ["uptime", "df -h"]
-        },
-        "executionTimeout": {
-            "Values": ["1800"]
-        },
-        "workingDirectory": {
-            "Values": ["/tmp"]
-        }
-    },
-    "TaskInvocationParameters": {
-        "RunCommand": {
-            "Comment": "Weekly system health check",
-            "DocumentHash": "sha256:...",
-            "DocumentHashType": "Sha256",
-            "DocumentVersion": "1",
-            "NotificationConfig": {
-                "NotificationArn": "arn:aws:sns:us-east-1:123456789012:maintenance-notifications",
-                "NotificationEvents": ["All"],
-                "NotificationType": "Command"
-            },
-            "OutputS3BucketName": "maintenance-logs-bucket",
-            "OutputS3KeyPrefix": "command-outputs/",
-            "ServiceRoleArn": "arn:aws:iam::123456789012:role/MaintenanceWindowServiceRole",
-            "TimeoutSeconds": 3600
-        }
-    }
-}
-```
-
-### Monitoring and Logging
-
-#### Execution History
-```bash
-# Get maintenance window executions
-aws ssm describe-maintenance-window-executions \
-    --window-id "mw-0123456789abcdef0" \
-    --max-results 10
-
-# Get task execution details
-aws ssm describe-maintenance-window-execution-tasks \
-    --window-execution-id "12345678-1234-1234-1234-123456789012"
-
-# Get task invocation details
-aws ssm describe-maintenance-window-execution-task-invocations \
-    --window-execution-id "12345678-1234-1234-1234-123456789012" \
-    --task-id "87654321-4321-4321-4321-210987654321"
-```
-
-#### CloudWatch Integration
-```json
-{
-    "MetricName": "MaintenanceWindowExecutionStatus",
-    "Namespace": "AWS/SSM-MaintenanceWindow",
-    "Dimensions": [
-        {
-            "Name": "MaintenanceWindowId",
-            "Value": "mw-0123456789abcdef0"
-        }
-    ],
-    "Value": 1,
-    "Unit": "Count"
-}
-```
-
-### Real-world Use Cases
-
-#### 1. Application Deployment Window
-```yaml
-Purpose: Deploy application updates
-Schedule: Every Sunday 2 AM
-Duration: 3 hours
-Tasks:
-  1. Stop application services
-  2. Deploy new version from S3
-  3. Update configuration
-  4. Start services
-  5. Health checks
-  6. Rollback if needed
-```
-
-#### 2. Database Maintenance Window  
-```yaml
-Purpose: Database optimization and backup
-Schedule: First Sunday of month 3 AM
-Duration: 4 hours
-Tasks:
-  1. Create database snapshot
-  2. Run VACUUM/ANALYZE operations
-  3. Update statistics
-  4. Clean up old log files
-  5. Performance tuning
-```
-
-#### 3. Security Patching Window
-```yaml
-Purpose: Apply security patches
-Schedule: Second Tuesday of month (Patch Tuesday + 1 week)
-Duration: 6 hours
-Tasks:
-  1. Scan for available patches
-  2. Apply security patches
-  3. Reboot if required
-  4. Verify services
-  5. Update compliance status
-```
-
-### Advanced Scenarios
-
-#### Multi-Phase Maintenance
-```bash
-# Phase 1: Pre-maintenance checks
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --task-arn "AWS-RunShellScript" \
-    --task-type "RUN_COMMAND" \
-    --priority 1 \
-    --task-parameters '{
-        "commands": {
-            "Values": [
-                "systemctl status application",
-                "df -h",
-                "free -m",
-                "uptime"
-            ]
-        }
-    }'
-
-# Phase 2: Actual maintenance
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --task-arn "CustomMaintenanceDocument" \
-    --task-type "RUN_COMMAND" \
-    --priority 2 \
-    --task-parameters '{
-        "operation": {
-            "Values": ["update-application"]
-        }
-    }'
-
-# Phase 3: Post-maintenance validation
-aws ssm register-task-with-maintenance-window \
-    --window-id "mw-0123456789abcdef0" \
-    --task-arn "AWS-RunShellScript" \
-    --task-type "RUN_COMMAND" \
-    --priority 3 \
-    --task-parameters '{
-        "commands": {
-            "Values": [
-                "curl -f http://localhost/health",
-                "systemctl status application"
-            ]
-        }
-    }'
-```
-
-### Best Practices
-
-#### 1. Planning and Design
-- Plan maintenance windows during low-traffic periods
-- Coordinate with application teams and stakeholders
-- Document maintenance procedures and rollback plans
-- Test maintenance tasks in non-production environments
-
-#### 2. Target Organization
-- Use consistent tagging strategies for target selection
-- Group similar resources for maintenance
-- Consider dependencies between resources
-- Plan for rolling maintenance across availability zones
-
-#### 3. Error Handling
-- Set appropriate concurrency and error thresholds
-- Implement proper error notification
-- Design idempotent maintenance tasks
-- Plan for partial failure scenarios
-
-#### 4. Security
-- Use least privilege IAM roles
-- Secure maintenance scripts and documents
-- Audit maintenance window activities
-- Encrypt sensitive maintenance data
-
-#### 5. Monitoring
-- Monitor maintenance window execution status
-- Set up alerts for failed maintenance tasks
-- Track maintenance window performance metrics
-- Regular review of maintenance outcomes
+Exam Scenario: Guarantee antivirus definitions installed daily across all prod Windows instances -> State Manager association with schedule.
 
 ---
+## 8. Patch Manager
+Automates OS and software patching.
 
-## Automation
+Key Elements:
+- Patch Baseline: Approve/Reject patches by classification (Security/Critical/Important), severity, product, auto-approval delays
+- Predefined Baselines: AWS provided (e.g., for Amazon Linux, Windows)
+- Custom Baselines: Tailor to compliance requirements
+- Patch Groups: Tag instances with `Patch Group=Prod` to map to baseline
+- Maintenance Windows: Execute patch operations in approved window
+- Compliance Reporting: View patch compliance state (COMPLIANT/NON_COMPLIANT)
 
-AWS Systems Manager Automation simplifies complex infrastructure management tasks by using predefined workflows called automation documents. It enables you to automate routine maintenance, deployment, and troubleshooting tasks at scale.
+Workflow:
+1. Tag instances with Patch Group
+2. Associate baseline (auto or explicit)
+3. Schedule patching via Maintenance Window or Automation
+4. Review compliance in Explorer / Compliance dashboard
 
-### Key Features
-- **Pre-built Documents**: AWS-provided automation workflows
-- **Custom Documents**: Create custom automation workflows
-- **Multi-step Workflows**: Complex orchestration with error handling
-- **Cross-service Integration**: Integrate with other AWS services
-- **Approval Gates**: Human approval steps in workflows
-- **Rate Control**: Control execution speed across resources
+Exam Distinctions:
+- Need to patch only security patches within 3 days: Use auto-approval + delay + maintenance window
+- Need compliance reports for auditors: Patch Manager + Compliance + AWS Config (advanced)
 
-### Automation Documents
+---
+## 9. Maintenance Windows
+Define recurring windows for safe operations.
+- Register tasks: Run Command, Automation, Lambda, Step Functions
+- Control: Max concurrency + error threshold
+- Ensure operational tasks don’t run outside approved times (governance)
 
-#### Document Structure
-```yaml
-schemaVersion: "0.3"
-description: "Custom automation document example"
-assumeRole: "{{ AutomationAssumeRole }}"
-parameters:
-  InstanceId:
-    type: String
-    description: "ID of the EC2 instance"
-  AutomationAssumeRole:
-    type: String
-    description: "IAM role for automation execution"
-    default: ""
+Exam Tip: Use with Patch Manager and State Manager to ensure changes happen during low-impact time.
 
-mainSteps:
-- name: "stopInstance" 
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "ec2"
-    Api: "StopInstances"
-    InstanceIds:
-    - "{{ InstanceId }}"
-  
-- name: "waitForInstanceStopped"
-  action: "aws:waitForAwsResourceProperty"
-  inputs:
-    Service: "ec2"
-    Api: "DescribeInstances"
-    InstanceIds:
-    - "{{ InstanceId }}"
-    PropertySelector: "$.Reservations[0].Instances[0].State.Name"
-    DesiredValues:
-    - "stopped"
+---
+## 10. Automation (Runbooks)
+Automates multi-step operations and remediation.
+
+Runbook Types:
+- AWS managed (`AWS-CreateImage`, `AWS-RestartEC2Instance`)
+- Community
+- Custom (YAML/JSON with steps: `aws:runCommand`, `aws:invokeLambda`, `aws:createImage`, branching, approvals)
+
+Features:
+- Parameters & outputs (can feed into other workflows)
+- Approval steps (`aws:approve`) with SNS notifications
+- Rate control & concurrency
+- Integration: EventBridge rule triggers automation on event (e.g., CloudWatch alarm -> restart)
+- Automation execution role vs target instance role separation
+
+Use Cases:
+- Golden AMI pipeline (update, harden, test, create AMI, tag, distribute)
+- Self-healing remediation (e.g., high memory -> restart service)
+- Compliance enforcement (ensure specific agent installed)
+
+Exam Scenario: Need standardized, auditable AMI creation -> SSM Automation Runbook `AWS-UpdateLinuxAmi` or custom chain.
+
+---
+## 11. Change Manager
+Provides change request lifecycle (plan, approve, implement) integrated with Automation.
+- Change Templates define required parameters, approvals
+- Change Requests implemented via runbooks
+- Supports standard vs emergency changes
+- Audit trail preserved
+
+Exam Tip: For controlled, auditable operational change with approvals, pick Change Manager (not just a runbook alone).
+
+---
+## 12. OpsCenter & OpsItems
+Central place to view, investigate, and remediate operational issues.
+- OpsItems include contextual data: related CloudWatch alarms, Config changes, logs, events
+- Can attach automation runbooks for remediation
+- Prioritize with severity; integrate with ChatOps or ticketing
+
+Exam Angle: Provide unified operations dashboard for multiple accounts -> Systems Manager Explorer + OpsCenter.
+
+---
+## 13. Explorer
+Aggregated operations + compliance view across accounts/regions.
+- Supports AWS Organizations delegated admin
+- Surfaces patch compliance, inventory coverage, OpsItems
+- Tag-based filtering for business context
+
+---
+## 14. Inventory & Compliance
+Inventory:
+- Collect metadata: Installed applications, network configs, services, registry (Windows), files
+- Query via `ListInventoryEntries` or integrate with Athena (store in S3)
+- Use tags + resource data sync
+
+Compliance:
+- Central view of patch, association (State Manager), custom compliance items
+- Extend with custom items via `PutComplianceItems`
+
+Exam Scenario: Need to track all installed versions of Log4j across fleet -> Inventory + Athena queries.
+
+---
+## 15. Distributor
+Package management for distributing & updating software packages.
+- Store versioned installers
+- Control access with IAM
+- Deploy via State Manager association or Run Command
+
+Exam Use Case: Roll out internal security agent across hybrid fleet -> Distributor + State Manager.
+
+---
+## 16. AppConfig (Related Service Integration)
+Though not strictly part of SSM core exam domain, know difference:
+- AppConfig used for feature flagging, progressive config rollout, validation
+- Parameter Store or Secrets Manager is the backing store for config values
+- Exam Distinction: If safe deployment of dynamic configuration with rollback needed -> AppConfig
+
+---
+## 17. Security, IAM, and Logging
+IAM Roles:
+- Instance profile: grants SSM agent permissions (SSM, EC2Messages, SSMMessages, Logs, S3, KMS)
+- Session initiation: User/role must have `ssm:StartSession` + resource-level constraints
+- Parameter Store access: path scoping & KMS key permissions
+
+Network:
+- Prefer VPC Endpoints for private access (Interface endpoints); reduces need for NAT/Internet
+- Required endpoints: `com.amazonaws.region.ssm`, `ec2messages`, `ssmmessages`; plus `logs`, `s3`, `kms` depending on features
+
+Encryption:
+- KMS for SecureString and session data logs encryption
+- S3 bucket encryption for logs/artifacts
+
+Auditing:
+- CloudTrail logs API interactions
+- Session logs to CW Logs / S3; command history kept
+
+Least Privilege Strategy:
+- Separate automation execution role from resource target roles
+- Use condition keys: `ssm:resourceTag/Environment`, `ssm:SessionDocumentAccessCheck`
+
+---
+## 18. Multi-Account & Governance
+Patterns:
+- Use AWS Organizations + Delegated Administrator for Systems Manager centralization
+- Resource Data Sync to central S3 bucket for inventory & compliance aggregation
+- Service Control Policies to restrict high-risk docs or session types
+- Tagging standards for environment, cost center, compliance scope
+
+Exam Scenario: Central ops team needs aggregated patch compliance for all prod accounts -> Resource Data Sync + Explorer.
+
+---
+## 19. Pricing Considerations (High-Level)
+- Most core features (Run Command, Session Manager, Parameter Store Standard tier) are no additional cost
+- Advanced Parameter Store incurs charges (higher throughput, larger size, policies)
+- Automation: Standard vs Premium steps (Premium = charged; approvals, 3rd-party, some integrations). Associate exam should know concept, not exact price
+- AppConfig, OpsCenter advanced usage, and some integrations may incur charges
+
+Exam Tip: If asked how to avoid new costs for config storage -> Use Standard Parameters if under limits.
+
+---
+## 20. Comparing Similar Services (Exam Differentiators)
+| Need | Choose |
+|------|--------|
+| Replace bastion host, record shell | Session Manager |
+| Execute one-time fleet command | Run Command |
+| Enforce recurring state (agent installed) | State Manager |
+| Multi-step remediation with approvals | Automation Runbook + Approval Step |
+| Patch OS monthly with compliance | Patch Manager + Maintenance Window |
+| Store encrypted small config values | Parameter Store SecureString |
+| Auto-rotate database secrets | Secrets Manager |
+| Progressive config rollout & validation | AppConfig |
+| Create golden AMI pipeline | SSM Automation |
+| Centralize ops issues | OpsCenter |
+| Governance & change approvals | Change Manager |
+
+---
+## 21. Common Exam Scenarios & Solutions
+1. Scenario: Need secure remote access to EC2 in private subnets without opening ports. Solution: Session Manager with proper IAM; optionally port forwarding.
+2. Scenario: Standardize patching across 500 Linux instances with reports. Solution: Patch Manager + Patch Baseline + Patch Group tags + Maintenance Window + Explorer.
+3. Scenario: Automatically remediate stopped critical service. Solution: CloudWatch Alarm -> EventBridge -> Automation Runbook (restart service) or Lambda.
+4. Scenario: Enforce specific antivirus config daily. Solution: State Manager association.
+5. Scenario: Provide centralized view of inventory and patch compliance across accounts. Solution: Resource Data Sync + Explorer.
+6. Scenario: Securely store API keys, rarely rotated, accessible by Lambda. Solution: Parameter Store SecureString.
+7. Scenario: Need approval before applying infrastructure change script. Solution: Automation Runbook with `aws:approve` step or Change Manager template.
+8. Scenario: Roll out internal security agent to all hybrid nodes. Solution: Distributor + State Manager.
+9. Scenario: Build hardened AMI monthly automatically. Solution: Automation runbook chain (patch, scan, test, create image, tag).
+10. Scenario: Limit command execution to only instances tagged Environment=Prod. Solution: IAM policy with condition on `ssm:resourceTag/Environment`.
+
+---
+## 22. Hands-On Example Snippets
+### 22.1 Creating a Secure String Parameter (CLI)
+```
+aws ssm put-parameter \
+	--name /myapp/prod/db/password \
+	--type SecureString \
+	--value 'SuperSecret!' \
+	--key-id alias/my-kms-key \
+	--overwrite
 ```
 
-#### AWS-Managed Automation Documents
-```yaml
-Common Documents:
-  - AWS-RestartEC2Instance: Restart EC2 instances
-  - AWS-StopEC2Instance: Stop EC2 instances  
-  - AWS-CreateImage: Create AMI from instance
-  - AWS-CopySnapshot: Copy EBS snapshots
-  - AWS-DeleteSnapshot: Delete EBS snapshots
-  - AWS-UpdateLinuxAmi: Update Linux AMI
-  - AWS-UpdateWindowsAmi: Update Windows AMI
-  - AWS-SetupInventory: Configure inventory collection
-  - AWS-ConfigureS3BucketLogging: Enable S3 logging
-  - AWS-PublishSNSNotification: Send SNS notifications
+### 22.2 Starting a Session
+```
+aws ssm start-session --target i-0123456789abcdef0
 ```
 
-### Automation Actions
-
-#### 1. aws:executeAwsApi
-Execute any AWS API operation.
-```yaml
-- name: "createSnapshot"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "ec2"
-    Api: "CreateSnapshot"
-    VolumeId: "{{ VolumeId }}"
-    Description: "Automated snapshot - {{ global:DATE_TIME }}"
-  outputs:
-  - Name: "SnapshotId"
-    Selector: "$.SnapshotId"
-    Type: "String"
+### 22.3 Run Command Across Tag Group
+```
+aws ssm send-command \
+	--document-name AWS-RunShellScript \
+	--targets Key=tag:Role,Values=WebServer \
+	--parameters commands='yum install -y amazon-cloudwatch-agent' \
+	--comment "Install CW Agent" \
+	--region us-east-1
 ```
 
-#### 2. aws:executeScript
-Execute Python or PowerShell scripts.
-```yaml
-- name: "processData"
-  action: "aws:executeScript"
-  inputs:
-    Runtime: "python3.8"
-    Handler: "script_handler"
-    Script: |
-      def script_handler(events, context):
-          import boto3
-          ec2 = boto3.client('ec2')
-          instances = ec2.describe_instances()
-          return {'instanceCount': len(instances['Reservations'])}
-  outputs:
-  - Name: "instanceCount"
-    Selector: "$.Payload.instanceCount"
-    Type: "Integer"
+### 22.4 Sample Automation Execution (Start EC2 Instance)
 ```
-
-#### 3. aws:executeStateMachine
-Execute AWS Step Functions state machines.
-```yaml
-- name: "executeWorkflow"
-  action: "aws:executeStateMachine"
-  inputs:
-    stateMachineArn: "arn:aws:states:us-east-1:123456789012:stateMachine:ProcessingWorkflow"
-    input: |
-      {
-        "inputData": "{{ inputParameter }}"
-      }
-```
-
-#### 4. aws:approve
-Add manual approval steps.
-```yaml
-- name: "approveProduction"
-  action: "aws:approve"
-  inputs:
-    NotificationArn: "arn:aws:sns:us-east-1:123456789012:approval-topic"
-    Message: "Approve production deployment?"
-    MinRequiredApprovals: 2
-    Approvers:
-    - "arn:aws:iam::123456789012:user/manager1"
-    - "arn:aws:iam::123456789012:user/manager2"
-```
-
-#### 5. aws:branch
-Conditional branching based on input values.
-```yaml
-- name: "checkEnvironment"
-  action: "aws:branch"
-  inputs:
-    Choices:
-    - Variable: "{{ Environment }}"
-      StringEquals: "production"
-      NextStep: "productionDeployment"
-    - Variable: "{{ Environment }}"
-      StringEquals: "staging"  
-      NextStep: "stagingDeployment"
-    Default: "developmentDeployment"
-```
-
-### Execution Modes
-
-#### 1. Simple Execution
-Execute automation on a single resource or set of parameters.
-```bash
 aws ssm start-automation-execution \
-    --document-name "AWS-RestartEC2Instance" \
-    --parameters "InstanceId=i-0123456789abcdef0,AutomationAssumeRole=arn:aws:iam::123456789012:role/AutomationRole"
+	--document-name AWS-StartEC2Instance \
+	--parameters InstanceId=i-0123456789abcdef0
 ```
 
-#### 2. Rate Control Execution
-Execute automation across multiple targets with rate control.
-```bash
-aws ssm start-automation-execution \
-    --document-name "AWS-RestartEC2Instance" \
-    --parameters "AutomationAssumeRole=arn:aws:iam::123456789012:role/AutomationRole" \
-    --targets "Key=tag:Environment,Values=production" \
-    --max-concurrency "25%" \
-    --max-errors "10%"
+### 22.5 Maintenance Window Creation
 ```
-
-### Real-world Automation Examples
-
-#### 1. Automated AMI Creation and Cleanup
-```yaml
-schemaVersion: "0.3"
-description: "Create AMI and clean up old AMIs"
-assumeRole: "{{ AutomationAssumeRole }}"
-parameters:
-  InstanceId:
-    type: String
-  RetentionDays:
-    type: String
-    default: "30"
-    
-mainSteps:
-- name: "createAMI"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "ec2"
-    Api: "CreateImage"
-    InstanceId: "{{ InstanceId }}"
-    Name: "AutomatedAMI-{{ global:DATE_TIME }}"
-    Description: "Automated AMI creation"
-    NoReboot: true
-  outputs:
-  - Name: "ImageId"
-    Selector: "$.ImageId"
-    Type: "String"
-
-- name: "waitForAMI"
-  action: "aws:waitForAwsResourceProperty"
-  inputs:
-    Service: "ec2"
-    Api: "DescribeImages"
-    ImageIds:
-    - "{{ createAMI.ImageId }}"
-    PropertySelector: "$.Images[0].State"
-    DesiredValues:
-    - "available"
-
-- name: "cleanupOldAMIs"
-  action: "aws:executeScript"
-  inputs:
-    Runtime: "python3.8"
-    Handler: "cleanup_amis"
-    Script: |
-      def cleanup_amis(events, context):
-          import boto3
-          from datetime import datetime, timedelta
-          
-          ec2 = boto3.client('ec2')
-          retention_days = int(events['RetentionDays'])
-          cutoff_date = datetime.now() - timedelta(days=retention_days)
-          
-          images = ec2.describe_images(Owners=['self'])
-          deleted_amis = []
-          
-          for image in images['Images']:
-              creation_date = datetime.strptime(image['CreationDate'], '%Y-%m-%dT%H:%M:%S.%fZ')
-              if creation_date < cutoff_date and 'AutomatedAMI' in image['Name']:
-                  try:
-                      ec2.deregister_image(ImageId=image['ImageId'])
-                      deleted_amis.append(image['ImageId'])
-                  except Exception as e:
-                      print(f"Error deleting {image['ImageId']}: {e}")
-          
-          return {'deletedAMIs': deleted_amis}
-    InputPayload:
-      RetentionDays: "{{ RetentionDays }}"
+aws ssm create-maintenance-window \
+	--name "MonthlyPatch" \
+	--schedule "cron(0 5 ? * SUN#1 *)" \
+	--duration 4 \
+	--cutoff 1 \
+	--allow-unassociated-targets
 ```
-
-#### 2. Automated Disaster Recovery Failover
-```yaml
-schemaVersion: "0.3"
-description: "Automated disaster recovery failover"
-assumeRole: "{{ AutomationAssumeRole }}"
-parameters:
-  PrimaryRegion:
-    type: String
-    default: "us-east-1"
-  SecondaryRegion:
-    type: String
-    default: "us-west-2"
-    
-mainSteps:
-- name: "checkPrimaryHealth"
-  action: "aws:executeScript"
-  inputs:
-    Runtime: "python3.8"
-    Handler: "health_check"
-    Script: |
-      def health_check(events, context):
-          import boto3
-          import requests
-          
-          # Check application health endpoint
-          try:
-              response = requests.get('https://app.example.com/health', timeout=10)
-              return {'healthy': response.status_code == 200}
-          except:
-              return {'healthy': False}
-  outputs:
-  - Name: "isHealthy"
-    Selector: "$.Payload.healthy"
-    Type: "Boolean"
-
-- name: "initiateFailover"
-  action: "aws:branch"
-  inputs:
-    Choices:
-    - Variable: "{{ checkPrimaryHealth.isHealthy }}"
-      BooleanEquals: false
-      NextStep: "failoverToSecondary"
-    Default: "noFailoverNeeded"
-
-- name: "failoverToSecondary"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "route53"
-    Api: "ChangeResourceRecordSets"
-    HostedZoneId: "Z123456789"
-    ChangeBatch:
-      Changes:
-      - Action: "UPSERT"
-        ResourceRecordSet:
-          Name: "app.example.com"
-          Type: "CNAME"
-          TTL: 60
-          ResourceRecords:
-          - Value: "app-dr.example.com"
-
-- name: "noFailoverNeeded"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "sns"
-    Api: "Publish"
-    TopicArn: "arn:aws:sns:us-east-1:123456789012:alerts"
-    Message: "Health check passed - no failover needed"
-```
-
-#### 3. Automated Security Group Remediation
-```yaml
-schemaVersion: "0.3"
-description: "Remove insecure security group rules"
-assumeRole: "{{ AutomationAssumeRole }}"
-parameters:
-  SecurityGroupId:
-    type: String
-    
-mainSteps:
-- name: "analyzeSecurityGroup"
-  action: "aws:executeScript"
-  inputs:
-    Runtime: "python3.8"
-    Handler: "analyze_sg"
-    Script: |
-      def analyze_sg(events, context):
-          import boto3
-          
-          ec2 = boto3.client('ec2')
-          sg_id = events['SecurityGroupId']
-          
-          response = ec2.describe_security_groups(GroupIds=[sg_id])
-          sg = response['SecurityGroups'][0]
-          
-          insecure_rules = []
-          for rule in sg['IpPermissions']:
-              for ip_range in rule.get('IpRanges', []):
-                  if ip_range.get('CidrIp') == '0.0.0.0/0':
-                      insecure_rules.append({
-                          'IpProtocol': rule['IpProtocol'],
-                          'FromPort': rule.get('FromPort', 0),
-                          'ToPort': rule.get('ToPort', 0),
-                          'CidrIp': '0.0.0.0/0'
-                      })
-          
-          return {'insecureRules': insecure_rules}
-    InputPayload:
-      SecurityGroupId: "{{ SecurityGroupId }}"
-  outputs:
-  - Name: "insecureRules"
-    Selector: "$.Payload.insecureRules"
-    Type: "StringList"
-
-- name: "removeInsecureRules"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "ec2"
-    Api: "RevokeSecurityGroupIngress"
-    GroupId: "{{ SecurityGroupId }}"
-    IpPermissions: "{{ analyzeSecurityGroup.insecureRules }}"
-  isEnd: false
-  onFailure: "Continue"
-
-- name: "notifyRemediation"
-  action: "aws:executeAwsApi"
-  inputs:
-    Service: "sns"
-    Api: "Publish"
-    TopicArn: "arn:aws:sns:us-east-1:123456789012:security-alerts"
-    Message: "Removed insecure rules from security group {{ SecurityGroupId }}"
-```
-
-### Integration with Other Services
-
-#### 1. EventBridge Integration
-```json
-{
-  "Rules": [
-    {
-      "Name": "AutomateOnEC2StateChange",
-      "EventPattern": {
-        "source": ["aws.ec2"],
-        "detail-type": ["EC2 Instance State-change Notification"],
-        "detail": {
-          "state": ["terminated"]
-        }
-      },
-      "Targets": [
-        {
-          "Id": "1",
-          "Arn": "arn:aws:ssm:us-east-1:123456789012:automation-definition/CleanupResources",
-          "InputTransformer": {
-            "InputPathsMap": {
-              "instance": "$.detail.instance-id"
-            },
-            "InputTemplate": "{\"InstanceId\": \"<instance>\"}"
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-#### 2. Lambda Integration
-```python
-import boto3
-import json
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Start automation execution
-    response = ssm.start_automation_execution(
-        DocumentName='CustomMaintenanceAutomation',
-        Parameters={
-            'InstanceId': ['i-0123456789abcdef0'],
-            'AutomationAssumeRole': ['arn:aws:iam::123456789012:role/AutomationRole']
-        }
-    )
-    
-    execution_id = response['AutomationExecutionId']
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'executionId': execution_id,
-            'message': 'Automation started successfully'
-        })
-    }
-```
-
-### Monitoring and Troubleshooting
-
-#### Execution Status Monitoring
-```bash
-# Get automation execution status
-aws ssm describe-automation-executions \
-    --filters "Key=DocumentName,Values=AWS-RestartEC2Instance"
-
-# Get execution details
-aws ssm get-automation-execution \
-    --automation-execution-id "12345678-1234-1234-1234-123456789012"
-
-# Get step execution details
-aws ssm describe-automation-step-executions \
-    --automation-execution-id "12345678-1234-1234-1234-123456789012"
-```
-
-#### CloudWatch Metrics
-```yaml
-Automation Metrics:
-  - AWS/SSM-RunCommand/CommandsSucceeded
-  - AWS/SSM-RunCommand/CommandsFailed
-  - AWS/SSM-RunCommand/CommandsTimedOut
-  - AWS/SSM-RunCommand/CommandsCancelled
-```
-
-### Best Practices
-
-#### 1. Document Design
-- Use descriptive names and documentation
-- Implement proper error handling
-- Add validation steps
-- Use parameters for flexibility
-
-#### 2. Security
-- Use least privilege IAM roles
-- Validate input parameters
-- Audit automation executions
-- Encrypt sensitive data
-
-#### 3. Testing
-- Test automations in non-production environments
-- Use simulation mode when available
-- Implement rollback procedures
-- Monitor execution metrics
-
-#### 4. Operations
-- Use tags for organization
-- Implement approval gates for critical operations
-- Monitor automation performance
-- Regular review and optimization
 
 ---
-
-## Inventory
-
-AWS Systems Manager Inventory collects metadata from your managed instances about installed applications, AWS components, instance details, network configurations, and Windows updates.
-
-### Key Features
-- **Automated Collection**: Gather system metadata automatically
-- **Customizable**: Configure what data to collect
-- **Searchable**: Query inventory data across instances
-- **Compliance**: Track software inventory for compliance
-- **Integration**: Works with other Systems Manager capabilities
-
-### Inventory Types
-
-#### Built-in Inventory Types
-```yaml
-AWS:Application:
-  - Name: Installed applications
-  - Data: Application name, version, publisher, install date
-  - Platforms: Windows, Linux, macOS
-
-AWS:AWSComponent:
-  - Name: AWS agent information
-  - Data: SSM Agent, CloudWatch agent, Inspector agent
-  - Platforms: All
-
-AWS:File:
-  - Name: File information
-  - Data: File path, size, creation date, checksum
-  - Platforms: All (configurable paths)
-
-AWS:Network:
-  - Name: Network configuration
-  - Data: IP addresses, MAC addresses, DNS, gateways
-  - Platforms: All
-
-AWS:WindowsUpdate:
-  - Name: Windows update information
-  - Data: Update ID, title, install date, classification
-  - Platforms: Windows only
-
-AWS:InstanceInformation:
-  - Name: Instance details
-  - Data: Instance ID, type, platform, IP addresses
-  - Platforms: All
-
-AWS:Service:
-  - Name: Service information  
-  - Data: Service name, status, start type
-  - Platforms: Windows
-
-AWS:Registry:
-  - Name: Windows registry information
-  - Data: Registry key paths and values
-  - Platforms: Windows only
-
-AWS:ComplianceItem:
-  - Name: Compliance status
-  - Data: Compliance type, status, severity
-  - Platforms: All
-```
-
-### Configuring Inventory Collection
-
-#### Basic Inventory Setup
-```bash
-# Associate inventory collection with instances
-aws ssm put-inventory \
-    --instance-id "i-0123456789abcdef0" \
-    --items file://inventory-items.json
-```
-
-#### Inventory Items Configuration
-```json
-[
-  {
-    "TypeName": "AWS:Application",
-    "SchemaVersion": "1.1",
-    "CaptureTime": "2024-01-15T10:30:00Z"
-  },
-  {
-    "TypeName": "AWS:File",
-    "SchemaVersion": "1.1", 
-    "CaptureTime": "2024-01-15T10:30:00Z",
-    "Context": {
-      "Path": "/etc",
-      "Pattern": "*",
-      "Recursive": true,
-      "DirScanLimit": 1000,
-      "FileScanLimit": 500
-    }
-  },
-  {
-    "TypeName": "AWS:Network",
-    "SchemaVersion": "1.1",
-    "CaptureTime": "2024-01-15T10:30:00Z"
-  }
-]
-```
-
-#### State Manager Association for Inventory
-```bash
-aws ssm create-association \
-    --name "AWS-GatherSoftwareInventory" \
-    --targets "Key=tag:Environment,Values=production" \
-    --schedule-expression "rate(1 day)" \
-    --association-name "DailyInventoryCollection" \
-    --parameters '{
-        "applications": ["Enabled"],
-        "awsComponents": ["Enabled"],
-        "networkConfig": ["Enabled"],
-        "windowsUpdates": ["Enabled"],
-        "instanceDetailedInformation": ["Enabled"],
-        "customInventory": ["Enabled"]
-    }'
-```
-
-### Custom Inventory Types
-
-#### Creating Custom Inventory
-```json
-{
-  "TypeName": "Custom:DatabaseInfo",
-  "SchemaVersion": "1.0",
-  "Content": [
-    {
-      "Name": "PostgreSQL",
-      "Version": "13.7",
-      "Status": "Running",
-      "Port": "5432",
-      "DataDirectory": "/var/lib/postgresql/13/main",
-      "ConfigFile": "/etc/postgresql/13/main/postgresql.conf"
-    },
-    {
-      "Name": "Redis",
-      "Version": "6.2.7",
-      "Status": "Running", 
-      "Port": "6379",
-      "ConfigFile": "/etc/redis/redis.conf"
-    }
-  ]
-}
-```
-
-#### Custom Inventory Collection Script
-```bash
-#!/bin/bash
-# Custom inventory collection script
-
-# Collect database information
-collect_database_info() {
-    local db_info='[]'
-    
-    # Check PostgreSQL
-    if systemctl is-active --quiet postgresql; then
-        version=$(postgres --version | awk '{print $3}')
-        db_info=$(echo "$db_info" | jq '. += [{
-            "Name": "PostgreSQL",
-            "Version": "'$version'",
-            "Status": "Running",
-            "Port": "5432"
-        }]')
-    fi
-    
-    # Check Redis
-    if systemctl is-active --quiet redis; then
-        version=$(redis-server --version | awk '{print $3}' | cut -d'=' -f2)
-        db_info=$(echo "$db_info" | jq '. += [{
-            "Name": "Redis", 
-            "Version": "'$version'",
-            "Status": "Running",
-            "Port": "6379"
-        }]')
-    fi
-    
-    echo "$db_info"
-}
-
-# Send custom inventory to Systems Manager
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-DATABASE_INFO=$(collect_database_info)
-
-aws ssm put-inventory \
-    --instance-id "$INSTANCE_ID" \
-    --items '[{
-        "TypeName": "Custom:DatabaseInfo",
-        "SchemaVersion": "1.0",
-        "CaptureTime": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
-        "Content": '$DATABASE_INFO'
-    }]'
-```
-
-### Querying Inventory Data
-
-#### Using AWS CLI
-```bash
-# Get inventory for specific instance
-aws ssm list-inventory-entries \
-    --instance-id "i-0123456789abcdef0" \
-    --type-name "AWS:Application" \
-    --max-results 50
-
-# Get inventory summary
-aws ssm get-inventory-schema \
-    --type-name "AWS:Application"
-
-# Query across multiple instances
-aws ssm get-inventory \
-    --filters "Key=AWS:InstanceInformation.InstanceStatus,Values=Active,Type=Equal" \
-    --result-attributes "AWS:Application.Name,AWS:Application.Version"
-```
-
-#### Resource Data Sync
-```bash
-# Create resource data sync for centralized querying
-aws ssm create-resource-data-sync \
-    --sync-name "InventoryDataSync" \
-    --s3-destination '{
-        "BucketName": "inventory-data-bucket",
-        "Prefix": "inventory-data/",
-        "SyncFormat": "JsonSerDe",
-        "Region": "us-east-1"
-    }'
-```
-
-### Inventory Analytics
-
-#### Amazon Athena Integration
-```sql
--- Query inventory data in S3 using Athena
-CREATE EXTERNAL TABLE inventory_applications (
-  instanceid string,
-  name string,
-  version string,
-  publisher string,
-  installdate string
-)
-STORED AS SERDE 'org.openx.data.jsonserde.JsonSerDe'
-LOCATION 's3://inventory-data-bucket/inventory-data/AWS:Application/'
-
--- Find instances with specific software
-SELECT instanceid, name, version 
-FROM inventory_applications 
-WHERE name LIKE '%Java%'
-
--- Count software installations
-SELECT name, COUNT(*) as instance_count
-FROM inventory_applications 
-GROUP BY name 
-ORDER BY instance_count DESC
-```
-
-#### AWS Config Integration
-```yaml
-Config Rules for Inventory:
-  - required-software-installed: Check if required software is installed
-  - approved-software-only: Ensure only approved software is installed
-  - software-version-compliance: Check software version compliance
-```
-
-### Compliance and Reporting
-
-#### Compliance Dashboard Queries
-```bash
-# Get compliance summary
-aws ssm list-compliance-items \
-    --resource-ids "i-0123456789abcdef0" \
-    --resource-types "ManagedInstance" \
-    --filters "Key=ComplianceType,Values=Association,Type=EQUAL"
-
-# Get compliance summary by patch group
-aws ssm list-compliance-summary-by-compliance-type \
-    --compliance-type "Patch"
-```
-
-#### Custom Compliance Rules
-```json
-{
-  "ComplianceType": "Custom:SecurityCompliance",
-  "ResourceType": "ManagedInstance", 
-  "ResourceId": "i-0123456789abcdef0",
-  "ComplianceStatus": "COMPLIANT",
-  "ExecutionSummary": {
-    "ExecutionTime": "2024-01-15T10:30:00Z",
-    "ExecutionId": "12345678-1234-1234-1234-123456789012",
-    "ExecutionType": "Command"
-  },
-  "Items": [
-    {
-      "ComplianceType": "Custom:SecurityCompliance",
-      "Status": "COMPLIANT",
-      "Severity": "HIGH",
-      "Title": "Antivirus Software Check",
-      "Details": {
-        "AntivirusName": "ClamAV",
-        "Version": "0.103.6",
-        "LastUpdate": "2024-01-15T09:00:00Z"
-      }
-    }
-  ]
-}
-```
-
-### Use Cases
-
-#### 1. Software License Management
-```bash
-# Track licensed software installations
-aws ssm get-inventory \
-    --filters "Key=AWS:Application.Name,Values=Microsoft Office,Adobe,Oracle,Type=Equal" \
-    --result-attributes "AWS:Application.Name,AWS:Application.Version,AWS:InstanceInformation.InstanceId"
-```
-
-#### 2. Security Compliance
-```python
-import boto3
-import json
-
-def check_security_compliance(instance_ids):
-    ssm = boto3.client('ssm')
-    compliance_results = []
-    
-    for instance_id in instance_ids:
-        # Get application inventory
-        response = ssm.list_inventory_entries(
-            InstanceId=instance_id,
-            TypeName='AWS:Application'
-        )
-        
-        applications = [entry['Name'] for entry in response['Entries']]
-        
-        # Check for security tools
-        security_tools = ['ClamAV', 'Nessus', 'OSSEC']
-        installed_tools = [tool for tool in security_tools if tool in applications]
-        
-        compliance_results.append({
-            'InstanceId': instance_id,
-            'SecurityTools': installed_tools,
-            'Compliant': len(installed_tools) >= 2
-        })
-    
-    return compliance_results
-```
-
-#### 3. Patch Compliance Tracking
-```bash
-# Check Windows update status
-aws ssm list-inventory-entries \
-    --instance-id "i-0123456789abcdef0" \
-    --type-name "AWS:WindowsUpdate" \
-    --filters "Key=InstalledTime,Values=2024-01,Type=BeginWith"
-```
-
-### Integration Examples
-
-#### 1. Lambda Function for Inventory Processing
-```python
-import boto3
-import json
-from datetime import datetime
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Get all managed instances
-    response = ssm.describe_instance_information()
-    instances = response['InstanceInformationList']
-    
-    inventory_summary = {}
-    
-    for instance in instances:
-        instance_id = instance['InstanceId']
-        
-        # Get application inventory
-        try:
-            app_response = ssm.list_inventory_entries(
-                InstanceId=instance_id,
-                TypeName='AWS:Application'
-            )
-            
-            applications = [entry['Name'] for entry in app_response['Entries']]
-            inventory_summary[instance_id] = {
-                'Platform': instance['PlatformType'],
-                'ApplicationCount': len(applications),
-                'Applications': applications[:10]  # Top 10
-            }
-        except Exception as e:
-            inventory_summary[instance_id] = {
-                'Error': str(e)
-            }
-    
-    # Store results in S3 or send to monitoring system
-    return {
-        'statusCode': 200,
-        'body': json.dumps(inventory_summary, default=str)
-    }
-```
-
-#### 2. EventBridge Rule for Inventory Changes
-```json
-{
-  "Rules": [
-    {
-      "Name": "InventoryChangeDetection",
-      "EventPattern": {
-        "source": ["aws.ssm"],
-        "detail-type": ["Systems Manager Inventory State Change"],
-        "detail": {
-          "state": ["CHANGED"],
-          "inventory-type": ["AWS:Application"]
-        }
-      },
-      "Targets": [
-        {
-          "Id": "1",
-          "Arn": "arn:aws:lambda:us-east-1:123456789012:function:ProcessInventoryChange"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Best Practices
-
-#### 1. Collection Strategy
-- Schedule inventory collection during low-usage periods
-- Use appropriate collection frequency based on change rate
-- Configure only necessary inventory types
-- Use tags to organize inventory data
-
-#### 2. Data Management
-- Set up Resource Data Sync for centralized analytics
-- Implement data retention policies
-- Use compression and partitioning for large datasets
-- Regular cleanup of obsolete inventory data
-
-#### 3. Performance
-- Limit file inventory scope to essential directories
-- Use filters to reduce data collection volume
-- Monitor inventory collection performance
-- Optimize custom inventory scripts
-
-#### 4. Security
-- Encrypt inventory data in transit and at rest
-- Control access to inventory data
-- Audit inventory access and changes
-- Sanitize sensitive data in custom inventory
+## 23. Design & Architecture Best Practices (Exam Lens)
+- Prefer automation & immutable images vs manual patching (Automation + Patch Manager)
+- Remove bastions -> Session Manager (improves security posture)
+- Enforce tagging early to enable fleet targeting & governance
+- Use Parameter Store for decoupling config from code, promote environment isolation
+- Integrate CloudWatch + EventBridge + Automation for self-healing patterns
+- Use Change Manager / Approval steps for production-impacting operations
+- Private VPC endpoints for restricted networks to avoid public internet for management traffic
+- Separate read vs write access to parameters for principle of least privilege
 
 ---
+## 24. Troubleshooting & Operational Insights
+Symptoms & Likely Causes:
+- Instance not showing as managed: Missing IAM instance profile, SSM Agent not running, blocked outbound endpoints
+- Session Manager fails: IAM permission missing, endpoint not reachable, KMS decrypt deny
+- Parameter throttling: Exceeded Standard throughput -> use caching or upgrade parameter tier
+- Patch compliance low: Incorrect Patch Group tag, baseline not associated, maintenance window not triggered
 
-## State Manager
-
-AWS Systems Manager State Manager is a configuration management service that automates the process of keeping your Amazon EC2 and hybrid infrastructure in a defined state.
-
-### Key Features
-- **Desired State Configuration**: Define and maintain desired configuration state
-- **Scheduled Execution**: Automatically run configurations on schedule
-- **Compliance Monitoring**: Track configuration drift and compliance
-- **Multi-platform Support**: Works across Windows, Linux, and macOS
-- **Document-based**: Uses Systems Manager documents for configuration
-
-### Core Concepts
-
-#### Association
-An association defines the configuration to apply to a set of targets on a schedule.
-
-```yaml
-Association Components:
-  - Document: What to execute (SSM document)
-  - Targets: Which resources to configure
-  - Schedule: When to execute
-  - Parameters: Configuration parameters
-  - Output Location: Where to store execution logs
-```
-
-#### Association States
-```yaml
-States:
-  - Pending: Association created but not executed
-  - Success: Last execution completed successfully
-  - Failed: Last execution failed
-  - Associated: Association is active
-  - Disassociated: Association is inactive
-```
-
-### Creating Associations
-
-#### Basic Association
-```bash
-aws ssm create-association \
-    --name "AWS-RunShellScript" \
-    --targets "Key=tag:Environment,Values=production" \
-    --schedule-expression "rate(30 minutes)" \
-    --parameters '{
-        "commands": [
-            "systemctl status nginx",
-            "curl -f http://localhost/health || systemctl restart nginx"
-        ]
-    }'
-```
-
-#### Advanced Association Configuration
-```json
-{
-    "Name": "AWS-ConfigureAWSPackage",
-    "DocumentVersion": "1",
-    "Targets": [
-        {
-            "Key": "tag:Role",
-            "Values": ["WebServer"]
-        }
-    ],
-    "ScheduleExpression": "cron(0 2 ? * SUN *)",
-    "AssociationName": "InstallCloudWatchAgent",
-    "Parameters": {
-        "action": ["Install"],
-        "name": ["AmazonCloudWatchAgent"],
-        "version": ["latest"]
-    },
-    "OutputLocation": {
-        "S3Location": {
-            "OutputS3BucketName": "state-manager-logs",
-            "OutputS3KeyPrefix": "associations/"
-        }
-    },
-    "MaxConcurrency": "25%",
-    "MaxErrors": "10%",
-    "ComplianceSeverity": "HIGH",
-    "SyncCompliance": "AUTO"
-}
-```
-
-### Common Use Cases
-
-#### 1. Software Installation and Updates
-```bash
-# Install and maintain CloudWatch agent
-aws ssm create-association \
-    --name "AWS-ConfigureAWSPackage" \
-    --targets "Key=tag:Monitoring,Values=enabled" \
-    --schedule-expression "rate(1 day)" \
-    --parameters '{
-        "action": ["Install"],
-        "name": ["AmazonCloudWatchAgent"],
-        "version": ["latest"]
-    }' \
-    --association-name "MaintainCloudWatchAgent"
-```
-
-#### 2. Configuration Management
-```yaml
-# Custom document for web server configuration
-schemaVersion: "2.2"
-description: "Configure nginx web server"
-parameters:
-  ServerName:
-    type: String
-    description: "Server name for nginx configuration"
-    default: "example.com"
-  
-mainSteps:
-- action: "aws:runShellScript"
-  name: "configureNginx"
-  inputs:
-    timeoutSeconds: "300"
-    runCommand:
-    - "#!/bin/bash"
-    - "cat > /etc/nginx/sites-available/default << EOF"
-    - "server {"
-    - "    listen 80;"
-    - "    server_name {{ ServerName }};"
-    - "    location / {"
-    - "        root /var/www/html;"
-    - "        index index.html;"
-    - "    }"
-    - "}"
-    - "EOF"
-    - "nginx -t && systemctl reload nginx"
-```
-
-#### 3. Security Hardening
-```bash
-# Security hardening association
-aws ssm create-association \
-    --name "CustomSecurityHardening" \
-    --targets "Key=tag:SecurityLevel,Values=high" \
-    --schedule-expression "rate(7 days)" \
-    --parameters '{
-        "actions": [
-            "disable-unused-services",
-            "configure-firewall",
-            "update-security-settings"
-        ]
-    }' \
-    --compliance-severity "CRITICAL"
-```
-
-### Compliance Management
-
-#### Compliance Types
-```yaml
-Built-in Compliance Types:
-  - Association: Document execution compliance
-  - Patch: Patch installation compliance
-  - Custom: User-defined compliance rules
-
-Compliance Statuses:
-  - COMPLIANT: Target meets requirements
-  - NON_COMPLIANT: Target doesn't meet requirements
-  - UNSPECIFIED_DATA: Insufficient data
-```
-
-#### Monitoring Compliance
-```bash
-# Get compliance summary
-aws ssm list-compliance-summary-by-compliance-type \
-    --compliance-type "Association"
-
-# Get detailed compliance information
-aws ssm list-compliance-items \
-    --resource-ids "i-0123456789abcdef0" \
-    --resource-types "ManagedInstance" \
-    --filters "Key=ComplianceType,Values=Association,Type=EQUAL"
-
-# Get compliance by resource type
-aws ssm list-compliance-summary-by-resource-type \
-    --resource-type "ManagedInstance"
-```
-
-#### Custom Compliance Rules
-```python
-import boto3
-import json
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    
-    # Custom compliance check for disk space
-    instances = ['i-0123456789abcdef0', 'i-0987654321fedcba0']
-    
-    for instance_id in instances:
-        try:
-            # Run disk space check
-            response = ssm.send_command(
-                InstanceIds=[instance_id],
-                DocumentName='AWS-RunShellScript',
-                Parameters={
-                    'commands': ['df -h / | tail -1 | awk \'{print $5}\' | sed \'s/%//\'']
-                }
-            )
-            
-            command_id = response['Command']['CommandId']
-            
-            # Wait for command completion and get results
-            # (In practice, you'd use a separate Lambda or polling mechanism)
-            
-            # Simulate compliance check result
-            disk_usage = 85  # Example: 85% disk usage
-            
-            compliance_status = 'COMPLIANT' if disk_usage < 90 else 'NON_COMPLIANT'
-            
-            # Put compliance item
-            ssm.put_compliance_items(
-                ResourceId=instance_id,
-                ResourceType='ManagedInstance',
-                ComplianceType='Custom:DiskSpace',
-                ExecutionSummary={
-                    'ExecutionTime': '2024-01-15T10:30:00Z',
-                    'ExecutionId': command_id,
-                    'ExecutionType': 'Command'
-                },
-                Items=[
-                    {
-                        'ComplianceType': 'Custom:DiskSpace',
-                        'Status': compliance_status,
-                        'Severity': 'HIGH' if compliance_status == 'NON_COMPLIANT' else 'INFORMATIONAL',
-                        'Title': 'Disk Space Check',
-                        'Details': {
-                            'DiskUsage': f'{disk_usage}%',
-                            'Threshold': '90%'
-                        }
-                    }
-                ]
-            )
-            
-        except Exception as e:
-            print(f"Error checking compliance for {instance_id}: {e}")
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps('Compliance check completed')
-    }
-```
-
-### Association Execution Control
-
-#### Rate Control Settings
-```json
-{
-    "MaxConcurrency": "25%",
-    "MaxErrors": "10%",
-    "ComplianceSeverity": "HIGH",
-    "SyncCompliance": "AUTO"
-}
-```
-
-#### Execution Targets
-```bash
-# Target by instance IDs
---targets "Key=InstanceIds,Values=i-0123456789abcdef0,i-0987654321fedcba0"
-
-# Target by tags
---targets "Key=tag:Environment,Values=production,staging"
-
-# Target by resource groups
---targets "Key=resource-groups:Name,Values=WebServerGroup"
-
-# Target all managed instances
---targets "Key=tag:SSMManaged,Values=true"
-```
-
-### Document Integration
-
-#### Using AWS-Managed Documents
-```bash
-# Common AWS-managed documents for State Manager
-AWS-RunShellScript              # Execute shell commands
-AWS-RunPowerShellScript        # Execute PowerShell commands  
-AWS-ConfigureAWSPackage        # Install/configure AWS packages
-AWS-InstallApplication         # Install applications
-AWS-ConfigureCloudWatchOnEC2Instance  # Configure CloudWatch
-AWS-UpdateSSMAgent             # Update SSM Agent
-AWS-ApplyPatchBaseline         # Apply patch baselines
-```
-
-#### Custom Document Example
-```yaml
-schemaVersion: "2.2"
-description: "Configure application monitoring"
-parameters:
-  ApplicationName:
-    type: String
-    description: "Name of the application to monitor"
-  MonitoringInterval:
-    type: String
-    description: "Monitoring interval in seconds"
-    default: "60"
-    
-mainSteps:
-- action: "aws:runShellScript"
-  name: "setupMonitoring"
-  inputs:
-    timeoutSeconds: "300"
-    runCommand:
-    - "#!/bin/bash"
-    - "APP_NAME='{{ ApplicationName }}'"
-    - "INTERVAL='{{ MonitoringInterval }}'"
-    - "# Create monitoring script"
-    - "cat > /usr/local/bin/monitor-${APP_NAME}.sh << 'EOF'"
-    - "#!/bin/bash"
-    - "while true; do"
-    - "  if pgrep -f ${APP_NAME} > /dev/null; then"
-    - "    echo \"$(date): ${APP_NAME} is running\" >> /var/log/${APP_NAME}-monitor.log"
-    - "  else"
-    - "    echo \"$(date): ${APP_NAME} is not running, attempting restart\" >> /var/log/${APP_NAME}-monitor.log"
-    - "    systemctl restart ${APP_NAME}"
-    - "  fi"
-    - "  sleep ${INTERVAL}"
-    - "done"
-    - "EOF"
-    - "chmod +x /usr/local/bin/monitor-${APP_NAME}.sh"
-    - "# Create systemd service"
-    - "cat > /etc/systemd/system/${APP_NAME}-monitor.service << 'EOF'"
-    - "[Unit]"
-    - "Description=${APP_NAME} Monitor Service"
-    - "After=network.target"
-    - ""
-    - "[Service]"
-    - "Type=simple"
-    - "ExecStart=/usr/local/bin/monitor-${APP_NAME}.sh"
-    - "Restart=always"
-    - ""
-    - "[Install]"
-    - "WantedBy=multi-user.target"
-    - "EOF"
-    - "systemctl daemon-reload"
-    - "systemctl enable ${APP_NAME}-monitor.service"
-    - "systemctl start ${APP_NAME}-monitor.service"
-```
-
-### Monitoring and Reporting
-
-#### CloudWatch Integration
-```yaml
-State Manager Metrics:
-  - AWS/SSM/AssociationSuccess
-  - AWS/SSM/AssociationFailed
-  - AWS/SSM/ComplianceByAssociation
-  - AWS/SSM/ComplianceByConfigType
-  - AWS/SSM/ComplianceBySeverity
-```
-
-#### EventBridge Integration
-```json
-{
-  "Rules": [
-    {
-      "Name": "StateManagerComplianceChange",
-      "EventPattern": {
-        "source": ["aws.ssm"],
-        "detail-type": ["EC2 State Manager Association State Change"],
-        "detail": {
-          "state": ["Failed", "Success"],
-          "association-id": ["12345678-1234-1234-1234-123456789012"]
-        }
-      },
-      "Targets": [
-        {
-          "Id": "1",
-          "Arn": "arn:aws:sns:us-east-1:123456789012:state-manager-alerts"
-        }
-      ]
-    }
-  ]
-}
-```
-
-#### Association History
-```bash
-# Get association execution history
-aws ssm describe-association-execution-history \
-    --association-id "12345678-1234-1234-1234-123456789012" \
-    --max-results 10
-
-# Get association execution targets
-aws ssm describe-association-execution-targets \
-    --association-id "12345678-1234-1234-1234-123456789012" \
-    --execution-id "87654321-4321-4321-4321-210987654321"
-```
-
-### Troubleshooting Common Issues
-
-#### 1. Association Execution Failures
-```yaml
-Common Causes:
-  - SSM Agent not running or outdated
-  - Insufficient IAM permissions
-  - Network connectivity issues
-  - Document syntax errors
-  - Target instances not managed
-
-Troubleshooting Steps:
-  1. Check SSM Agent status
-  2. Verify IAM roles and policies
-  3. Review association execution history
-  4. Check instance connectivity
-  5. Validate document syntax
-```
-
-#### 2. Compliance Issues
-```bash
-# Debug compliance status
-aws ssm get-compliance-summary
-
-# Check specific resource compliance
-aws ssm list-resource-compliance-summaries \
-    --filters "Key=OverallSeverity,Values=CRITICAL,Type=EQUAL"
-
-# Get compliance details
-aws ssm list-compliance-items \
-    --resource-ids "i-0123456789abcdef0" \
-    --resource-types "ManagedInstance"
-```
-
-### Best Practices
-
-#### 1. Association Design
-- Use descriptive association names
-- Set appropriate schedules based on requirements
-- Configure proper rate control settings
-- Use tags for organized targeting
-
-#### 2. Document Management
-- Version control custom documents
-- Test documents thoroughly before deployment
-- Use parameters for flexibility
-- Implement proper error handling
-
-#### 3. Monitoring
-- Set up CloudWatch alarms for failures
-- Monitor compliance trends
-- Regular review of association performance
-- Automated notification of compliance issues
-
-#### 4. Security
-- Follow least privilege principle for IAM roles
-- Encrypt sensitive parameters
-- Audit association changes
-- Use secure document sharing practices
+Diagnostics:
+- Check SSM Agent logs (`/var/log/amazon/ssm/`)
+- Use `aws ssm describe-instance-information`
+- CloudWatch Logs for session or command output
 
 ---
+## 25. Quick Recall Sheet (High-Yield Exam Points)
+- Session Manager: No inbound ports, logs to S3/CW, IAM controlled
+- Parameter Store: Hierarchical, SecureString with KMS, Standard vs Advanced
+- Patch Manager: Baseline + Patch Group tag + Maintenance Window
+- State Manager: Enforce recurring config (drift correction)
+- Run Command: One-time fleet actions with rate + error controls
+- Automation: Runbooks for multi-step remediation & AMI pipelines
+- Change Manager: Approvals + governance on operational change
+- OpsCenter/Explorer: Central aggregated operations view
+- Distributor: Software package distribution
+- Hybrid Activations: On-prem management with Activation Code/ID
+- Resource Data Sync: Aggregate inventory/compliance to central S3
+
+---
+## 26. Practice Questions (Self-Test)
+1. You need secure CLI shell access to private EC2 instances without opening any inbound ports and want all commands logged centrally. Which service? (Answer: Session Manager)
+2. You must apply only critical security patches to production Linux within 48 hours and report compliance. Which combination? (Patch Manager + Custom Baseline + Maintenance Window + Explorer)
+3. Store app config values (non-rotated) encrypted and pulled at deploy time via CloudFormation templates. Which service and feature? (Parameter Store SecureString + dynamic references)
+4. Automate creation of a hardened AMI monthly with approvals. Which feature? (Automation runbook with approval step)
+5. Enforce that a log shipping agent stays installed. Which feature? (State Manager association)
+6. Collect metadata of installed software across hybrid fleet and query centrally. Which combination? (Inventory + Resource Data Sync + Athena)
+7. Need to restrict parameter path access to only /prod/ for a deployment role. Which mechanism? (IAM policy resource scoping to parameter ARN path)
+8. Need single place to see operational issues + related alarms. Which feature? (OpsCenter OpsItems)
+9. Need to distribute an internal security agent to all nodes regularly. Which feature? (Distributor + State Manager)
+10. Need to reduce risk of unauthorized ad hoc production changes; require approval before execution. Which capability? (Change Manager or Automation with approval)
+
+---
+## 27. Final Tips for Exam Day
+- Map scenario verbs: "enforce" -> State Manager; "multi-step with approvals" -> Automation / Change Manager; "ad hoc run" -> Run Command; "secure access" -> Session Manager
+- Always consider least privilege & no inbound security group exposures
+- Pair patch operations with Maintenance Windows for governance
+- Distinguish Parameter Store vs Secrets Manager vs AppConfig
+- Remember Resource Data Sync purpose (central aggregation)
+- Recognize when to use runbook vs Lambda (complex orchestrated vs single action)
+
+---
+## 28. References (For Further Study)
+- AWS Systems Manager User Guide
+- AWS SAA-C03 Exam Guide Objectives
+- AWS Blogs: Operational Excellence with Systems Manager
+- AWS Well-Architected Framework (Operations Pillar)
+
+---
+© 2025 – Study reference guide. Not an official AWS publication.
+

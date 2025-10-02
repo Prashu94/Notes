@@ -467,3 +467,4 @@ C++: see §5 next_comb. Python: see §5 next_comb.
 - Precompute and reuse popcounts; often faster than recomputing.
 - For Python, favor large integer ops over Python loops; PyPy can help.
 - Keep templates ready; copy-paste and adapt under contest time.
+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
