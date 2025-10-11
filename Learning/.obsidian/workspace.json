@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "06a4abbdcabef046",
+        "id": "53124aefecaac3d0",
         "type": "tabs",
         "children": [
           {
-            "id": "36867b607fdeb0c0",
+            "id": "d25f7870eb75850b",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -40,7 +40,7 @@
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "byModifiedTime",
+                "sortOrder": "byModifiedTimeReverse",
                 "autoReveal": false
               },
               "icon": "lucide-folder-closed",
@@ -178,8 +178,22 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "36867b607fdeb0c0",
+  "active": "d25f7870eb75850b",
   "lastOpenFiles": [
+    "aws-sns-saa-c03-guide.md",
+    "aws-ec2-saa-c03-guide.md",
+    "aws-lambda-saa-c03-guide.md",
+    "aws-vpn-gateway-saa-c03-guide.md",
+    "aws-transit-gateway-saa-c03-guide.md",
+    "aws-rds-saa-c03-guide.md",
+    "aws-aurora-saa-c03-guide.md",
+    "aws-dynamodb-saa-c03-guide.md",
+    "aws-redshift-saa-c03-guide.md",
+    "aws-sqs-saa-c03-guide.md",
+    "aws-cloudformation-saa-c03-guide.md",
+    "aws-cloudtrail-saa-c03-guide.md",
+    "aws-cloudwatch-saa-c03-guide.md",
+    "aws-organizations-saa-c03-guide.md",
     "aws-s3-and-glacier-saa-c03-guide.md",
     "aws-efs-saa-c03-guide.md",
     "aws-storage-gateway-saa-c03-guide.md",
@@ -192,20 +206,6 @@
     "aws-certificate-manager-saa-c03-guide.md",
     "aws-guardduty-saa-c03-guide.md",
     "aws-waf-shield-saa-c03-guide.md",
-    "aws-kms-saa-c03-guide.md",
-    "aws-secrets-manager-saa-c03-guide.md",
-    "aws-ebs-saa-c03-guide.md",
-    "aws-route53-saa-c03-guide.md",
-    "aws-iam-saa-c03-guide.md",
-    "aws-direct-connect-saa-c03-guide.md",
-    "aws-cloudformation-saa-c03-guide.md",
-    "aws-backup-saa-c03-guide.md",
-    "aws-networking-saa-c03-guide.md",
-    "aws-elb-saa-c03-guide.md",
-    "aws-ec2-scaling-saa-c03-guide.md",
-    "Amazon EC2 - Observability,  Monitoring and Troubleshooting.md",
-    "aws-systems-manager-saa-c03-guide.md",
-    "aws-organizations-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
