@@ -335,6 +335,7 @@ Consolidated billing is automatically enabled when you create an organization. I
 - **Guardrails**: Preventive and detective controls
 - **Account Factory**: Automated account provisioning
 - **Dashboard**: Centralized governance dashboard
+![[Pasted image 20251012112026.png]]
 
 ### AWS Config
 - **Organization-wide rules**: Deploy Config rules across all accounts
