@@ -16,7 +16,7 @@
 13. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 
 ---
-
+![[Pasted image 20251012101649.png]]
 ## Introduction to AWS Organizations
 
 AWS Organizations is a service that helps you centrally manage and govern your environment as you grow and scale your AWS resources. It provides centralized management of multiple AWS accounts, enabling you to:
@@ -147,7 +147,7 @@ More restrictive approach that only allows specific actions.
 }
 ```
 
-### Common SCP Use Cases
+![[Pasted image 20251012105623.png]]### Common SCP Use Cases
 
 #### 1. Prevent Account Closure
 ```json

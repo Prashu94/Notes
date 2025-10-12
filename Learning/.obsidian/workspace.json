@@ -180,6 +180,11 @@
   },
   "active": "d25f7870eb75850b",
   "lastOpenFiles": [
+    "aws-eventbridge-saa-c03-guide.md",
+    "Pasted image 20251012105623.png",
+    "Pasted image 20251012101649.png",
+    "aws-redshift-saa-c03-guide.md",
+    "aws-organizations-saa-c03-guide.md",
     "aws-sns-saa-c03-guide.md",
     "aws-ec2-saa-c03-guide.md",
     "aws-lambda-saa-c03-guide.md",
@@ -188,12 +193,10 @@
     "aws-rds-saa-c03-guide.md",
     "aws-aurora-saa-c03-guide.md",
     "aws-dynamodb-saa-c03-guide.md",
-    "aws-redshift-saa-c03-guide.md",
     "aws-sqs-saa-c03-guide.md",
     "aws-cloudformation-saa-c03-guide.md",
     "aws-cloudtrail-saa-c03-guide.md",
     "aws-cloudwatch-saa-c03-guide.md",
-    "aws-organizations-saa-c03-guide.md",
     "aws-s3-and-glacier-saa-c03-guide.md",
     "aws-efs-saa-c03-guide.md",
     "aws-storage-gateway-saa-c03-guide.md",
@@ -205,7 +208,6 @@
     "aws-trusted-advisor-saa-c03-guide.md",
     "aws-certificate-manager-saa-c03-guide.md",
     "aws-guardduty-saa-c03-guide.md",
-    "aws-waf-shield-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
