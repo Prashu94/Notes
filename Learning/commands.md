@@ -116,3 +116,37 @@ resp = agent.invoke({"input": "How many orders were shipped last week by region?
 print(resp["output"])  # final natural-language answer
 # Optional: inspect SQL used
 # print(resp["intermediate_steps"])
+
+import os
+from langchain_openai import ChatOpenAI
+from langchain_community.utilities import SQLDatabase
+from langchain_community.agent_toolkits import create_sql_agent
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain.chains import RetrievalQA
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+# SQL tool (joins happen here when needed)
+db = SQLDatabase.from_uri(
+    os.environ["PG_DSN"],
+    include_tables=["orders", "customers", "regions"],  # whitelist
+    sample_rows_in_table_info=2,
+)
+sql_agent = create_sql_agent(llm=llm, db=db, agent_type="openai-tools", verbose=False)
+
+# RAG tool (explanations/policies, not numbers)
+emb = OpenAIEmbeddings(model="text-embedding-3-small")
+vs = Chroma(collection_name="kb_docs", embedding_function=emb)
+retriever = vs.as_retriever(search_kwargs={"k": 5})
+rag = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+
+def answer(question: str):
+    needs_sql = any(w in question.lower() for w in ["how many", "count", "sum", "latest", "by region", "average", "trend", "this week", "last month"])
+    if needs_sql:
+        return sql_agent.invoke({"input": question})["output"]
+    else:
+        return rag({"query": question})["result"]
+
+print(answer("How many orders were shipped last week by region?"))      # SQL
+print(answer("What is our return policy for refurbished items?"))       # RAG
