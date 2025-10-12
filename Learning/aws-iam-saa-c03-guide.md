@@ -241,7 +241,7 @@ Roles provide temporary access without long-term credentials.
 | AWS Service Use | Limited | No | Yes |
 
 ---
-
+![[Pasted image 20251012111406.png]]
 ## IAM Policies
 
 IAM policies are JSON documents that define permissions. They determine what actions are allowed or denied on which resources and under what conditions.

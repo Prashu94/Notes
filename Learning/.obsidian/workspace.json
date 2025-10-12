@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "aws-organizations-saa-c03-guide.md",
+                "file": "aws-iam-saa-c03-guide.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "aws-organizations-saa-c03-guide"
+              "title": "aws-iam-saa-c03-guide"
             }
           }
         ]
@@ -180,11 +180,13 @@
   },
   "active": "d25f7870eb75850b",
   "lastOpenFiles": [
+    "Pasted image 20251012111406.png",
+    "Pasted image 20251012111355.png",
+    "aws-organizations-saa-c03-guide.md",
     "aws-eventbridge-saa-c03-guide.md",
     "Pasted image 20251012105623.png",
     "Pasted image 20251012101649.png",
     "aws-redshift-saa-c03-guide.md",
-    "aws-organizations-saa-c03-guide.md",
     "aws-sns-saa-c03-guide.md",
     "aws-ec2-saa-c03-guide.md",
     "aws-lambda-saa-c03-guide.md",
@@ -207,7 +209,6 @@
     "aws-inspector-saa-c03-guide.md",
     "aws-trusted-advisor-saa-c03-guide.md",
     "aws-certificate-manager-saa-c03-guide.md",
-    "aws-guardduty-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
