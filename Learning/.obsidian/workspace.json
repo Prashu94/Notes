@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "aws-organizations-saa-c03-guide.md",
+                "file": "commands.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "aws-organizations-saa-c03-guide"
+              "title": "commands"
             }
           }
         ]
@@ -180,12 +180,16 @@
   },
   "active": "d25f7870eb75850b",
   "lastOpenFiles": [
+    "AWS Commands.md",
+    "commands.md",
+    "sqlalchemy-understanding.md",
+    "aws-cloudwatch-saa-c03-guide.md",
+    "aws-organizations-saa-c03-guide.md",
     "Pasted image 20251012112026.png",
     "aws-cloudformation-saa-c03-guide.md",
     "aws-iam-saa-c03-guide.md",
     "Pasted image 20251012111406.png",
     "Pasted image 20251012111355.png",
-    "aws-organizations-saa-c03-guide.md",
     "aws-eventbridge-saa-c03-guide.md",
     "Pasted image 20251012105623.png",
     "Pasted image 20251012101649.png",
@@ -200,7 +204,6 @@
     "aws-dynamodb-saa-c03-guide.md",
     "aws-sqs-saa-c03-guide.md",
     "aws-cloudtrail-saa-c03-guide.md",
-    "aws-cloudwatch-saa-c03-guide.md",
     "aws-s3-and-glacier-saa-c03-guide.md",
     "aws-efs-saa-c03-guide.md",
     "aws-storage-gateway-saa-c03-guide.md",
@@ -208,8 +211,6 @@
     "aws-vpc-saa-c03-guide.md",
     "aws-directory-services-saa-c03-guide.md",
     "aws-cognito-saa-c03-guide.md",
-    "aws-inspector-saa-c03-guide.md",
-    "aws-trusted-advisor-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
