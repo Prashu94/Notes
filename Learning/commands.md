@@ -8,7 +8,11 @@ export OLLAMA_HOME=/Volumes/MyPassport/.ollama
 source ~/.zshrc
 ollama run llama2
 ollama stop llama2
-
+brew install redis
+brew services start redis
+redis-server
+brew services stop redis
+redis-cli
 # Simple POC that:
 # 1) pulls rows from Postgres
 # 2) renders narrative documents

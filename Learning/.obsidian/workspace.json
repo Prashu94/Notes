@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "53124aefecaac3d0",
+        "id": "3d16512801b9383c",
         "type": "tabs",
         "children": [
           {
-            "id": "d25f7870eb75850b",
+            "id": "7d794019b4e7ee4b",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "commands.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "commands"
+              "title": "New tab"
             }
           }
         ]
@@ -178,10 +174,23 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "d25f7870eb75850b",
+  "active": "7d794019b4e7ee4b",
   "lastOpenFiles": [
-    "AWS Commands.md",
     "commands.md",
+    "gcp-gke-ace-pca-guide.md",
+    "gcp-cloud-run-ace-pca-guide.md",
+    "gcp-app-engine-pca-guide.md",
+    "gcp-app-engine-ace-pca-guide.md",
+    "gcp-professional-cloud-architect-guide.md",
+    "gcp-cloud-functions-ace-pca-guide.md",
+    "gcp-vpc-ace-pca-guide.md",
+    "gcp-load-balancing-ace-pca-guide.md",
+    "gcp-cloud-router-ace-pca-guide.md",
+    "gcp-hybrid-connectivity-ace-pca-guide.md",
+    "gcp-cloud-dns-ace-pca-guide.md",
+    "gcp-cloud-cdn-ace-pca-guide.md",
+    "gcp-compute-engine-ace-pca-guide.md",
+    "AWS Commands.md",
     "sqlalchemy-understanding.md",
     "aws-cloudwatch-saa-c03-guide.md",
     "aws-organizations-saa-c03-guide.md",
@@ -198,19 +207,6 @@
     "aws-ec2-saa-c03-guide.md",
     "aws-lambda-saa-c03-guide.md",
     "aws-vpn-gateway-saa-c03-guide.md",
-    "aws-transit-gateway-saa-c03-guide.md",
-    "aws-rds-saa-c03-guide.md",
-    "aws-aurora-saa-c03-guide.md",
-    "aws-dynamodb-saa-c03-guide.md",
-    "aws-sqs-saa-c03-guide.md",
-    "aws-cloudtrail-saa-c03-guide.md",
-    "aws-s3-and-glacier-saa-c03-guide.md",
-    "aws-efs-saa-c03-guide.md",
-    "aws-storage-gateway-saa-c03-guide.md",
-    "aws-fsx-saa-c03-guide.md",
-    "aws-vpc-saa-c03-guide.md",
-    "aws-directory-services-saa-c03-guide.md",
-    "aws-cognito-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
