@@ -154,3 +154,7 @@ def answer(question: str):
 
 print(answer("How many orders were shipped last week by region?"))      # SQL
 print(answer("What is our return policy for refurbished items?"))       # RAG
+
+
+brew services start mongodb-community@8.2
+brew services stop mongodb-community@8.2
