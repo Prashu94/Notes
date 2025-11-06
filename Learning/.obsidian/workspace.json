@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "3d16512801b9383c",
+        "id": "c2b0928e78a4a6c1",
         "type": "tabs",
         "children": [
           {
-            "id": "7d794019b4e7ee4b",
+            "id": "734b3da37ee482ce",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "commands.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "commands"
+              "title": "New tab"
             }
           }
         ]
@@ -177,7 +173,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "7d794019b4e7ee4b",
+  "active": "e7b58c8acfa50268",
   "lastOpenFiles": [
     "commands.md",
     "gcp-gke-ace-pca-guide.md",
