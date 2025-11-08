@@ -1,0 +1,27 @@
+# Core Dependencies
+neo4j==5.14.0
+python-dotenv==1.0.0
+
+# LangChain and AI
+langchain==0.1.0
+langchain-community==0.0.10
+langchain-openai==0.0.2
+openai==1.6.1
+
+# Document Processing
+pypdf==3.17.1
+python-docx==1.1.0
+unstructured==0.11.0
+
+# Data Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Utilities
+tenacity==8.2.3
+tiktoken==0.5.2
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.12.1
