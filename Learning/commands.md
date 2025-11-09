@@ -158,3 +158,14 @@ print(answer("What is our return policy for refurbished items?"))       # RAG
 
 brew services start mongodb-community@8.2
 brew services stop mongodb-community@8.2
+
+
+brew services start neo4j
+brew services list
+brew services stop neo4j
+
+sudo systemctl stop neo4j
+sudo systemctl disable neo4j
+
+rm /lib/systemd/system/neo4j.service
+rm -rf NEO4J_HOME

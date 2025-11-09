@@ -11,10 +11,14 @@
             "id": "734b3da37ee482ce",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "commands.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "commands"
             }
           }
         ]
@@ -173,7 +177,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e7b58c8acfa50268",
+  "active": "734b3da37ee482ce",
   "lastOpenFiles": [
     "commands.md",
     "gcp-gke-ace-pca-guide.md",
