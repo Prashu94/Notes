@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "commands.md",
+                "file": "neo4j-concepts/02-cypher-query-language.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "commands"
+              "title": "02-cypher-query-language"
             }
           }
         ]
@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -179,6 +180,27 @@
   },
   "active": "734b3da37ee482ce",
   "lastOpenFiles": [
+    "neo4j-concepts/CODE-EXAMPLES-README.md",
+    "neo4j-concepts/README-SUMMARY.md",
+    "neo4j-concepts/utility-network-operations/src/services/service_request_manager.py",
+    "neo4j-concepts/utility-network-operations/src/services/network_monitoring.py",
+    "neo4j-concepts/utility-network-operations/src/services/leak_detection.py",
+    "neo4j-concepts/utility-network-operations/src/services/consumption_analytics.py",
+    "neo4j-concepts/utility-network-operations/src/services/billing_service.py",
+    "neo4j-concepts/utility-network-operations/src/services/__init__.py",
+    "neo4j-concepts/utility-network-operations/src/repositories/infrastructure_repo.py",
+    "neo4j-concepts/utility-network-operations/src/repositories/incident_repo.py",
+    "neo4j-concepts/utility-network-operations/src/repositories/customer_repo.py",
+    "neo4j-concepts/utility-network-operations/src/repositories/billing_repo.py",
+    "neo4j-concepts/utility-network-operations/docs/EMBEDDINGS.md",
+    "neo4j-concepts/utility-network-operations/README.md",
+    "neo4j-concepts/QUICKSTART.md",
+    "neo4j-concepts/HONEST-STATUS.md",
+    "neo4j-concepts/QUICKSTART-REAL.md",
+    "neo4j-concepts/IMPLEMENTATION-STATUS.md",
+    "neo4j-concepts/energy-grid-management/README.md",
+    "neo4j-concepts/energy-grid-management/PROJECT-COMPLETE.md",
+    "neo4j-concepts/01-neo4j-fundamentals.md",
     "commands.md",
     "gcp-gke-ace-pca-guide.md",
     "gcp-cloud-run-ace-pca-guide.md",
@@ -194,22 +216,11 @@
     "gcp-cloud-cdn-ace-pca-guide.md",
     "gcp-compute-engine-ace-pca-guide.md",
     "AWS Commands.md",
-    "sqlalchemy-understanding.md",
-    "aws-cloudwatch-saa-c03-guide.md",
-    "aws-organizations-saa-c03-guide.md",
     "Pasted image 20251012112026.png",
-    "aws-cloudformation-saa-c03-guide.md",
-    "aws-iam-saa-c03-guide.md",
     "Pasted image 20251012111406.png",
     "Pasted image 20251012111355.png",
-    "aws-eventbridge-saa-c03-guide.md",
     "Pasted image 20251012105623.png",
     "Pasted image 20251012101649.png",
-    "aws-redshift-saa-c03-guide.md",
-    "aws-sns-saa-c03-guide.md",
-    "aws-ec2-saa-c03-guide.md",
-    "aws-lambda-saa-c03-guide.md",
-    "aws-vpn-gateway-saa-c03-guide.md",
     "Untitled.canvas"
   ]
 }
