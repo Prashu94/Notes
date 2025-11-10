@@ -1,0 +1,133 @@
+{
+  "name": "neo4j-rag-kb",
+  "displayName": "Neo4j RAG Knowledge Base",
+  "description": "RAG-powered knowledge base using Neo4j with GitHub Copilot Pro and Ollama embeddings",
+  "version": "0.1.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Data Science",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:neo4j-rag-kb.initializeKB",
+    "onCommand:neo4j-rag-kb.loadDocuments",
+    "onCommand:neo4j-rag-kb.queryKB",
+    "onCommand:neo4j-rag-kb.openChat"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "neo4j-rag-kb.initializeKB",
+        "title": "Neo4j RAG: Initialize Knowledge Base"
+      },
+      {
+        "command": "neo4j-rag-kb.loadDocuments",
+        "title": "Neo4j RAG: Load Documents"
+      },
+      {
+        "command": "neo4j-rag-kb.queryKB",
+        "title": "Neo4j RAG: Query Knowledge Base"
+      },
+      {
+        "command": "neo4j-rag-kb.openChat",
+        "title": "Neo4j RAG: Open Chat Interface"
+      },
+      {
+        "command": "neo4j-rag-kb.clearKB",
+        "title": "Neo4j RAG: Clear Knowledge Base"
+      }
+    ],
+    "configuration": {
+      "title": "Neo4j RAG Knowledge Base",
+      "properties": {
+        "neo4jRagKb.neo4j.uri": {
+          "type": "string",
+          "default": "bolt://localhost:7687",
+          "description": "Neo4j connection URI"
+        },
+        "neo4jRagKb.neo4j.username": {
+          "type": "string",
+          "default": "neo4j",
+          "description": "Neo4j username"
+        },
+        "neo4jRagKb.neo4j.password": {
+          "type": "string",
+          "default": "password",
+          "description": "Neo4j password"
+        },
+        "neo4jRagKb.neo4j.database": {
+          "type": "string",
+          "default": "neo4j",
+          "description": "Neo4j database name"
+        },
+        "neo4jRagKb.ollama.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama server URL"
+        },
+        "neo4jRagKb.ollama.embeddingModel": {
+          "type": "string",
+          "default": "nomic-embed-text",
+          "description": "Ollama embedding model"
+        },
+        "neo4jRagKb.document.chunkSize": {
+          "type": "number",
+          "default": 1000,
+          "description": "Document chunk size"
+        },
+        "neo4jRagKb.document.chunkOverlap": {
+          "type": "number",
+          "default": 200,
+          "description": "Document chunk overlap"
+        },
+        "neo4jRagKb.rag.retrievalK": {
+          "type": "number",
+          "default": 5,
+          "description": "Number of documents to retrieve"
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "neo4jRagKbView",
+          "name": "Neo4j RAG KB"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "neo4j-rag-kb",
+          "title": "Neo4j RAG Knowledge Base",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "eslint": "^8.x",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "neo4j-driver": "^5.15.0"
+  }
+}

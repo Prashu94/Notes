@@ -1,0 +1,59 @@
+# Sample Text Document for Testing Neo4j RAG Knowledge Base
+
+## Introduction to Retrieval-Augmented Generation (RAG)
+
+Retrieval-Augmented Generation (RAG) is a powerful technique that combines the strengths of retrieval-based and generation-based approaches in natural language processing. RAG systems enhance the capabilities of large language models by providing them with relevant context retrieved from external knowledge bases.
+
+## How RAG Works
+
+The RAG process involves several key steps:
+
+1. **Document Ingestion**: Documents are loaded and split into manageable chunks. This ensures that the information can be efficiently stored and retrieved.
+
+2. **Embedding Generation**: Each document chunk is converted into a vector embedding using an embedding model. These embeddings capture the semantic meaning of the text.
+
+3. **Vector Storage**: The embeddings are stored in a vector database, such as Neo4j, which supports efficient similarity search operations.
+
+4. **Query Processing**: When a user asks a question, the query is also converted into an embedding using the same embedding model.
+
+5. **Retrieval**: The system performs a similarity search to find the most relevant document chunks based on vector similarity between the query and stored embeddings.
+
+6. **Answer Generation**: The retrieved documents are provided as context to a large language model, which generates a comprehensive answer based on the question and the retrieved information.
+
+## Benefits of Using Neo4j for RAG
+
+Neo4j offers several advantages for RAG implementations:
+
+- **Graph Structure**: Neo4j's native graph database allows for complex relationships between documents, entities, and concepts.
+- **Vector Search**: Neo4j supports vector indexing and similarity search, enabling efficient retrieval of relevant documents.
+- **Scalability**: Neo4j can handle large knowledge bases with millions of documents and relationships.
+- **Flexibility**: The graph structure allows for advanced querying patterns and knowledge graph construction.
+
+## Ollama for Local LLM Inference
+
+Ollama is an excellent choice for running language models locally:
+
+- **Privacy**: All data remains on your local machine, ensuring complete privacy.
+- **No API Costs**: Unlike cloud-based solutions, Ollama is completely free to use.
+- **Model Variety**: Ollama supports various models including Llama, Mistral, and specialized embedding models.
+- **Easy Setup**: Simple installation and model management through command-line interface.
+
+## Best Practices for RAG Systems
+
+To build effective RAG systems, consider the following best practices:
+
+1. **Chunk Size Optimization**: Choose appropriate chunk sizes (typically 500-1500 tokens) to balance context and specificity.
+
+2. **Overlap Strategy**: Use chunk overlap to ensure important information isn't lost at chunk boundaries.
+
+3. **Metadata Enrichment**: Add relevant metadata to documents to enable filtered retrieval and better context.
+
+4. **Hybrid Search**: Combine vector similarity search with keyword-based search for better results.
+
+5. **Retrieval Tuning**: Experiment with the number of retrieved documents (k) to find the optimal balance.
+
+6. **Prompt Engineering**: Craft clear prompts that instruct the LLM to answer based only on provided context.
+
+## Conclusion
+
+RAG systems represent a significant advancement in AI-powered question answering and information retrieval. By combining the power of vector databases like Neo4j with local LLM inference through Ollama, developers can build sophisticated knowledge base systems that are both powerful and privacy-preserving.

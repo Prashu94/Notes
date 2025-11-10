@@ -1,0 +1,128 @@
+# Neo4j Graph Database Guide
+
+## What is Neo4j?
+
+Neo4j is a highly scalable native graph database that stores and manages data in nodes and relationships rather than tables and rows. It uses the property graph model, where both nodes and relationships can have properties (key-value pairs).
+
+## Core Concepts
+
+### Nodes
+Nodes are the fundamental units in a Neo4j graph. They represent entities or objects in your domain. Each node can have:
+- One or more labels (categories or types)
+- Properties (key-value pairs storing data)
+- Relationships to other nodes
+
+### Relationships
+Relationships connect nodes and always have:
+- A direction (from one node to another)
+- A type (describes the nature of the relationship)
+- Properties (optional data about the relationship)
+
+### Properties
+Properties are name-value pairs that store data on nodes and relationships. They can be:
+- Strings
+- Numbers (integers, floats)
+- Booleans
+- Lists
+- Spatial types
+- Temporal types (dates, times)
+
+## Cypher Query Language
+
+Cypher is Neo4j's declarative query language, designed specifically for working with graph data. It uses ASCII-art syntax to represent patterns in the graph.
+
+### Basic Patterns
+
+Creating a node:
+```
+CREATE (n:Person {name: 'Alice', age: 30})
+```
+
+Creating a relationship:
+```
+MATCH (a:Person {name: 'Alice'}), (b:Person {name: 'Bob'})
+CREATE (a)-[:KNOWS]->(b)
+```
+
+Querying patterns:
+```
+MATCH (p:Person)-[:KNOWS]->(friend)
+WHERE p.name = 'Alice'
+RETURN friend.name
+```
+
+## Vector Search in Neo4j
+
+Neo4j supports vector similarity search, which is essential for RAG applications. Vector indexes enable efficient nearest-neighbor searches in high-dimensional vector spaces.
+
+### Creating Vector Indexes
+
+```cypher
+CREATE VECTOR INDEX document_embeddings
+FOR (d:Document)
+ON d.embedding
+OPTIONS {
+  indexConfig: {
+    `vector.dimensions`: 768,
+    `vector.similarity_function`: 'cosine'
+  }
+}
+```
+
+### Performing Vector Similarity Search
+
+```cypher
+MATCH (d:Document)
+WITH d, gds.similarity.cosine(d.embedding, $queryEmbedding) AS score
+RETURN d.content, score
+ORDER BY score DESC
+LIMIT 5
+```
+
+## Use Cases for Neo4j in RAG
+
+### Knowledge Graph Construction
+Neo4j excels at representing complex knowledge structures:
+- Documents connected to topics, entities, and concepts
+- Hierarchical relationships between information
+- Cross-references and citations
+
+### Enhanced Retrieval
+Graph structure enables advanced retrieval patterns:
+- Multi-hop reasoning (traversing relationships)
+- Contextual retrieval (finding related information)
+- Filtered search based on relationships
+
+### Metadata Management
+Store and query rich metadata:
+- Document provenance and lineage
+- Version history and updates
+- Access patterns and usage statistics
+
+## Performance Optimization
+
+### Indexing Strategies
+- Create indexes on frequently queried properties
+- Use vector indexes for embedding searches
+- Implement full-text indexes for keyword searches
+
+### Query Optimization
+- Use PROFILE and EXPLAIN to analyze query performance
+- Limit result sets with appropriate WHERE clauses
+- Use parameters to enable query plan caching
+
+### Data Modeling Best Practices
+- Normalize when appropriate, but embrace denormalization when it improves query performance
+- Use relationship types to capture semantic meaning
+- Store frequently accessed data as properties rather than requiring traversals
+
+## Integration with LangChain
+
+Neo4j integrates seamlessly with LangChain through:
+- Neo4jVector: Vector store implementation
+- Neo4jGraph: Graph database wrapper
+- Native support for document storage and retrieval
+
+## Conclusion
+
+Neo4j provides a robust foundation for building RAG systems, offering both graph database capabilities and vector search functionality. Its flexible data model and powerful query language make it ideal for complex knowledge base applications.
