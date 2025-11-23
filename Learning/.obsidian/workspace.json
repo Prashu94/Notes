@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gcp-ace-cap/gcp-compute-engine-pca-guide.md",
-                "mode": "source",
+                "file": "dynamic-programming-complete-guide.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "gcp-compute-engine-pca-guide"
+              "title": "dynamic-programming-complete-guide"
             }
           }
         ]
@@ -40,7 +40,7 @@
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "byModifiedTimeReverse",
+                "sortOrder": "byModifiedTime",
                 "autoReveal": false
               },
               "icon": "lucide-folder-closed",
@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -177,8 +178,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "684dd4b94d720d56",
+  "active": "ac66b563da9f1df3",
   "lastOpenFiles": [
+    "graphs-complete-guide-part1-fundamentals.md",
+    "graphs-complete-guide-part2-advanced.md",
+    "gcp-ace-cap/gcp-compute-engine-pca-guide.md",
     "gcp-ace-cap/gcp-compute-engine-ace-guide.md",
     "gcp-ace-cap/gcp-cloud-run-ace-pca-guide.md",
     "aws-networking-saa-c03-guide.md",
@@ -202,9 +206,6 @@
     "gcp-ace-cap/gcp-load-balancing-ace-pca-guide.md",
     "gcp-ace-cap/gcp-load-balancing-ace-guide.md",
     "gcp-ace-cap/gcp-kms-secretmanager-pca-guide.md",
-    "gcp-ace-cap/gcp-kms-secretmanager-ace-guide.md",
-    "gcp-ace-cap/gcp-iam-pca-guide.md",
-    "gcp-ace-cap/gcp-iam-ace-guide.md",
     "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "gcp-ace-cap/gcp-gke-ace-pca-guide.md.bak",
     "gcp-ace-cap/gcp-compute-engine-ace-pca-guide.md.bak",
