@@ -1,0 +1,495 @@
+# Google Cloud Storage - Associate Cloud Engineer (ACE) Comprehensive Guide
+
+## Table of Contents
+1. [Overview](#overview)
+2. [Core Concepts](#core-concepts)
+3. [Storage Classes](#storage-classes)
+4. [Buckets](#buckets)
+5. [Objects](#objects)
+6. [Access Control](#access-control)
+7. [Lifecycle Management](#lifecycle-management)
+8. [Data Transfer](#data-transfer)
+9. [Monitoring & Logging](#monitoring--logging)
+10. [ACE Exam Tips](#ace-exam-tips)
+
+---
+
+## Overview
+
+Cloud Storage is Google's object storage service for storing and accessing unstructured data. It's globally available, highly durable (99.999999999% annual durability), and scales automatically.
+
+**Key Characteristics:**
+- **Object Storage:** Store any type of file
+- **Globally Accessible:** Access from anywhere via HTTP(S)
+- **No Capacity Planning:** Unlimited storage
+- **Strong Consistency:** Read-after-write consistency
+
+---
+
+## Core Concepts
+
+### Buckets
+
+Containers for objects. Bucket names are globally unique.
+
+**Bucket Naming Rules:**
+- 3-63 characters
+- Lowercase letters, numbers, hyphens, underscores, periods
+- Must start/end with letter or number
+- Cannot contain "google" or variations
+
+**Example:** `my-project-data-bucket`
+
+### Objects
+
+Files stored in buckets. Objects have:
+- **Name (key):** Unique within bucket
+- **Data (value):** The file contents
+- **Metadata:** Content-type, ACLs, custom metadata
+
+**Example:** `gs://my-bucket/folder/file.txt`
+
+### Locations
+
+**Region:** Single geographic location (e.g., `us-central1`)
+- Lower latency for users in that region
+- Lower cost
+
+**Dual-Region:** Two specific regions (e.g., `nam4` = Iowa + South Carolina)
+- Higher availability
+- Synchronous replication
+
+**Multi-Region:** Large geographic area (e.g., `us`, `eu`, `asia`)
+- Highest availability
+- Best for global access
+
+---
+
+## Storage Classes
+
+### Standard Storage
+
+**Use Case:** Hot data accessed frequently
+**Minimum Storage:** None
+**Retrieval Cost:** None
+
+**Best For:**
+- Website content
+- Streaming videos
+- Active databases
+- Data analytics
+
+**Example:**
+```bash
+gsutil mb -c STANDARD -l us-central1 gs://my-standard-bucket
+```
+
+### Nearline Storage
+
+**Use Case:** Data accessed < 1/month
+**Minimum Storage:** 30 days
+**Retrieval Cost:** $0.01/GB
+
+**Best For:**
+- Data backups
+- Long-tail multimedia content
+- Data archiving (monthly access)
+
+**Example:**
+```bash
+gsutil mb -c NEARLINE -l us-central1 gs://my-nearline-bucket
+```
+
+### Coldline Storage
+
+**Use Case:** Data accessed < 1/quarter
+**Minimum Storage:** 90 days
+**Retrieval Cost:** $0.02/GB
+
+**Best For:**
+- Disaster recovery data
+- Archives accessed quarterly
+- Compliance data
+
+**Example:**
+```bash
+gsutil mb -c COLDLINE -l us-central1 gs://my-coldline-bucket
+```
+
+### Archive Storage
+
+**Use Case:** Data accessed < 1/year
+**Minimum Storage:** 365 days
+**Retrieval Cost:** $0.05/GB
+
+**Best For:**
+- Long-term archiving
+- Regulatory compliance data
+- Cold disaster recovery
+
+**Example:**
+```bash
+gsutil mb -c ARCHIVE -l us-central1 gs://my-archive-bucket
+```
+
+### Comparison Table
+
+| Class | Monthly Access | Min Duration | Retrieval Cost | Storage Cost (per GB/month) |
+|-------|----------------|--------------|----------------|------------------------------|
+| **Standard** | Frequent | None | None | $0.020 (regional) |
+| **Nearline** | < 1/month | 30 days | $0.01/GB | $0.010 |
+| **Coldline** | < 1/quarter | 90 days | $0.02/GB | $0.004 |
+| **Archive** | < 1/year | 365 days | $0.05/GB | $0.0012 |
+
+---
+
+## Buckets
+
+### Creating a Bucket
+
+**Console:**
+1. Go to **Cloud Storage > Buckets**
+2. Click **Create Bucket**
+3. Enter bucket name
+4. Choose location type and region
+5. Select default storage class
+6. Choose access control (Uniform or Fine-grained)
+7. Click **Create**
+
+**gcloud:**
+```bash
+gsutil mb -p PROJECT_ID -c STORAGE_CLASS -l LOCATION gs://BUCKET_NAME
+```
+
+**Examples:**
+```bash
+# Regional bucket with Standard storage
+gsutil mb -c STANDARD -l us-central1 gs://my-data-bucket
+
+# Multi-region bucket with Nearline storage
+gsutil mb -c NEARLINE -l us gs://my-backup-bucket
+```
+
+### Listing Buckets
+
+```bash
+gsutil ls
+
+# With details
+gsutil ls -L gs://BUCKET_NAME
+```
+
+### Deleting a Bucket
+
+**Must be empty first!**
+
+```bash
+# Delete all objects
+gsutil rm -r gs://BUCKET_NAME/*
+
+# Delete bucket
+gsutil rb gs://BUCKET_NAME
+```
+
+### Bucket Configuration
+
+**Enable versioning:**
+```bash
+gsutil versioning set on gs://BUCKET_NAME
+```
+
+**Set default storage class:**
+```bash
+gsutil defstorageclass set NEARLINE gs://BUCKET_NAME
+```
+
+**Enable uniform bucket-level access:**
+```bash
+gsutil iam ch allUsers:objectViewer gs://BUCKET_NAME
+```
+
+---
+
+## Objects
+
+### Uploading Objects
+
+**Single file:**
+```bash
+gsutil cp LOCAL_FILE gs://BUCKET_NAME/
+```
+
+**Multiple files:**
+```bash
+gsutil cp *.jpg gs://BUCKET_NAME/images/
+```
+
+**Recursive upload:**
+```bash
+gsutil cp -r LOCAL_FOLDER gs://BUCKET_NAME/
+```
+
+**With storage class:**
+```bash
+gsutil cp -s NEARLINE file.txt gs://BUCKET_NAME/
+```
+
+### Downloading Objects
+
+**Single file:**
+```bash
+gsutil cp gs://BUCKET_NAME/file.txt ./
+```
+
+**Multiple files:**
+```bash
+gsutil cp gs://BUCKET_NAME/*.txt ./
+```
+
+**Recursive download:**
+```bash
+gsutil cp -r gs://BUCKET_NAME/folder ./
+```
+
+### Listing Objects
+
+```bash
+# List all objects
+gsutil ls gs://BUCKET_NAME
+
+# List with details (size, timestamp)
+gsutil ls -l gs://BUCKET_NAME
+
+# List recursively
+gsutil ls -r gs://BUCKET_NAME/**
+```
+
+### Deleting Objects
+
+```bash
+# Single object
+gsutil rm gs://BUCKET_NAME/file.txt
+
+# Multiple objects
+gsutil rm gs://BUCKET_NAME/*.txt
+
+# Delete folder recursively
+gsutil rm -r gs://BUCKET_NAME/folder/
+```
+
+### Copying/Moving Objects
+
+**Copy within Cloud Storage:**
+```bash
+gsutil cp gs://SOURCE_BUCKET/file.txt gs://DEST_BUCKET/
+```
+
+**Move (rename):**
+```bash
+gsutil mv gs://BUCKET/old-name.txt gs://BUCKET/new-name.txt
+```
+
+### Viewing Object Metadata
+
+```bash
+gsutil stat gs://BUCKET_NAME/file.txt
+```
+
+### Setting Object Metadata
+
+```bash
+gsutil setmeta -h "Content-Type:application/json" \
+  -h "Cache-Control:public, max-age=3600" \
+  gs://BUCKET_NAME/file.json
+```
+
+---
+
+## Access Control
+
+### IAM (Bucket-Level)
+
+**Grant read access:**
+```bash
+gsutil iam ch user:EMAIL:roles/storage.objectViewer gs://BUCKET_NAME
+```
+
+**Grant write access:**
+```bash
+gsutil iam ch user:EMAIL:roles/storage.objectCreator gs://BUCKET_NAME
+```
+
+**Grant admin access:**
+```bash
+gsutil iam ch user:EMAIL:roles/storage.admin gs://BUCKET_NAME
+```
+
+**Make bucket publicly readable:**
+```bash
+gsutil iam ch allUsers:objectViewer gs://BUCKET_NAME
+```
+
+### ACLs (Object-Level)
+
+**Enable fine-grained ACLs:**
+```bash
+gsutil uniformbucketlevelaccess set off gs://BUCKET_NAME
+```
+
+**Grant read access to object:**
+```bash
+gsutil acl ch -u EMAIL:READ gs://BUCKET_NAME/file.txt
+```
+
+**Make object public:**
+```bash
+gsutil acl ch -u AllUsers:READ gs://BUCKET_NAME/file.txt
+```
+
+### Signed URLs
+
+Temporary access to private objects:
+
+```bash
+gsutil signurl -d 10m KEY_FILE gs://BUCKET_NAME/file.txt
+```
+
+---
+
+## Lifecycle Management
+
+Automatically transition or delete objects based on conditions.
+
+### Lifecycle Rules
+
+**Delete objects older than 30 days:**
+```json
+{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": {"type": "Delete"},
+        "condition": {"age": 30}
+      }
+    ]
+  }
+}
+```
+
+**Transition to Nearline after 30 days:**
+```json
+{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": {"type": "SetStorageClass", "storageClass": "NEARLINE"},
+        "condition": {"age": 30}
+      }
+    ]
+  }
+}
+```
+
+**Apply lifecycle configuration:**
+```bash
+gsutil lifecycle set lifecycle.json gs://BUCKET_NAME
+```
+
+**View lifecycle configuration:**
+```bash
+gsutil lifecycle get gs://BUCKET_NAME
+```
+
+---
+
+## Data Transfer
+
+### gsutil (Command-Line)
+
+**Parallel uploads:**
+```bash
+gsutil -m cp -r large-folder gs://BUCKET_NAME/
+```
+
+**Resume interrupted transfers:**
+```bash
+gsutil cp -c file.txt gs://BUCKET_NAME/
+```
+
+### Cloud Console (Web UI)
+
+Upload/download via browser (good for small files < 100 MB).
+
+### Storage Transfer Service
+
+For large-scale transfers from:
+- Other cloud providers (AWS S3, Azure Blob)
+- On-premises via Transfer Service agent
+- Another Cloud Storage bucket
+
+**Use Case:** Migrate 10+ TB of data.
+
+### Transfer Appliance
+
+Physical device shipped by Google for massive data transfers (100+ TB).
+
+---
+
+## Monitoring & Logging
+
+### Cloud Monitoring Metrics
+
+- Total bytes
+- Object count
+- Request count
+- Bandwidth
+
+### Cloud Logging
+
+Enable access logs:
+```bash
+gsutil logging set on -b gs://LOG_BUCKET gs://DATA_BUCKET
+```
+
+**Log Format:** JSON with request details (IP, timestamp, object, HTTP status).
+
+---
+
+## ACE Exam Tips
+
+1. **Storage Classes:** Know the access frequency and minimum storage duration for each class.
+   - Standard: No minimum, frequent access
+   - Nearline: 30 days, < 1/month
+   - Coldline: 90 days, < 1/quarter
+   - Archive: 365 days, < 1/year
+
+2. **gsutil Commands:** Memorize:
+   - `gsutil mb`: Make bucket
+   - `gsutil cp`: Copy/upload/download
+   - `gsutil rm`: Delete
+   - `gsutil ls`: List
+   - `gsutil iam`: IAM permissions
+
+3. **Access Control:**
+   - IAM = Bucket-level (uniform)
+   - ACL = Object-level (fine-grained)
+   - Uniform access is recommended (simpler)
+
+4. **Lifecycle Management:** Automatically transition storage classes or delete old objects to save costs.
+
+5. **Signed URLs:** Provide temporary access to private objects without changing permissions.
+
+6. **Object Versioning:** Enable to prevent accidental deletion. Old versions are kept.
+
+7. **Multi-Region vs Region:**
+   - Multi-region: Higher availability, higher cost, global access
+   - Region: Lower cost, lower latency for single-region access
+
+8. **Transfer Methods:**
+   - < 1 TB: gsutil
+   - 1-10 TB: Storage Transfer Service
+   - 10+ TB: Storage Transfer Service with Transfer Appliance
+
+9. **Bucket Naming:** Globally unique, 3-63 chars, lowercase only.
+
+10. **Minimum Storage Duration:** If you delete an object before the minimum duration, you're charged for the full duration.

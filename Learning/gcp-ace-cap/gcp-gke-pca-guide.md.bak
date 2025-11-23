@@ -1,0 +1,329 @@
+# Google Kubernetes Engine (GKE) - Professional Cloud Architect (PCA) Comprehensive Guide
+
+## Table of Contents
+1. [Architectural Overview](#architectural-overview)
+2. [Design Decisions & Trade-offs](#design-decisions--trade-offs)
+3. [Networking Architecture](#networking-architecture)
+4. [Security Architecture](#security-architecture)
+5. [High Availability & Disaster Recovery](#high-availability--disaster-recovery)
+6. [Scalability Patterns](#scalability-patterns)
+7. [Storage Architecture](#storage-architecture)
+8. [Cost Optimization](#cost-optimization)
+9. [Multi-Cluster & Hybrid Patterns](#multi-cluster--hybrid-patterns)
+10. [Migration Strategies](#migration-strategies)
+11. [PCA Exam Tips](#pca-exam-tips)
+
+---
+
+## GKE Architecture Design
+
+### Control Plane Availability
+
+**Zonal Clusters:**
+- **Architecture**: Single control plane in one zone. Nodes can be in one zone (Single-Zone) or multiple zones (Multi-Zonal).
+- **SLA**: 99.5% for zonal clusters.
+- **Use Case**: Dev/Test environments, batch processing, non-critical workloads.
+- **Risk**: If the zone fails, the control plane is inaccessible (cannot manage cluster), though workloads may continue running.
+
+**Regional Clusters:**
+- **Architecture**: Control plane replicated across 3 zones in a region. Nodes are also distributed across 3 zones by default.
+- **SLA**: 99.95% for regional clusters.
+- **Use Case**: Production workloads, high availability requirements.
+- **Benefit**: Zero downtime during upgrades (control plane replicas upgraded one by one). Resilient to single zone failure.
+
+### GKE Modes: Autopilot vs Standard (Architectural View)
+
+| Feature | Autopilot | Standard |
+|---------|-----------|----------|
+| **Responsibility** | Google manages nodes, security, scaling. | User manages nodes, system pods, OS config. |
+| **SLA** | Covers Pods and Control Plane. | Covers Control Plane (and Nodes if Regional). |
+| **Security** | Hardened by default (no SSH, Workload Identity). | Configurable (can be insecure if misconfigured). |
+| **Cost Model** | Pay per Pod (vCPU/RAM). Higher unit cost, zero waste. | Pay per Node (VM). Lower unit cost, potential bin-packing waste. |
+| **Best For** | Most production workloads, variable traffic, low ops teams. | Specific hardware needs, custom kernel modules, legacy apps requiring node access. |
+
+### Version Management
+
+**Release Channels:**
+- **Rapid**: Newest features, less stability. For testing new features.
+- **Regular**: Default. Balance of features and stability. For most production apps.
+- **Stable**: High stability, older features. For critical, slow-changing apps.
+
+**Maintenance Windows & Exclusions:**
+- Configure windows for upgrades to occur during off-peak hours.
+- Use exclusions to prevent upgrades during critical business events (e.g., Black Friday).
+
+---
+
+## Networking Architecture
+
+### VPC-Native Clusters (Alias IPs)
+
+**Architecture:**
+- Pods get IP addresses from a secondary range in the VPC subnet.
+- Pod IPs are natively routable within the VPC and across VPC Peering/VPN/Interconnect.
+- No NAT required for Pod-to-Pod communication across nodes.
+- **Requirement**: Must be enabled for GKE Autopilot and recommended for Standard.
+
+**Benefits:**
+- **Performance**: No route lookup penalty or encapsulation overhead.
+- **Scalability**: Supports more Pods per node and cluster.
+- **Security**: Firewall rules can target Pod IP ranges directly.
+- **Anti-Spoofing**: VPC checks source IPs.
+
+### Private Clusters
+
+**Architecture:**
+- **Private Nodes**: Nodes have only internal IP addresses. No public internet access.
+- **Private Endpoint**: Control plane has a private internal IP.
+- **Public Endpoint (Optional)**: Control plane can also have a public IP (restricted by Authorized Networks).
+
+**Outbound Internet Access:**
+- Since nodes have no public IPs, use **Cloud NAT** for outbound internet access (e.g., pulling images from Docker Hub, calling external APIs).
+- **Private Google Access**: Enabled on subnet to allow nodes to reach Google APIs (GCR, Cloud Logging) without internet.
+
+### Master Authorized Networks
+
+- Restricts access to the cluster's public endpoint (control plane).
+- Whitelist specific CIDR ranges (e.g., corporate VPN, bastion host).
+- **Best Practice**: Always enable for public endpoints to prevent unauthorized internet access to the API server.
+
+### Shared VPC (Hub-and-Spoke)
+
+**Architecture:**
+- **Host Project**: Contains the VPC network, subnets, and Shared VPC configuration.
+- **Service Project**: Contains the GKE cluster.
+- **Roles**:
+  - Host Project Admin manages network (subnets, firewalls).
+  - Service Project Admin manages GKE cluster.
+  - GKE Service Account in Service Project needs `Compute Network User` role on the Host Project subnet.
+
+**Use Case:**
+- Centralized network management (SecOps/NetOps team).
+- Distributed cluster ownership (DevOps teams).
+- Separation of duties.
+
+### Ingress and Load Balancing
+
+**1. GKE Ingress Controller (GCE):**
+- Creates Google Cloud Load Balancers (GCLB) automatically.
+- **External HTTP(S) Load Balancer**: Global, Anycast IP, managed certificates, Cloud Armor integration.
+- **Internal HTTP(S) Load Balancer**: Regional, private access within VPC.
+
+**2. Container Native Load Balancing (NEG):**
+- Uses **Network Endpoint Groups (NEGs)**.
+- Load balancer sends traffic directly to Pod IPs (bypassing kube-proxy/node iptables).
+- **Benefits**: Lower latency, better visibility, supports Pod readiness gates.
+
+**3. Multi-Cluster Ingress (MCI):**
+- Single global load balancer fronting multiple GKE clusters across regions.
+- **Use Case**: Global high availability, low latency (closest cluster routing), blue-green clusters.
+
+---
+
+## Security Architecture
+
+### Workload Identity
+
+**Concept:**
+- Maps Kubernetes Service Accounts (KSA) to Google IAM Service Accounts (GSA).
+- Pods authenticate to Google Cloud APIs (Storage, Spanner, BigQuery) using the GSA identity.
+- **Mechanism**: Uses OIDC federation. No secrets/keys stored in the cluster.
+
+**Architecture:**
+1. Create GSA with IAM roles (e.g., `roles/storage.objectViewer`).
+2. Create KSA in Kubernetes.
+3. Bind KSA to GSA: `gcloud iam service-accounts add-iam-policy-binding ... --role roles/iam.workloadIdentityUser`
+4. Annotate KSA: `iam.gke.io/gcp-service-account=...`
+
+**Best Practice**: NEVER use Node Service Account for workload permissions. Always use Workload Identity.
+
+### Network Policies
+
+**Concept:**
+- Acts as a firewall for Pod-to-Pod communication inside the cluster.
+- Default behavior: All Pods can talk to all Pods (Allow All).
+- **Implementation**: Uses Dataplane V2 (Cilium) or Calico.
+
+**Patterns:**
+- **Deny-All Default**: Block all traffic, then allow specific paths.
+- **Namespace Isolation**: Allow traffic only within the same namespace.
+- **Frontend-Backend**: Allow Frontend Pods to talk to Backend Pods on specific ports only.
+
+### Binary Authorization
+
+**Concept:**
+- Supply chain security. Ensures only trusted/verified images are deployed.
+- **Attestors**: Sign images after passing CI/CD checks (vulnerability scan, unit tests).
+- **Policy**: GKE enforces policy at admission time. If image is not signed by required attestors, deployment is blocked.
+
+**Modes:**
+- **Audit Only**: Log violations but allow deployment (Dry Run).
+- **Enforce**: Block deployment of non-compliant images.
+
+### Security Hardening
+
+1. **Shielded GKE Nodes**: Verifies node integrity (Secure Boot, Integrity Monitoring). Enabled by default.
+2. **Private Clusters**: Remove public IPs from nodes.
+3. **RBAC (Role-Based Access Control)**: Least privilege for users accessing the cluster (via Cloud IAM + Kubernetes RBAC).
+4. **Pod Security Standards (PSS)**:
+   - **Privileged**: Unrestricted (avoid).
+   - **Baseline**: Minimal restrictions, prevents known privilege escalations.
+   - **Restricted**: Heavily restricted (no root, dropped capabilities). Best for security-critical apps.
+5. **Secret Encryption**: Enable Application-layer Secrets Encryption (envelope encryption) using Cloud KMS keys to encrypt secrets in etcd.
+
+---
+
+## Scalability and Reliability
+
+### Autoscaling Dimensions
+
+**1. Horizontal Pod Autoscaler (HPA):**
+- Scales **Pods** based on CPU/Memory or Custom Metrics (Cloud Monitoring).
+- **Best For**: Stateless apps, handling traffic spikes.
+
+**2. Vertical Pod Autoscaler (VPA):**
+- Adjusts **Pod resource requests/limits** based on historical usage.
+- **Best For**: Stateful apps, monolithic apps, "rightsizing" initial requests.
+- **Modes**: Off (recommendations only), Initial (apply at start), Auto (restart to apply).
+
+**3. Cluster Autoscaler (CA):**
+- Scales **Nodes** (Node Pools) when Pods cannot be scheduled (pending state) or nodes are underutilized.
+- **Best For**: Cost optimization, handling aggregate cluster load.
+- **Interaction**: HPA adds Pods -> Cluster fills up -> CA adds Nodes.
+
+**4. Node Auto-Provisioning (NAP):**
+- Extension of Cluster Autoscaler.
+- Automatically creates **new Node Pools** with optimal machine types for pending Pods.
+- **Best For**: Diverse workloads requiring different machine types (e.g., GPU, High-Mem) without manual pool management.
+
+### High Availability Patterns
+
+**1. Regional Clusters**:
+- Protects against zonal failures.
+- Distribute nodes across 3 zones.
+- Use **Pod Topology Spread Constraints** to ensure Pods are spread across zones.
+
+**2. Pod Disruption Budgets (PDB):**
+- Limits the number of Pods that can be down simultaneously during voluntary disruptions (upgrades, scaling).
+- Ensures service availability during maintenance.
+
+**3. Liveness and Readiness Probes:**
+- **Liveness**: Restarts dead containers.
+- **Readiness**: Removes unready containers from Service endpoints (load balancer).
+- **Startup**: Delays other probes for slow-starting apps.
+
+---
+
+## Storage Patterns
+
+### Container Storage Interface (CSI)
+
+GKE uses the Compute Engine PD CSI driver by default.
+
+**Storage Types:**
+- **Standard Persistent Disk (pd-standard)**: HDD. Cheap, lower IOPS.
+- **Balanced Persistent Disk (pd-balanced)**: SSD. Balance of cost/performance. Default.
+- **SSD Persistent Disk (pd-ssd)**: High performance SSD.
+- **Local SSD**: Ephemeral, attached physically to node. High IOPS, low latency. Data lost if node fails. Use for cache/scratch.
+- **Filestore (NFS)**: Shared file storage (ReadWriteMany). Accessible by multiple Pods across zones.
+
+### StatefulSets and Regional PD
+
+**Regional Persistent Disks:**
+- Replicated across two zones in the same region.
+- **Use Case**: High availability for stateful databases (MySQL, Postgres).
+- If primary zone fails, GKE can force-attach the disk to a node in the secondary zone.
+
+**Access Modes:**
+- **ReadWriteOnce (RWO)**: Mounted by single node (Block storage).
+- **ReadWriteMany (RWX)**: Mounted by multiple nodes (File storage - Filestore).
+- **ReadOnlyMany (ROX)**: Read-only by multiple nodes (Config/Secrets).
+
+---
+
+## Cost Optimization Strategies
+
+### 1. Spot VMs (Preemptible)
+- **Concept**: Excess Compute Engine capacity at 60-91% discount.
+- **Risk**: Can be preempted with 30-second warning.
+- **Use Case**: Batch jobs, stateless services, fault-tolerant workloads.
+- **Strategy**: Use mixed node pools (On-demand for base load, Spot for bursts).
+- **Graceful Termination**: Handle `SIGTERM` in application to finish requests before shutdown.
+
+### 2. GKE Autopilot
+- **Optimization**: Eliminates "bin-packing" waste. You don't pay for unused space on nodes.
+- **Scenario**: If your Standard clusters have low utilization (<60-70%), Autopilot is often cheaper.
+
+### 3. Rightsizing
+- Use **VPA** in recommendation mode to find actual usage.
+- Adjust resource requests to match reality.
+- **Impact**: HPA scales based on utilization relative to requests. Accurate requests = efficient scaling.
+
+### 4. GKE Cost Allocation
+- Enable **GKE Cost Allocation** in Cloud Billing.
+- Break down costs by **Namespace** and **Label**.
+- **Use Case**: Chargeback/Showback to different teams/departments sharing a cluster.
+
+### 5. Image Streaming
+- Enables faster Pod startup by streaming image data.
+- Reduces time nodes are running while initializing.
+
+---
+
+## Multi-Cluster and Hybrid Patterns
+
+### Multi-Cluster Services (MCS)
+- Allows Services to be exported and imported across clusters.
+- **Concept**: "ClusterSet" groups clusters.
+- **Service Discovery**: `<service>.<ns>.svc.clusterset.local`.
+- **Use Case**: High availability, data locality, migration.
+
+### GKE Enterprise (formerly Anthos)
+- **Fleet**: Logical grouping of clusters.
+- **Config Sync**: GitOps for multi-cluster configuration management. Enforce consistent policies across all clusters.
+- **Policy Controller**: Enforce OPA Gatekeeper policies (e.g., "All images must come from gcr.io").
+- **Service Mesh (ASM)**: Managed Istio. mTLS, observability, traffic splitting across clusters.
+
+---
+
+## Migration Strategies
+
+### Migrate to Containers (formerly Migrate for Anthos)
+- Tool to lift-and-shift VMs to GKE containers.
+- **Source**: Compute Engine, VMware, AWS EC2, Azure VMs.
+- **Process**:
+  1. Replicates VM disk.
+  2. Analyzes OS and app.
+  3. Generates Dockerfile and Kubernetes artifacts.
+  4. Deploys to GKE.
+- **Benefit**: Quick modernization without code rewrite.
+
+---
+
+## Decision Matrices
+
+### Network Endpoint Groups (NEG) vs Instance Groups
+| Feature | NEG (Container-Native) | Instance Groups (Legacy) |
+|---------|------------------------|--------------------------|
+| **Traffic Routing** | LB -> Pod IP | LB -> Node IP -> iptables -> Pod IP |
+| **Hops** | 1 Hop (Direct) | 2 Hops (Node + NAT) |
+| **Latency** | Lower | Higher |
+| **Visibility** | LB sees Pod health | LB sees Node health only |
+| **Recommendation** | **Preferred** for Ingress | Legacy / NodePort |
+
+### Ingress vs Service (LoadBalancer)
+| Feature | Ingress (L7 HTTP/S) | Service LoadBalancer (L4 TCP/UDP) |
+|---------|---------------------|-----------------------------------|
+| **Protocol** | HTTP, HTTPS, HTTP/2 | TCP, UDP |
+| **Routing** | Path/Host-based (/api, foo.com) | Port-based only |
+| **SSL Termination** | Yes (Managed Certs) | No (Pass-through) |
+| **Cost** | 1 LB for many services | 1 LB per service ($$$) |
+| **WAF** | Cloud Armor supported | Not supported |
+
+### Workload Identity vs Node Service Account
+| Feature | Workload Identity | Node Service Account |
+|---------|-------------------|----------------------|
+| **Granularity** | Per Pod/Deployment | Per Node (All pods on node) |
+| **Security** | Least Privilege | Broad Privilege (Risk) |
+| **Credential** | Short-lived Token | Metadata Server |
+| **Recommendation** | **Always Use** | Avoid for app permissions |

@@ -1,0 +1,293 @@
+# Cloud SQL - Associate Cloud Engineer Guide
+
+## Table of Contents
+1. [Cloud SQL Overview](#cloud-sql-overview)
+2. [Creating Instances](#creating-instances)
+3. [Connecting to Cloud SQL](#connecting-to-cloud-sql)
+4. [Backups and Restores](#backups-and-restores)
+5. [Replication Operations](#replication-operations)
+6. [Maintenance and Updates](#maintenance-and-updates)
+7. [Monitoring and Logging](#monitoring-and-logging)
+8. [Troubleshooting](#troubleshooting)
+
+---
+
+## Cloud SQL Overview
+
+Cloud SQL is a fully managed relational database service for MySQL, PostgreSQL, and SQL Server.
+
+**Key Features:**
+- **Fully Managed**: Google handles backups, replication, patches, and updates.
+- **High Availability**: Automatic failover with regional instances.
+- **Security**: Data encrypted at rest and in transit. IAM integration.
+- **Scalability**: Vertical scaling (machine type, storage) and horizontal scaling (read replicas).
+
+---
+
+## Creating Instances
+
+### Create Instance via gcloud
+
+```bash
+# Create a MySQL instance
+gcloud sql instances create my-instance \
+    --database-version=MYSQL_8_0 \
+    --cpu=2 \
+    --memory=4GiB \
+    --region=us-central1 \
+    --root-password=supersecret
+
+# Create a PostgreSQL instance
+gcloud sql instances create my-pg-instance \
+    --database-version=POSTGRES_14 \
+    --tier=db-custom-2-7680 \
+    --region=us-central1
+```
+
+### Configuration Options
+
+- **Machine Type (Tier)**:
+  - Shared core (e.g., `db-f1-micro`, `db-g1-small`) - Dev/Test only.
+  - Custom (e.g., `db-custom-2-7680` for 2 vCPU, 7.5GB RAM).
+- **Storage**:
+  - **Auto-storage increase**: Automatically increases storage when near limit.
+  - **SSD vs HDD**: SSD recommended for production.
+- **Private IP**: Requires "Private Services Access" (VPC Peering).
+
+```bash
+# Update instance configuration
+gcloud sql instances patch my-instance \
+    --storage-auto-increase \
+    --backup-start-time=02:00
+```
+
+---
+
+## Connecting to Cloud SQL
+
+### 1. Cloud SQL Auth Proxy (Recommended)
+
+Securely connects to Cloud SQL without authorized networks or SSL certificates management.
+
+**Steps:**
+1. Enable Cloud SQL Admin API.
+2. Install Cloud SQL Auth Proxy.
+3. Start the proxy:
+   ```bash
+   ./cloud-sql-proxy --instances=my-project:us-central1:my-instance=tcp:3306
+   ```
+4. Connect application to `127.0.0.1:3306`.
+
+**Benefits:**
+- Encrypts traffic automatically.
+- Uses IAM permissions for authentication.
+- Works with dynamic IP addresses.
+
+### 2. Private IP
+
+Connects directly from resources (VMs, GKE) within the same VPC.
+
+**Prerequisites:**
+- Configure **Private Services Access** (allocates IP range and creates VPC peering).
+- Enable Private IP on the instance.
+
+```bash
+# Enable Private IP
+gcloud sql instances patch my-instance \
+    --network=default
+```
+
+### 3. Public IP with Authorized Networks
+
+Connects from external static IP addresses.
+
+```bash
+# Add authorized network
+gcloud sql instances patch my-instance \
+    --authorized-networks=203.0.113.0/24
+```
+
+### 4. SSL/TLS Certificates
+
+For secure connection without Proxy (if not using Private IP).
+
+```bash
+# Create client certificate
+gcloud sql ssl client-certs create common-name \
+    --instance=my-instance \
+    --save-key=client-key.pem \
+    --save-cert=client-cert.pem
+```
+
+---
+
+## Backups and Restores
+
+### Automated Backups
+
+- Taken daily during a 4-hour window.
+- Retained for 7 days by default (configurable).
+- Required for Point-in-Time Recovery (PITR).
+
+```bash
+# Configure automated backups
+gcloud sql instances patch my-instance \
+    --backup-start-time=04:00
+```
+
+### On-Demand Backups
+
+- Manually triggered.
+- Persist until deleted.
+
+```bash
+# Create on-demand backup
+gcloud sql backups create --instance=my-instance --description="Pre-migration backup"
+
+# List backups
+gcloud sql backups list --instance=my-instance
+```
+
+### Restoring
+
+**Restore to Same Instance:**
+Overwrites current data.
+
+```bash
+gcloud sql backups restore BACKUP_ID --restore-instance=my-instance
+```
+
+**Restore to New Instance (Recommended for Testing):**
+Creates a clone from backup.
+
+```bash
+gcloud sql instances create new-instance --region=us-central1
+gcloud sql backups restore BACKUP_ID --restore-instance=new-instance --backup-instance=my-instance
+```
+
+**Point-in-Time Recovery (PITR):**
+Restores to a specific timestamp (requires binary logging enabled).
+
+```bash
+gcloud sql instances clone my-instance new-instance \
+    --point-in-time="2023-10-27T12:00:00Z"
+```
+
+---
+
+## Replication Operations
+
+### Create Read Replica
+
+Offloads read traffic from primary.
+
+```bash
+gcloud sql instances create my-replica \
+    --master-instance-name=my-instance \
+    --region=us-central1
+```
+
+### Promote Replica
+
+Promotes a read replica to a standalone primary instance (e.g., for DR or migration).
+
+```bash
+gcloud sql instances promote-replica my-replica
+```
+
+---
+
+## Maintenance and Updates
+
+### Maintenance Windows
+
+Cloud SQL updates require downtime (usually < 60s).
+
+```bash
+# Set maintenance window
+gcloud sql instances patch my-instance \
+    --maintenance-window-day=SUN \
+    --maintenance-window-hour=02 \
+    --maintenance-release-channel=production
+```
+
+### Import and Export
+
+**Export Data (SQL Dump or CSV):**
+Requires Cloud Storage bucket.
+
+```bash
+# Export to SQL dump
+gcloud sql export sql my-instance gs://my-bucket/dump.sql \
+    --database=mydb
+
+# Export to CSV
+gcloud sql export csv my-instance gs://my-bucket/data.csv \
+    --query="SELECT * FROM users"
+```
+
+**Import Data:**
+
+```bash
+# Import from SQL dump
+gcloud sql import sql my-instance gs://my-bucket/dump.sql --database=mydb
+```
+
+---
+
+## Monitoring and Logging
+
+### Cloud Monitoring Metrics
+- **CPU Utilization**: `database/cpu/utilization`
+- **Memory Usage**: `database/memory/utilization`
+- **Disk Usage**: `database/disk/bytes_used`
+- **Connections**: `database/network/connections`
+
+### Cloud Logging
+- **General Logs**: `cloudsql.googleapis.com/mysql.log`
+- **Error Logs**: `cloudsql.googleapis.com/mysql.err`
+- **Slow Query Logs**: Enable via flags (`slow_query_log=on`).
+
+```bash
+# View logs via gcloud
+gcloud logging read "resource.type=cloudsql_database AND logName:mysql.err" --limit=10
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Connection Refused / Timeouts**:
+   - Check Authorized Networks (if Public IP).
+   - Check Firewall Rules (if Private IP).
+   - Verify Cloud SQL Auth Proxy is running.
+
+2. **Storage Full**:
+   - Instance stops if storage is full.
+   - Enable `storage-auto-increase`.
+   - Manually increase storage size.
+
+3. **High Memory Usage**:
+   - Check for inefficient queries.
+   - Upgrade machine type.
+
+4. **Backup Failures**:
+   - Check if instance was stopped (backups require running instance).
+   - Check IAM permissions for service account.
+
+### Reset Root Password
+
+```bash
+gcloud sql users set-password root \
+    --host=% \
+    --instance=my-instance \
+    --password=newpassword
+```
+
+### Restart Instance
+
+```bash
+gcloud sql instances restart my-instance
+```

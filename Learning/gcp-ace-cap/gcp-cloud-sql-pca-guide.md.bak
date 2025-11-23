@@ -1,0 +1,177 @@
+# Cloud SQL - Professional Cloud Architect Guide
+
+## Table of Contents
+1. [High Availability Architecture](#high-availability-architecture)
+2. [Disaster Recovery Strategies](#disaster-recovery-strategies)
+3. [Replication Patterns](#replication-patterns)
+4. [Security Architecture](#security-architecture)
+5. [Migration Strategies](#migration-strategies)
+6. [Performance Optimization](#performance-optimization)
+7. [Decision Matrices](#decision-matrices)
+
+---
+
+## High Availability Architecture
+
+### Regional Availability (HA)
+
+**Architecture:**
+- **Primary Instance**: Located in Primary Zone (e.g., `us-central1-a`).
+- **Standby Instance**: Located in Secondary Zone (e.g., `us-central1-b`).
+- **Synchronous Replication**: Writes are committed to Regional Persistent Disk (replicated across zones) before acknowledged.
+- **Shared IP**: Both instances share a single Static IP.
+
+**Failover Process:**
+1. **Detection**: Heartbeat failure (approx. 60s).
+2. **Switch**: Standby instance becomes Primary.
+3. **Re-routing**: Shared IP points to new Primary.
+4. **Impact**: Brief downtime (typically < 60s). Existing connections dropped; app must reconnect.
+
+**Requirements:**
+- Automated backups must be enabled.
+- Point-in-Time Recovery (PITR) must be enabled (requires binary logging).
+- **SLA**: 99.95% availability for HA instances (General Purpose).
+
+**Zonal vs Regional:**
+- **Zonal**: Single zone. No failover. 99.5% SLA. Good for dev/test.
+- **Regional (HA)**: Multi-zone. Automatic failover. 99.95% SLA. Required for production.
+
+---
+
+## Disaster Recovery Strategies
+
+### Cross-Region Read Replicas
+
+**Architecture:**
+- Primary in Region A (e.g., `us-central1`).
+- Read Replica in Region B (e.g., `us-east1`).
+- **Asynchronous Replication**: Potential replication lag.
+
+**DR Workflow (Promote Replica):**
+1. **Region A Failure**: Primary becomes unavailable.
+2. **Decision**: Promote Cross-Region Replica in Region B.
+3. **Action**: `gcloud sql instances promote-replica my-replica`.
+4. **Result**: Replica becomes standalone Primary.
+5. **Post-Recovery**: Update application connection strings to new Primary IP.
+
+**RTO/RPO Considerations:**
+- **RPO (Recovery Point Objective)**: Depends on replication lag. Data not yet replicated is lost.
+- **RTO (Recovery Time Objective)**: Time to promote replica + update app config.
+
+### Database Migration Service (DMS) for DR
+
+- Can be used to set up continuous replication from Cloud SQL to another Cloud SQL instance for DR purposes, often with easier switchover workflows.
+
+---
+
+## Replication Patterns
+
+### 1. Read Replicas (In-Region)
+- **Purpose**: Scale read traffic.
+- **Load Balancing**: Cloud SQL does **not** provide a load balancer endpoint for replicas. You must implement client-side load balancing or use an internal L4 LB (ProxySQL/HAProxy).
+- **Limit**: Up to 10 direct replicas.
+
+### 2. Cross-Region Replicas
+- **Purpose**: Disaster Recovery (DR) and Data Locality (serving users in another region).
+- **Cost**: Incurs cross-region network egress charges.
+
+### 3. Cascading Replicas
+- **Architecture**: Primary -> Replica A -> Replica B.
+- **Purpose**:
+  - Offload replication log overhead from Primary.
+  - Distribute reads in a multi-region topology (Primary -> Region B Replica -> Region B Local Replicas).
+- **Limit**: Max 4 levels deep.
+
+### 4. External Replicas
+- **Purpose**: Hybrid cloud or multi-cloud scenarios.
+- **External Read Replica**: Cloud SQL Primary -> On-prem MySQL Replica.
+- **External Primary**: On-prem MySQL Primary -> Cloud SQL Replica (Migration path).
+
+---
+
+## Security Architecture
+
+### Encryption
+- **At Rest**: Encrypted by default (AES-256).
+- **CMEK (Customer-Managed Encryption Keys)**: Use Cloud KMS keys to manage encryption.
+  - **Key Revocation**: Revoking key renders database inaccessible (Crypto-shredding).
+- **In Transit**: SSL/TLS. Enforce SSL with `require_ssl` flag.
+
+### Network Security
+- **Private Service Access**: VPC Peering. Private IP only.
+- **Authorized Networks**: Public IP allowlist (Less secure, avoid for production).
+- **Cloud SQL Auth Proxy**:
+  - Authenticates via IAM (no static passwords in config).
+  - Encrypts traffic.
+  - Works with Private IP.
+
+### IAM Integration
+- **IAM Database Authentication**: Log in to DB using IAM users/service accounts instead of database passwords.
+- **Roles**:
+  - `roles/cloudsql.client`: Connect to instance.
+  - `roles/cloudsql.admin`: Full control.
+  - `roles/cloudsql.editor`: Manage instance (no delete/permission changes).
+
+---
+
+## Migration Strategies
+
+### Database Migration Service (DMS)
+- **Serverless**: Fully managed migration service.
+- **Homogeneous**: MySQL to Cloud SQL for MySQL, PostgreSQL to Cloud SQL for PostgreSQL.
+- **Continuous Replication**: Minimal downtime.
+  1. Initial snapshot.
+  2. Continuous replication (CDC).
+  3. Cutover (Promote).
+
+### External Master (Legacy)
+- Configure Cloud SQL as a replica of an external master.
+- Manual setup of VPN/Interconnect and replication user.
+
+### Import/Export
+- **Offline Migration**: Dump SQL -> Upload to GCS -> Import.
+- **Downtime**: High (Time to dump + transfer + import).
+
+---
+
+## Performance Optimization
+
+### Maintenance Windows
+- **Deny Maintenance Period**: Block maintenance during peak business events (up to 90 days).
+- **Order of Update**: Replicas updated first, then Primary.
+
+### Query Insights
+- Built-in observability tool.
+- Identifies:
+  - Top queries by load.
+  - Long-running queries.
+  - Lock contention.
+- **Action**: Add indexes, optimize SQL, resize instance.
+
+### Storage
+- **SSD vs HDD**: Always use SSD for production (better IOPS).
+- **IOPS**: Linked to disk size. Increase disk size to increase IOPS (up to 64TB).
+
+---
+
+## Decision Matrices
+
+### Cloud SQL vs Cloud Spanner vs Bigtable
+
+| Feature | Cloud SQL | Cloud Spanner | Bigtable |
+|---------|-----------|---------------|----------|
+| **Type** | Relational (OLTP) | Relational (OLTP) | NoSQL (Wide-column) |
+| **Scale** | Vertical (up to ~64TB) | Horizontal (Petabytes) | Horizontal (Petabytes) |
+| **Consistency** | Strong (Single Region) | Strong (Global) | Eventual (Multi-cluster) |
+| **Availability** | 99.95% (Regional) | 99.999% (Global) | 99.99% |
+| **Use Case** | ERP, CRM, Web Apps (MySQL/PG) | Global Supply Chain, Banking, High Scale | IoT, Time-series, AdTech |
+
+### Cloud SQL Editions
+
+| Feature | Enterprise | Enterprise Plus |
+|---------|------------|-----------------|
+| **Performance** | Standard | High (Data Cache, improved IO path) |
+| **SLA** | 99.95% | 99.99% |
+| **Maintenance** | < 60s downtime | < 10s downtime |
+| **Replication** | Standard | Accelerated |
+| **Use Case** | General workloads | High-performance, mission-critical |

@@ -414,14 +414,14 @@ Amazon Elastic Compute Cloud (EC2) is a web service that provides secure, resiza
 - **Processing**: Temporary data processing workloads
 
 #### Instance Store vs EBS
-| Feature | Instance Store | EBS |
-|---------|----------------|-----|
-| Persistence | Temporary | Persistent |
-| Performance | Very High | High (varies by type) |
-| Backup | Not available | Snapshots |
-| Encryption | Limited | Full support |
-| Resize | Not possible | Can be resized |
-| Multi-Attach | No | Yes (io1/io2) |
+| Feature      | Instance Store | EBS                   |
+| ------------ | -------------- | --------------------- |
+| Persistence  | Temporary      | Persistent            |
+| Performance  | Very High      | High (varies by type) |
+| Backup       | Not available  | Snapshots             |
+| Encryption   | Limited        | Full support          |
+| Resize       | Not possible   | Can be resized        |
+| Multi-Attach | No             | Yes (io1/io2)         |
 
 ### Amazon Machine Images (AMIs)
 
