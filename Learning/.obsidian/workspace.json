@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "e8194bdd1a2fe6a9",
+        "id": "b45ddd3d1e00a29a",
         "type": "tabs",
         "children": [
           {
-            "id": "ac66b563da9f1df3",
+            "id": "a54140845349021e",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "dynamic-programming-complete-guide.md",
-                "mode": "preview",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "dynamic-programming-complete-guide"
+              "title": "New tab"
             }
           }
         ]
@@ -78,8 +74,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5,
-    "collapsed": true
+    "width": 459.5
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -178,10 +173,12 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "ac66b563da9f1df3",
+  "active": "e7b58c8acfa50268",
   "lastOpenFiles": [
-    "graphs-complete-guide-part1-fundamentals.md",
     "graphs-complete-guide-part2-advanced.md",
+    "bit-manipulation-complete-guide.md",
+    "graphs-complete-guide-part1-fundamentals.md",
+    "dynamic-programming-complete-guide.md",
     "gcp-ace-cap/gcp-compute-engine-pca-guide.md",
     "gcp-ace-cap/gcp-compute-engine-ace-guide.md",
     "gcp-ace-cap/gcp-cloud-run-ace-pca-guide.md",
@@ -204,8 +201,6 @@
     "gcp-ace-cap/gcp-networking-ace-guide.md",
     "gcp-ace-cap/gcp-load-balancing-pca-guide.md",
     "gcp-ace-cap/gcp-load-balancing-ace-pca-guide.md",
-    "gcp-ace-cap/gcp-load-balancing-ace-guide.md",
-    "gcp-ace-cap/gcp-kms-secretmanager-pca-guide.md",
     "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "gcp-ace-cap/gcp-gke-ace-pca-guide.md.bak",
     "gcp-ace-cap/gcp-compute-engine-ace-pca-guide.md.bak",
