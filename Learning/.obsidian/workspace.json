@@ -4,19 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "c50dced1b848e3f5",
+        "id": "09ece6e292b128d7",
         "type": "tabs",
         "children": [
           {
-            "id": "6e97a3ad602fb7c6",
+            "id": "51bab6f248151c3e",
             "type": "leaf",
             "state": {
-              "type": "image",
-              "state": {
-                "file": "NotebookLM Mind Map (1).png"
-              },
-              "icon": "lucide-image",
-              "title": "NotebookLM Mind Map (1)"
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -76,7 +74,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -175,7 +174,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "684dd4b94d720d56",
+  "active": "e7b58c8acfa50268",
   "lastOpenFiles": [
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
