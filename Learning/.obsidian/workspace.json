@@ -4,17 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "b45ddd3d1e00a29a",
+        "id": "c50dced1b848e3f5",
         "type": "tabs",
         "children": [
           {
-            "id": "a54140845349021e",
+            "id": "6e97a3ad602fb7c6",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "type": "image",
+              "state": {
+                "file": "NotebookLM Mind Map (1).png"
+              },
+              "icon": "lucide-image",
+              "title": "NotebookLM Mind Map (1)"
             }
           }
         ]
@@ -36,7 +38,7 @@
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "byModifiedTime",
+                "sortOrder": "alphabetical",
                 "autoReveal": false
               },
               "icon": "lucide-folder-closed",
@@ -173,10 +175,17 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e7b58c8acfa50268",
+  "active": "684dd4b94d720d56",
   "lastOpenFiles": [
-    "graphs-complete-guide-part2-advanced.md",
+    "NotebookLM Mind Map.png",
+    "NotebookLM Mind Map (1).png",
+    "aws-sa-c03/aws-backup-saa-c03-guide.md",
+    "aws-sa-c03/aws-aurora-saa-c03-guide.md",
+    "aws-sa-c03/aws-dynamodb-saa-c03-guide.md",
     "bit-manipulation-complete-guide.md",
+    "aws-sa-c03/aws-redshift-saa-c03-guide.md",
+    "aws-sa-c03/aws-eventbridge-saa-c03-guide.md",
+    "graphs-complete-guide-part2-advanced.md",
     "graphs-complete-guide-part1-fundamentals.md",
     "dynamic-programming-complete-guide.md",
     "gcp-ace-cap/gcp-compute-engine-pca-guide.md",
@@ -195,12 +204,6 @@
     "gcp-ace-cap/gcp-pubsub-pca-guide.md",
     "gcp-ace-cap/gcp-pubsub-ace-guide.md",
     "gcp-ace-cap/gcp-professional-cloud-architect-guide.md",
-    "gcp-ace-cap/gcp-operations-pca-guide.md",
-    "gcp-ace-cap/gcp-operations-ace-guide.md",
-    "gcp-ace-cap/gcp-networking-pca-guide.md",
-    "gcp-ace-cap/gcp-networking-ace-guide.md",
-    "gcp-ace-cap/gcp-load-balancing-pca-guide.md",
-    "gcp-ace-cap/gcp-load-balancing-ace-pca-guide.md",
     "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "gcp-ace-cap/gcp-gke-ace-pca-guide.md.bak",
     "gcp-ace-cap/gcp-compute-engine-ace-pca-guide.md.bak",
