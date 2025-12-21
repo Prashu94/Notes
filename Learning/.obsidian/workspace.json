@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "52d7a8eb04b09be3",
+        "id": "daa33ac0e6bbe371",
         "type": "tabs",
         "children": [
           {
-            "id": "e5ccc1181f847bac",
+            "id": "b0d0ed8d11d432f1",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "bit-manipulation-complete-guide.md",
-                "mode": "preview",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "bit-manipulation-complete-guide"
+              "title": "New tab"
             }
           }
         ]
@@ -177,8 +173,28 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e5ccc1181f847bac",
+  "active": "684dd4b94d720d56",
   "lastOpenFiles": [
+    "aws-sa-c03/aws-kinesis-saa-c03-guide.md",
+    "aws-sa-c03/aws-glue-saa-c03-guide.md",
+    "aws-sa-c03/aws-datasync-saa-c03-guide.md",
+    "aws-sa-c03/aws-elasticache-saa-c03-guide.md",
+    "aws-sa-c03/aws-snow-family-saa-c03-guide.md",
+    "aws-sa-c03/aws-ecs-eks-fargate-saa-c03-guide.md",
+    "aws-sa-c03/aws-athena-saa-c03-guide.md",
+    "aws-sa-c03/aws-macie-saa-c03-guide.md",
+    "gcp-pca-study-guide/02_Designing_and_Planning_Solution_Architecture.md",
+    "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
+    "gcp-pca-study-guide/08_AI_Machine_Learning_and_Data_Analytics.md",
+    "gcp-pca-study-guide/06_Operations_Reliability_and_SRE.md",
+    "gcp-pca-study-guide/05_Security_and_Compliance_by_Design.md",
+    "gcp-pca-study-guide/README.md",
+    "gcp-pca-study-guide/00_Introduction_and_Exam_Overview.md",
+    "gcp-pca-study-guide/04_Data_and_Storage_Strategy.md",
+    "gcp-pca-study-guide/01_Case_Studies_Analysis.md",
+    "gcp-pca-study-guide/03_Compute_and_Networking_Infrastructure.md",
+    "gcp-pca-study-guide",
+    "bit-manipulation-complete-guide.md",
     "aws-sa-c03/aws-ec2-saa-c03-guide.md",
     "gcp-ace-cap/mindmaps/05-Operations-Management.md",
     "gcp-ace-cap/mindmaps/04-Security-IAM.md",
@@ -187,27 +203,8 @@
     "gcp-ace-cap/mindmaps/00-Master-Index.md",
     "gcp-ace-cap/mindmaps/01-Compute-Services.md",
     "gcp-ace-cap/mindmaps",
-    "aws-sa-c03/aws-transit-gateway-saa-c03-guide.md",
-    "bit-manipulation-complete-guide.md",
-    "aws-sa-c03/aws-rds-saa-c03-guide.md",
-    "aws-sa-c03/aws-redshift-saa-c03-guide.md",
-    "aws-sa-c03/aws-backup-saa-c03-guide.md",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
-    "aws-sa-c03/aws-aurora-saa-c03-guide.md",
-    "aws-sa-c03/aws-dynamodb-saa-c03-guide.md",
-    "aws-sa-c03/aws-eventbridge-saa-c03-guide.md",
-    "graphs-complete-guide-part2-advanced.md",
-    "graphs-complete-guide-part1-fundamentals.md",
-    "dynamic-programming-complete-guide.md",
-    "gcp-ace-cap/gcp-compute-engine-pca-guide.md",
-    "gcp-ace-cap/gcp-compute-engine-ace-guide.md",
-    "gcp-ace-cap/gcp-cloud-run-ace-pca-guide.md",
-    "aws-networking-saa-c03-guide.md",
-    "gcp-ace-cap/gcp-vpc-networking-pca-guide.md",
-    "gcp-ace-cap/gcp-vpc-networking-ace-guide.md",
-    "gcp-ace-cap/gcp-vpc-ace-pca-guide.md",
-    "gcp-ace-cap/gcp-storage-pca-guide.md",
     "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "gcp-ace-cap/gcp-gke-ace-pca-guide.md.bak",
     "gcp-ace-cap/gcp-compute-engine-ace-pca-guide.md.bak",
@@ -216,7 +213,6 @@
     "gcp-ace-cap/gcp-cloud-sql-pca-guide.md.old",
     "gcp-ace-cap/gcp-cloud-sql-pca-guide.md.bak",
     "gcp-ace-cap/gcp-cloud-sql-ace-guide.md.bak",
-    "gcp-ace-cap/gcp-cloud-run-ace-pca-guide.md.bak",
     "Pasted image 20251012112026.png",
     "Pasted image 20251012111406.png",
     "Pasted image 20251012111355.png",
