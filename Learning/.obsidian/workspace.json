@@ -11,10 +11,14 @@
             "id": "b0d0ed8d11d432f1",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "commands.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "commands"
             }
           }
         ]
@@ -74,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -173,8 +178,16 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "684dd4b94d720d56",
+  "active": "b0d0ed8d11d432f1",
   "lastOpenFiles": [
+    "sqlalchemy.epub",
+    "postgresqlforjobseekers.pdf",
+    "annas-arch-59637336a35e.epub",
+    "Java21Guide.pdf",
+    "annas-arch-df49bc55d26e.epub",
+    "Neo4j_ The Definitive Guide_ Hands-On Recipes for -- Luanne Misquitta, Christophe Willemsen -- 1st Edition, 2025 -- O'Reilly Media, Incorporated -- 9781098165642 -- 5c282a41a5458fbe4b78410366d50379 -- Anna’s Archive.epub",
+    "Microservices with Spring Boot 3.pdf",
+    "bit-manipulation-complete-guide.md",
     "aws-sa-c03/aws-kinesis-saa-c03-guide.md",
     "aws-sa-c03/aws-glue-saa-c03-guide.md",
     "aws-sa-c03/aws-datasync-saa-c03-guide.md",
@@ -194,25 +207,17 @@
     "gcp-pca-study-guide/01_Case_Studies_Analysis.md",
     "gcp-pca-study-guide/03_Compute_and_Networking_Infrastructure.md",
     "gcp-pca-study-guide",
-    "bit-manipulation-complete-guide.md",
     "aws-sa-c03/aws-ec2-saa-c03-guide.md",
     "gcp-ace-cap/mindmaps/05-Operations-Management.md",
     "gcp-ace-cap/mindmaps/04-Security-IAM.md",
     "gcp-ace-cap/mindmaps/02-Storage-Database-Services.md",
     "gcp-ace-cap/mindmaps/03-Networking-Services.md",
     "gcp-ace-cap/mindmaps/00-Master-Index.md",
-    "gcp-ace-cap/mindmaps/01-Compute-Services.md",
     "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
     "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "gcp-ace-cap/gcp-gke-ace-pca-guide.md.bak",
-    "gcp-ace-cap/gcp-compute-engine-ace-pca-guide.md.bak",
-    "gcp-ace-cap/gcp-cloud-storage-pca-guide.md.bak",
-    "gcp-ace-cap/gcp-cloud-storage-ace-guide.md.bak",
-    "gcp-ace-cap/gcp-cloud-sql-pca-guide.md.old",
-    "gcp-ace-cap/gcp-cloud-sql-pca-guide.md.bak",
-    "gcp-ace-cap/gcp-cloud-sql-ace-guide.md.bak",
     "Pasted image 20251012112026.png",
     "Pasted image 20251012111406.png",
     "Pasted image 20251012111355.png",
