@@ -446,27 +446,717 @@ User drags seek bar to t=1234 seconds
    - Start playback within 500ms
 ```
 
-**Trick Play (Preview Thumbnails)**:
+### 2.5 Trick Play & Preview Thumbnails (Deep Dive)
+
+**Overview**: Netflix shows preview thumbnails when users hover over the seek bar, allowing quick visual navigation through content without playing. This feature requires sophisticated thumbnail generation, storage, and real-time rendering.
+
+#### 2.5.1 Thumbnail Generation Pipeline
+
+**Generation During Encoding**:
+```python
+class ThumbnailGenerator:
+    """
+    Generate preview thumbnails during video encoding process
+    Integrated into encoding pipeline to avoid re-processing
+    """
+    
+    def __init__(self):
+        self.thumbnail_interval = 10  # Generate every 10 seconds
+        self.thumbnail_width = 320    # 16:9 aspect ratio
+        self.thumbnail_height = 180
+        self.sprite_columns = 5       # 5x5 grid = 25 thumbnails per sprite
+        self.sprite_rows = 5
+    
+    def generate_thumbnails(self, video_file, content_id):
+        """
+        Extract thumbnails from video at regular intervals
+        """
+        duration = self.get_video_duration(video_file)
+        total_thumbnails = int(duration / self.thumbnail_interval)
+        
+        thumbnails = []
+        
+        # Extract frames using FFmpeg
+        for i in range(total_thumbnails):
+            timestamp = i * self.thumbnail_interval
+            
+            # Extract frame at specific timestamp
+            thumbnail = self.extract_frame(
+                video_file=video_file,
+                timestamp=timestamp,
+                width=self.thumbnail_width,
+                height=self.thumbnail_height
+            )
+            
+            # Apply optimizations
+            optimized = self.optimize_thumbnail(thumbnail)
+            thumbnails.append(optimized)
+        
+        # Create sprite sheets (25 thumbnails per sheet)
+        sprite_sheets = self.create_sprite_sheets(thumbnails)
+        
+        # Generate metadata for client
+        metadata = self.generate_thumbnail_metadata(
+            content_id=content_id,
+            total_thumbnails=total_thumbnails,
+            sprite_sheets=sprite_sheets
+        )
+        
+        # Upload to S3
+        self.upload_sprites(content_id, sprite_sheets, metadata)
+        
+        return metadata
+    
+    def extract_frame(self, video_file, timestamp, width, height):
+        """
+        Extract single frame using FFmpeg
+        """
+        cmd = [
+            'ffmpeg',
+            '-ss', str(timestamp),           # Seek to timestamp
+            '-i', video_file,
+            '-vframes', '1',                 # Extract 1 frame
+            '-vf', f'scale={width}:{height}',  # Resize
+            '-q:v', '5',                     # Quality (1-31, lower=better)
+            '-f', 'image2pipe',              # Output to pipe
+            '-vcodec', 'mjpeg',              # JPEG codec
+            'pipe:1'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True)
+        return Image.open(io.BytesIO(result.stdout))
+    
+    def optimize_thumbnail(self, image):
+        """
+        Optimize thumbnail for web delivery
+        """
+        # Apply slight sharpening (helps with compression)
+        sharpened = image.filter(ImageFilter.SHARPEN)
+        
+        # Convert to RGB (remove alpha channel)
+        if sharpened.mode != 'RGB':
+            sharpened = sharpened.convert('RGB')
+        
+        # Compress with MozJPEG quality 85
+        output = io.BytesIO()
+        sharpened.save(
+            output,
+            format='JPEG',
+            quality=85,
+            optimize=True,
+            progressive=True
+        )
+        
+        return Image.open(output)
+    
+    def create_sprite_sheets(self, thumbnails):
+        """
+        Combine thumbnails into sprite sheets (5×5 grid)
+        """
+        sprite_sheets = []
+        
+        for i in range(0, len(thumbnails), 25):
+            batch = thumbnails[i:i+25]
+            
+            # Create blank canvas
+            sprite = Image.new(
+                'RGB',
+                (self.thumbnail_width * self.sprite_columns,
+                 self.thumbnail_height * self.sprite_rows),
+                color='black'
+            )
+            
+            # Paste thumbnails in grid
+            for idx, thumb in enumerate(batch):
+                col = idx % self.sprite_columns
+                row = idx // self.sprite_columns
+                
+                x = col * self.thumbnail_width
+                y = row * self.thumbnail_height
+                
+                sprite.paste(thumb, (x, y))
+            
+            sprite_sheets.append(sprite)
+        
+        return sprite_sheets
+    
+    def generate_thumbnail_metadata(self, content_id, total_thumbnails, sprite_sheets):
+        """
+        Generate JSON metadata for client-side rendering
+        """
+        return {
+            'content_id': content_id,
+            'thumbnail_interval': self.thumbnail_interval,
+            'thumbnail_width': self.thumbnail_width,
+            'thumbnail_height': self.thumbnail_height,
+            'sprite_columns': self.sprite_columns,
+            'sprite_rows': self.sprite_rows,
+            'total_thumbnails': total_thumbnails,
+            'total_sprites': len(sprite_sheets),
+            'thumbnails_per_sprite': 25,
+            'base_url': f'https://assets.netflix.com/thumbnails/{content_id}/',
+            'format': 'sprite',
+            'version': 2
+        }
 ```
-User hovers over seek bar at t=1234 seconds
-    ↓
-1. Calculate thumbnail index
-   thumbnail_index = floor(1234 / 10) = 123  // Every 10 seconds
-    ↓
-2. Load thumbnail sprite sheet
-   GET /thumbnails/sprite_12.jpg
-   - Sprite sheet contains 25 thumbnails (250 seconds)
-   - Each thumbnail: 160x90 pixels
-   - Layout: 5 columns × 5 rows
-    ↓
-3. Extract specific thumbnail
-   column = 123 % 5 = 3
-   row = floor(123 / 5) % 5 = 4
-   crop: (3*160, 4*90, 160, 90)
-    ↓
-4. Display in seek bar tooltip
-   - Show thumbnail + timestamp
-   - Update in real-time as user moves cursor
+
+**FFmpeg Command for Batch Extraction**:
+```bash
+#!/bin/bash
+# Extract thumbnails every 10 seconds from entire video
+
+ffmpeg -i input.mp4 \
+  -vf "fps=1/10,scale=320:180" \  # 1 frame per 10 seconds, scale to 320x180
+  -q:v 5 \                        # Quality level 5
+  -f image2 \                      # Image output format
+  thumbnails/thumb_%04d.jpg        # Output pattern (thumb_0001.jpg, etc.)
+```
+
+#### 2.5.2 Thumbnail Formats & Storage
+
+**Format 1: Sprite Sheets (Netflix Web & Mobile)**
+
+```
+Sprite Sheet Structure:
+┌───────────────────────────────────────────────────────────────┐
+│              Sprite Sheet (1600×900 pixels)                    │
+│  ┌────────┬────────┬────────┬────────┬────────┐              │
+│  │Thumb 1 │Thumb 2 │Thumb 3 │Thumb 4 │Thumb 5 │  Row 1       │
+│  │0:00    │0:10    │0:20    │0:30    │0:40    │              │
+│  ├────────┼────────┼────────┼────────┼────────┤              │
+│  │Thumb 6 │Thumb 7 │Thumb 8 │Thumb 9 │Thumb 10│  Row 2       │
+│  │0:50    │1:00    │1:10    │1:20    │1:30    │              │
+│  ├────────┼────────┼────────┼────────┼────────┤              │
+│  │Thumb 11│Thumb 12│Thumb 13│Thumb 14│Thumb 15│  Row 3       │
+│  │1:40    │1:50    │2:00    │2:10    │2:20    │              │
+│  ├────────┼────────┼────────┼────────┼────────┤              │
+│  │Thumb 16│Thumb 17│Thumb 18│Thumb 19│Thumb 20│  Row 4       │
+│  │2:30    │2:40    │2:50    │3:00    │3:10    │              │
+│  ├────────┼────────┼────────┼────────┼────────┤              │
+│  │Thumb 21│Thumb 22│Thumb 23│Thumb 24│Thumb 25│  Row 5       │
+│  │3:20    │3:30    │3:40    │3:50    │4:00    │              │
+│  └────────┴────────┴────────┴────────┴────────┘              │
+│                                                                │
+│  File: sprite_00.jpg (covers 0:00 - 4:10)                     │
+│  Size: ~150-250KB (JPEG quality 85)                           │
+│  Dimensions: 1600×900 (5×320 × 5×180)                         │
+│                                                                │
+└───────────────────────────────────────────────────────────────┘
+
+Storage Structure:
+s3://netflix-assets/thumbnails/{content_id}/
+├── sprite_00.jpg   (0:00 - 4:10)
+├── sprite_01.jpg   (4:10 - 8:20)
+├── sprite_02.jpg   (8:20 - 12:30)
+└── ... (total: duration / 250 seconds)
+└── metadata.json   (thumbnail mapping)
+```
+
+**Format 2: BIF (Base Index Frames) - Netflix TV Apps**
+
+Netflix developed BIF format specifically for TV apps (Roku, Fire TV, smart TVs):
+
+```python
+class BIFGenerator:
+    """
+    Generate BIF (Base Index Frames) file
+    Proprietary format optimized for TV scrubbing
+    """
+    
+    BIF_MAGIC = b'BIF\x00'  # Magic number
+    BIF_VERSION = 0
+    
+    def generate_bif(self, thumbnails, output_file):
+        """
+        Create BIF file with embedded thumbnails
+        
+        BIF Format:
+        - Header (512 bytes)
+        - Index table (8 bytes per thumbnail)
+        - Thumbnail data (JPEG images)
+        """
+        with open(output_file, 'wb') as f:
+            # Write header
+            header = self.create_header(len(thumbnails))
+            f.write(header)
+            
+            # Calculate index table
+            index_table = []
+            data_offset = 512 + (len(thumbnails) * 8)
+            
+            for i, thumb in enumerate(thumbnails):
+                timestamp_ms = i * 10000  # 10 seconds in milliseconds
+                
+                # Compress thumbnail to JPEG
+                jpeg_data = self.thumbnail_to_jpeg(thumb)
+                
+                index_table.append({
+                    'timestamp': timestamp_ms,
+                    'offset': data_offset,
+                    'size': len(jpeg_data)
+                })
+                
+                data_offset += len(jpeg_data)
+            
+            # Write index table
+            for entry in index_table:
+                f.write(struct.pack('<I', entry['timestamp']))  # 4 bytes
+                f.write(struct.pack('<I', entry['offset']))     # 4 bytes
+            
+            # Write thumbnail data
+            for thumb in thumbnails:
+                jpeg_data = self.thumbnail_to_jpeg(thumb)
+                f.write(jpeg_data)
+    
+    def create_header(self, thumbnail_count):
+        """
+        BIF file header structure (512 bytes)
+        """
+        header = bytearray(512)
+        
+        # Magic number (4 bytes)
+        header[0:4] = self.BIF_MAGIC
+        
+        # Version (4 bytes)
+        struct.pack_into('<I', header, 4, self.BIF_VERSION)
+        
+        # Thumbnail count (4 bytes)
+        struct.pack_into('<I', header, 8, thumbnail_count)
+        
+        # Thumbnail interval (4 bytes, in milliseconds)
+        struct.pack_into('<I', header, 12, 10000)  # 10 seconds
+        
+        # Reserved (remaining bytes)
+        
+        return bytes(header)
+```
+
+**BIF File Advantages**:
+- Single file (no multiple HTTP requests)
+- Direct seek to any thumbnail by offset
+- Efficient for TV remote control scrubbing
+- Smaller total size (no sprite sheet overhead)
+
+**Format 3: WebVTT Thumbnail Track (Alternative)**
+
+```vtt
+WEBVTT
+
+00:00:00.000 --> 00:00:10.000
+thumbnails/thumb_0001.jpg#xywh=0,0,160,90
+
+00:00:10.000 --> 00:00:20.000
+thumbnails/sprite_00.jpg#xywh=160,0,160,90
+
+00:00:20.000 --> 00:00:30.000
+thumbnails/sprite_00.jpg#xywh=320,0,160,90
+
+... (continues for entire video)
+```
+
+#### 2.5.3 Client-Side Rendering
+
+**Web Browser Implementation (JavaScript)**:
+
+```javascript
+class ThumbnailPreview {
+    constructor(videoPlayer, metadata) {
+        this.player = videoPlayer;
+        this.metadata = metadata;
+        this.spriteCache = new Map();  // Cache loaded sprite sheets
+        this.canvas = null;
+        this.ctx = null;
+        this.previewElement = null;
+        
+        this.init();
+    }
+    
+    init() {
+        // Create canvas for thumbnail rendering
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = this.metadata.thumbnail_width;
+        this.canvas.height = this.metadata.thumbnail_height;
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Create preview tooltip element
+        this.previewElement = document.createElement('div');
+        this.previewElement.className = 'thumbnail-preview';
+        this.previewElement.style.display = 'none';
+        
+        // Add canvas to preview element
+        this.previewElement.appendChild(this.canvas);
+        
+        // Add timestamp overlay
+        this.timestampElement = document.createElement('div');
+        this.timestampElement.className = 'timestamp';
+        this.previewElement.appendChild(this.timestampElement);
+        
+        // Attach to video player
+        this.player.appendChild(this.previewElement);
+        
+        // Bind events
+        this.setupEventListeners();
+    }
+    
+    setupEventListeners() {
+        const progressBar = this.player.querySelector('.progress-bar');
+        
+        progressBar.addEventListener('mousemove', (e) => {
+            this.onProgressBarHover(e);
+        });
+        
+        progressBar.addEventListener('mouseleave', () => {
+            this.hidePreview();
+        });
+    }
+    
+    async onProgressBarHover(event) {
+        // Calculate timestamp from mouse position
+        const rect = event.currentTarget.getBoundingClientRect();
+        const percent = (event.clientX - rect.left) / rect.width;
+        const timestamp = percent * this.player.duration;
+        
+        // Show preview
+        await this.showPreview(timestamp, event.clientX, rect.top);
+    }
+    
+    async showPreview(timestamp, mouseX, progressBarY) {
+        // Calculate which thumbnail to show
+        const thumbnailIndex = Math.floor(timestamp / this.metadata.thumbnail_interval);
+        const spriteIndex = Math.floor(thumbnailIndex / this.metadata.thumbnails_per_sprite);
+        const thumbnailInSprite = thumbnailIndex % this.metadata.thumbnails_per_sprite;
+        
+        // Load sprite sheet (from cache or download)
+        const spriteImage = await this.loadSprite(spriteIndex);
+        
+        // Calculate position in sprite sheet
+        const col = thumbnailInSprite % this.metadata.sprite_columns;
+        const row = Math.floor(thumbnailInSprite / this.metadata.sprite_columns);
+        
+        const sx = col * this.metadata.thumbnail_width;
+        const sy = row * this.metadata.thumbnail_height;
+        
+        // Draw thumbnail to canvas
+        this.ctx.drawImage(
+            spriteImage,
+            sx, sy,  // Source x, y
+            this.metadata.thumbnail_width,
+            this.metadata.thumbnail_height,
+            0, 0,    // Destination x, y
+            this.metadata.thumbnail_width,
+            this.metadata.thumbnail_height
+        );
+        
+        // Update timestamp text
+        this.timestampElement.textContent = this.formatTimestamp(timestamp);
+        
+        // Position preview element (centered above mouse)
+        const previewWidth = this.previewElement.offsetWidth;
+        const previewX = mouseX - (previewWidth / 2);
+        const previewY = progressBarY - this.previewElement.offsetHeight - 10;
+        
+        this.previewElement.style.left = `${previewX}px`;
+        this.previewElement.style.top = `${previewY}px`;
+        this.previewElement.style.display = 'block';
+    }
+    
+    async loadSprite(spriteIndex) {
+        // Check cache first
+        if (this.spriteCache.has(spriteIndex)) {
+            return this.spriteCache.get(spriteIndex);
+        }
+        
+        // Download sprite sheet
+        const spriteUrl = `${this.metadata.base_url}sprite_${spriteIndex.toString().padStart(2, '0')}.jpg`;
+        
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            
+            img.onload = () => {
+                // Cache loaded sprite (keep last 5 in memory)
+                if (this.spriteCache.size >= 5) {
+                    const firstKey = this.spriteCache.keys().next().value;
+                    this.spriteCache.delete(firstKey);
+                }
+                this.spriteCache.set(spriteIndex, img);
+                resolve(img);
+            };
+            
+            img.onerror = reject;
+            img.src = spriteUrl;
+        });
+    }
+    
+    hidePreview() {
+        this.previewElement.style.display = 'none';
+    }
+    
+    formatTimestamp(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
+}
+
+// Usage
+const metadata = await fetch('/api/thumbnails/content_12345678').then(r => r.json());
+const thumbnailPreview = new ThumbnailPreview(videoPlayerElement, metadata);
+```
+
+**CSS Styling**:
+```css
+.thumbnail-preview {
+    position: absolute;
+    background: #000;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    padding: 4px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.thumbnail-preview canvas {
+    display: block;
+    border-radius: 2px;
+}
+
+.thumbnail-preview .timestamp {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: bold;
+}
+```
+
+#### 2.5.4 Performance Optimization
+
+**Progressive Loading Strategy**:
+
+```javascript
+class OptimizedThumbnailLoader {
+    constructor() {
+        this.preloadRadius = 2;  // Preload ±2 sprites around current position
+        this.loadQueue = [];
+        this.loading = false;
+    }
+    
+    async onVideoTimeUpdate(currentTime) {
+        // Calculate which sprites are likely to be needed
+        const currentSpriteIndex = this.getSpriteIndex(currentTime);
+        
+        // Preload surrounding sprites
+        for (let i = -this.preloadRadius; i <= this.preloadRadius; i++) {
+            const spriteIndex = currentSpriteIndex + i;
+            
+            if (spriteIndex >= 0 && spriteIndex < this.totalSprites) {
+                this.scheduleLoad(spriteIndex);
+            }
+        }
+        
+        this.processQueue();
+    }
+    
+    scheduleLoad(spriteIndex) {
+        if (!this.spriteCache.has(spriteIndex) && 
+            !this.loadQueue.includes(spriteIndex)) {
+            this.loadQueue.push(spriteIndex);
+        }
+    }
+    
+    async processQueue() {
+        if (this.loading || this.loadQueue.length === 0) return;
+        
+        this.loading = true;
+        
+        // Load up to 3 sprites in parallel
+        const batch = this.loadQueue.splice(0, 3);
+        await Promise.all(batch.map(idx => this.loadSprite(idx)));
+        
+        this.loading = false;
+        this.processQueue();  // Continue with next batch
+    }
+}
+```
+
+**Lazy Loading with Intersection Observer**:
+
+```javascript
+// Only load thumbnails when progress bar is visible
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            // User can see progress bar, start preloading
+            thumbnailPreview.enablePreloading();
+        } else {
+            // Progress bar not visible, pause preloading
+            thumbnailPreview.disablePreloading();
+        }
+    });
+});
+
+observer.observe(progressBarElement);
+```
+
+**Service Worker Caching**:
+
+```javascript
+// Cache sprite sheets in Service Worker for offline/fast access
+self.addEventListener('fetch', (event) => {
+    if (event.request.url.includes('/thumbnails/')) {
+        event.respondWith(
+            caches.open('netflix-thumbnails-v1').then(cache => {
+                return cache.match(event.request).then(response => {
+                    return response || fetch(event.request).then(response => {
+                        cache.put(event.request, response.clone());
+                        return response;
+                    });
+                });
+            })
+        );
+    }
+});
+```
+
+#### 2.5.5 Platform-Specific Implementations
+
+**Smart TV (BIF Format)**:
+
+```javascript
+// TV platforms use BIF files for efficient scrubbing
+class BIFThumbnailPlayer {
+    constructor(bifUrl) {
+        this.bifUrl = bifUrl;
+        this.bifData = null;
+        this.indexTable = [];
+    }
+    
+    async init() {
+        // Download entire BIF file (typically 5-15MB)
+        const response = await fetch(this.bifUrl);
+        this.bifData = await response.arrayBuffer();
+        
+        // Parse header and index
+        this.parseHeader();
+        this.parseIndex();
+    }
+    
+    getThumbnailAtTime(timestamp) {
+        // Binary search in index table
+        const index = this.binarySearch(timestamp);
+        
+        // Extract JPEG data from BIF
+        const offset = this.indexTable[index].offset;
+        const size = this.indexTable[index].size;
+        
+        const jpegData = new Uint8Array(this.bifData, offset, size);
+        
+        // Convert to blob URL for display
+        const blob = new Blob([jpegData], { type: 'image/jpeg' });
+        return URL.createObjectURL(blob);
+    }
+}
+```
+
+**Mobile (Optimized Sprites)**:
+
+```javascript
+// Mobile uses smaller thumbnails (160×90 vs 320×180)
+// And more aggressive caching to save bandwidth
+
+class MobileThumbnailLoader {
+    constructor() {
+        this.maxCacheSize = 3;  // Only cache 3 sprites on mobile
+        this.lowDataMode = this.checkDataSaver();
+    }
+    
+    checkDataSaver() {
+        // Check if user has data saver enabled
+        return navigator.connection?.saveData || false;
+    }
+    
+    async loadSprite(spriteIndex) {
+        if (this.lowDataMode) {
+            // In data saver mode, only load on explicit user interaction
+            return this.loadOnDemand(spriteIndex);
+        }
+        
+        return this.standardLoad(spriteIndex);
+    }
+}
+```
+
+#### 2.5.6 Metrics & Analytics
+
+**Thumbnail Performance Tracking**:
+
+```javascript
+class ThumbnailAnalytics {
+    trackThumbnailLoad(spriteIndex, loadTime) {
+        // Send to analytics
+        this.sendMetric({
+            event: 'thumbnail_load',
+            sprite_index: spriteIndex,
+            load_time_ms: loadTime,
+            cache_hit: loadTime < 50  // <50ms = cache hit
+        });
+    }
+    
+    trackUserInteraction() {
+        // Track how often users hover over progress bar
+        this.sendMetric({
+            event: 'thumbnail_hover',
+            session_id: this.sessionId,
+            hover_count: this.hoverCount
+        });
+    }
+}
+```
+
+**Performance Metrics**:
+- **Thumbnail Load Time**: <100ms (p95) from cache, <500ms cold load
+- **Sprite Sheet Size**: 150-250KB per sprite (JPEG quality 85)
+- **Total Thumbnail Storage**: 5-10MB per 2-hour movie
+- **Cache Hit Rate**: 85-95% (with progressive preloading)
+- **User Engagement**: 60-70% of users hover over progress bar
+
+#### 2.5.7 Cost & Trade-offs
+
+**Storage Costs**:
+- 2-hour movie: ~720 thumbnails (every 10 seconds)
+- 29 sprite sheets × 200KB = ~6MB
+- 15,000 titles × 6MB = 90GB
+- S3 storage: $2/month, CloudFront transfer: $50/month
+
+**Bandwidth Optimization**:
+- Sprite sheets reduce requests (25 thumbnails per file vs 25 files)
+- Progressive loading reduces wasted bandwidth
+- Caching eliminates repeated downloads
+
+**Quality Trade-offs**:
+- Higher intervals (15s) = fewer thumbnails, less storage/bandwidth
+- Lower resolution = smaller files, lower quality
+- Netflix uses 10-second intervals, 320×180 resolution as optimal balance
+
+**Alternative: Dynamic Thumbnail Generation**:
+```
+Some platforms generate thumbnails on-the-fly:
+- Saves storage (no pre-generated thumbnails)
+- Higher latency (200-500ms to generate)
+- More compute cost
+- Netflix uses pre-generated for better UX
 ```
 
 ## 3. Content Type Specific Streaming

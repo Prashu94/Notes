@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "aws-sa-c03/aws-storage-gateway-saa-c03-guide.md",
+                "file": "netflix-system-design/01-content-ingestion-pipeline.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "aws-storage-gateway-saa-c03-guide"
+              "title": "01-content-ingestion-pipeline"
             }
           }
         ]
@@ -180,6 +180,9 @@
   },
   "active": "b0d0ed8d11d432f1",
   "lastOpenFiles": [
+    "netflix-system-design/03-video-streaming-architecture.md",
+    "netflix-system-design/01-content-ingestion-pipeline.md",
+    "aws-sa-c03/aws-storage-gateway-saa-c03-guide.md",
     "aws-sa-c03/aws-s3-and-glacier-saa-c03-guide.md",
     "commands.md",
     "sqlalchemy.epub",
@@ -211,9 +214,6 @@
     "gcp-pca-study-guide",
     "aws-sa-c03/aws-ec2-saa-c03-guide.md",
     "gcp-ace-cap/mindmaps/05-Operations-Management.md",
-    "gcp-ace-cap/mindmaps/04-Security-IAM.md",
-    "gcp-ace-cap/mindmaps/02-Storage-Database-Services.md",
-    "gcp-ace-cap/mindmaps/03-Networking-Services.md",
     "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
