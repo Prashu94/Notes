@@ -1,11 +1,78 @@
 # Senior Java Developer Interview Questions (10+ Years Experience)
-## Java, Spring Boot & Microservices
+## Java, Spring Boot & Microservices - Comprehensive Guide
 
 ---
 
-# Part 1: Advanced Java Concepts
+## Table of Contents
 
-## 1. Explain the Java Memory Model and how volatile keyword works at CPU level.
+### Part 1: Core Java & JVM Fundamentals
+1. [Java Memory Model & Concurrency](#1-java-memory-model--concurrency)
+2. [Garbage Collection & Memory Management](#2-garbage-collection--memory-management)
+3. [Modern Java Features (Java 17-21)](#3-modern-java-features)
+
+### Part 2: Advanced Concurrency
+4. [Thread-Safe Collections](#4-thread-safe-collections)
+5. [Fork/Join Framework & Parallel Streams](#5-forkjoin-framework--parallel-streams)
+6. [CompletableFuture & Reactive Programming](#6-completablefuture--reactive-programming)
+7. [Virtual Threads (Project Loom)](#7-virtual-threads)
+
+### Part 3: Design Patterns & Best Practices
+8. [Immutability & Thread Safety](#8-immutability--thread-safety)
+9. [Reference Types & Memory Leaks](#9-reference-types--memory-leaks)
+10. [Design Patterns in Java](#10-design-patterns-in-java)
+
+### Part 4: Spring Framework Core
+11. [IoC Container & Dependency Injection](#11-ioc-container--dependency-injection)
+12. [Spring AOP & Proxies](#12-spring-aop--proxies)
+13. [Bean Lifecycle & Scopes](#13-bean-lifecycle--scopes)
+
+### Part 5: Spring Boot
+14. [Auto-Configuration Mechanism](#14-auto-configuration-mechanism)
+15. [Spring Boot Actuator & Monitoring](#15-spring-boot-actuator--monitoring)
+16. [Configuration Management](#16-configuration-management)
+
+### Part 6: Data Access & Persistence
+17. [Spring Data JPA Deep Dive](#17-spring-data-jpa-deep-dive)
+18. [Transaction Management](#18-transaction-management)
+19. [Database Performance Optimization](#19-database-performance-optimization)
+
+### Part 7: Spring Security
+20. [Security Architecture & Filters](#20-security-architecture--filters)
+21. [OAuth2 & JWT Implementation](#21-oauth2--jwt-implementation)
+22. [Method Security & Authorization](#22-method-security--authorization)
+
+### Part 8: Microservices Architecture
+23. [Microservices Design Principles](#23-microservices-design-principles)
+24. [Service Communication Patterns](#24-service-communication-patterns)
+25. [API Gateway & Service Discovery](#25-api-gateway--service-discovery)
+26. [API Versioning & Backward Compatibility](#26-api-versioning--backward-compatibility)
+
+### Part 9: Microservices Resilience
+27. [Circuit Breaker & Retry Patterns](#27-circuit-breaker--retry-patterns)
+28. [Rate Limiting & Bulkhead](#28-rate-limiting--bulkhead)
+29. [Distributed Transactions & SAGA Pattern](#29-distributed-transactions--saga-pattern)
+
+### Part 10: Distributed Systems
+30. [Distributed Caching Strategies](#30-distributed-caching-strategies)
+31. [Event-Driven Architecture](#31-event-driven-architecture)
+32. [CQRS & Event Sourcing](#32-cqrs--event-sourcing)
+
+### Part 11: Observability & Monitoring
+33. [Logging, Metrics & Tracing](#33-logging-metrics--tracing)
+34. [Health Checks & Alerting](#34-health-checks--alerting)
+
+### Part 12: Cloud Native & DevOps
+35. [Containerization & Kubernetes](#35-containerization--kubernetes)
+36. [High Availability & Disaster Recovery](#36-high-availability--disaster-recovery)
+37. [Performance Optimization](#37-performance-optimization)
+
+---
+
+# Part 1: Core Java & JVM Fundamentals
+
+## 1. Java Memory Model & Concurrency
+
+### Question: Explain the Java Memory Model and how volatile keyword works at CPU level.
 
 **Answer:**
 
@@ -78,9 +145,437 @@ Thread 2: if(volatileVar) { y = x; }   // y will see x=1
 | Simple flag | ✓ | ✗ |
 | Counter increment | ✗ | ✓ |
 | Read-heavy, single writer | ✓ | ✗ |
-| Compound operations | ✗ | ✓ |
+**Follow-up Questions:**
+- What's the difference between volatile and synchronized?
+- Can volatile replace synchronized for all use cases?
+- How does volatile affect JIT compiler optimizations?
+- What are the performance implications of volatile?
 
 ---
+
+## 2. Garbage Collection & Memory Management
+
+### Question: Explain different GC algorithms and when to use each. How do you diagnose and fix memory leaks?
+
+**Answer:**
+
+**Garbage Collection Algorithms:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                JVM Heap Structure                        │
+├──────────────────────────┬──────────────────────────────┤
+│      Young Generation    │      Old Generation          │
+│  ┌──────┬──────────────┐ │                              │
+│  │ Eden │   Survivor   │ │      Tenured Space          │
+│  │      │  S0    S1    │ │                              │
+└──┴──────┴──────────────┴─┴──────────────────────────────┘
+          Minor GC              Major GC / Full GC
+```
+
+**1. Serial GC (-XX:+UseSerialGC):**
+- Single-threaded
+- Small heap (<100MB)
+- Client applications, embedded systems
+- Pause time: 100ms - 1s
+
+**2. Parallel GC (-XX:+UseParallelGC):**
+- Multi-threaded, throughput-oriented
+- Medium to large heap (2-8GB)
+- Batch processing, non-interactive
+- Pause time: 200ms - 2s
+- Default before Java 9
+
+**3. G1 GC (-XX:+UseG1GC):**
+- Balanced throughput and latency
+- Large heap (4GB+)
+- Most applications
+- Pause time: <200ms (configurable)
+- Default from Java 9+
+
+**4. ZGC (-XX:+UseZGC):**
+- Ultra-low latency (<10ms)
+- Very large heap (100GB+)
+- Real-time systems
+- Java 15+ (production-ready)
+
+**5. Shenandoah GC (-XX:+UseShenandoahGC):**
+- Low pause times (<10ms)
+- Concurrent compaction
+- Alternative to ZGC
+
+**G1 GC Configuration:**
+
+```bash
+# Recommended G1 settings
+java -XX:+UseG1GC \
+     -XX:MaxGCPauseMillis=200 \
+     -XX:G1HeapRegionSize=8m \
+     -XX:InitiatingHeapOccupancyPercent=45 \
+     -XX:G1ReservePercent=10 \
+     -XX:G1HeapWastePercent=5 \
+     -Xms4g -Xmx4g \
+     -XX:+UseStringDeduplication \
+     -jar app.jar
+```
+
+**ZGC Configuration:**
+
+```bash
+# Ultra-low latency with ZGC
+java -XX:+UseZGC \
+     -XX:+ZGenerational \
+     -XX:SoftMaxHeapSize=12g \
+     -Xms16g -Xmx16g \
+     -XX:ConcGCThreads=4 \
+     -jar app.jar
+```
+
+**Memory Leak Detection:**
+
+```java
+// Common memory leak patterns
+
+// 1. Static collections
+public class CacheManager {
+    private static Map<String, Object> cache = new HashMap<>();
+    
+    public static void put(String key, Object value) {
+        cache.put(key, value);  // Never removed!
+    }
+}
+
+// 2. Listener leaks
+public class EventManager {
+    private List<EventListener> listeners = new ArrayList<>();
+    
+    public void addListener(EventListener listener) {
+        listeners.add(listener);  // Never removed when component destroyed
+    }
+}
+
+// 3. ThreadLocal leaks
+public class RequestContext {
+    private static ThreadLocal<User> currentUser = new ThreadLocal<>();
+    
+    public static void setUser(User user) {
+        currentUser.set(user);  // Must call remove() after use!
+    }
+    
+    // CORRECT:
+    public static void cleanup() {
+        currentUser.remove();  // Always clean up
+    }
+}
+
+// 4. Connection leaks
+public class DatabaseService {
+    public List<User> getUsers() {
+        Connection conn = dataSource.getConnection();
+        // Missing try-with-resources or finally block
+        return query(conn);  // Connection never closed!
+    }
+    
+    // CORRECT:
+    public List<User> getUsersCorrect() {
+        try (Connection conn = dataSource.getConnection()) {
+            return query(conn);
+        }
+    }
+}
+```
+
+**Memory Leak Diagnosis Tools:**
+
+```bash
+# 1. Heap dump on OOM
+java -XX:+HeapDumpOnOutOfMemoryError \
+     -XX:HeapDumpPath=/logs/heapdump.hprof \
+     -jar app.jar
+
+# 2. Enable GC logging
+java -Xlog:gc*:file=/logs/gc.log:time,uptime,level,tags \
+     -XX:+PrintGCDetails \
+     -XX:+PrintGCDateStamps \
+     -jar app.jar
+
+# 3. JVM monitoring flags
+java -XX:+PrintGCApplicationStoppedTime \
+     -XX:+PrintTenuringDistribution \
+     -XX:+PrintAdaptiveSizePolicy \
+     -jar app.jar
+```
+
+**Analyzing Memory with JVM Tools:**
+
+```bash
+# Generate heap dump
+jcmd <pid> GC.heap_dump /tmp/heapdump.hprof
+
+# View heap histogram
+jcmd <pid> GC.class_histogram
+
+# View native memory
+jcmd <pid> VM.native_memory summary
+
+# Analyze with jhat (basic)
+jhat heapdump.hprof
+# Then browse to http://localhost:7000
+
+# Better: Use Eclipse MAT or VisualVM
+```
+
+**Preventing Memory Leaks:**
+
+```java
+@Component
+public class ProperResourceManagement {
+    
+    // Use WeakHashMap for caches
+    private Map<Key, Value> cache = new WeakHashMap<>();
+    
+    // Use try-with-resources
+    public void processFile(String path) {
+        try (InputStream is = new FileInputStream(path);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+            // Auto-closed
+        } catch (IOException e) {
+            log.error("Error processing file", e);
+        }
+    }
+    
+    // Clean up ThreadLocal
+    @PreDestroy
+    public void cleanup() {
+        ThreadLocalContext.clear();
+    }
+    
+    // Use @Scheduled with fixed pool
+    @Scheduled(fixedRate = 60000)
+    public void scheduledTask() {
+        try {
+            // Do work
+        } finally {
+            // Clean up resources
+        }
+    }
+}
+```
+
+**Follow-up Questions:**
+- When would you choose ZGC over G1?
+- How do you tune GC for a trading system requiring <1ms latency?
+- What tools do you use for memory profiling in production?
+- Explain the difference between minor GC and major GC.
+
+---
+
+## 3. Modern Java Features
+
+### Question: Explain Records, Sealed Classes, Pattern Matching, and Virtual Threads. How do they improve code quality?
+
+**Answer:**
+
+**1. Records (Java 14+):**
+
+```java
+// Traditional POJO
+public class PersonOld {
+    private final String name;
+    private final int age;
+    
+    public PersonOld(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    public String getName() { return name; }
+    public int getAge() { return age; }
+    
+    @Override
+    public boolean equals(Object o) { /* boilerplate */ }
+    @Override
+    public int hashCode() { /* boilerplate */ }
+    @Override
+    public String toString() { /* boilerplate */ }
+}
+
+// Modern Record (16 lines → 1 line!)
+public record Person(String name, int age) {
+    // Compact constructor for validation
+    public Person {
+        if (age < 0) throw new IllegalArgumentException("Age cannot be negative");
+    }
+    
+    // Custom method
+    public boolean isAdult() {
+        return age >= 18;
+    }
+    
+    // Override accessors if needed
+    @Override
+    public String name() {
+        return name.toUpperCase();
+    }
+}
+
+// Usage
+Person person = new Person("John", 30);
+System.out.println(person.name());  // JOHN
+System.out.println(person.age());   // 30
+```
+
+**2. Sealed Classes (Java 17+):**
+
+```java
+// Restrict inheritance hierarchy
+public sealed interface PaymentMethod 
+    permits CreditCard, DebitCard, PayPal, BankTransfer {
+    
+    Money process(Money amount);
+}
+
+public final class CreditCard implements PaymentMethod {
+    private final String cardNumber;
+    private final String cvv;
+    
+    @Override
+    public Money process(Money amount) {
+        // Process credit card payment
+        return amount;
+    }
+}
+
+public final class PayPal implements PaymentMethod {
+    private final String email;
+    
+    @Override
+    public Money process(Money amount) {
+        // Process PayPal payment
+        return amount;
+    }
+}
+
+// Non-sealed allows further extension
+public non-sealed class BankTransfer implements PaymentMethod {
+    @Override
+    public Money process(Money amount) {
+        return amount;
+    }
+}
+
+// Benefits:
+// 1. Exhaustive pattern matching
+// 2. Better domain modeling
+// 3. Compiler guarantees all cases covered
+```
+
+**3. Pattern Matching for switch (Java 21+):**
+
+```java
+// Old way
+public String processPayment(PaymentMethod payment) {
+    if (payment instanceof CreditCard) {
+        CreditCard cc = (CreditCard) payment;
+        return "Processing credit card: " + cc.getCardNumber();
+    } else if (payment instanceof PayPal) {
+        PayPal pp = (PayPal) payment;
+        return "Processing PayPal: " + pp.getEmail();
+    } else {
+        return "Unknown payment method";
+    }
+}
+
+// Modern way with pattern matching
+public String processPaymentModern(PaymentMethod payment) {
+    return switch (payment) {
+        case CreditCard cc -> "Processing credit card: " + cc.getCardNumber();
+        case PayPal pp -> "Processing PayPal: " + pp.getEmail();
+        case DebitCard dc -> "Processing debit card: " + dc.getCardNumber();
+        case BankTransfer bt -> "Processing bank transfer: " + bt.getAccountNumber();
+        // Compiler ensures all cases covered (exhaustive)
+    };
+}
+
+// With guards
+public String processPaymentWithGuards(PaymentMethod payment, Money amount) {
+    return switch (payment) {
+        case CreditCard cc when amount.greaterThan(Money.of(1000)) ->
+            "High-value credit card transaction requires verification";
+        case CreditCard cc -> "Processing credit card: " + cc.getCardNumber();
+        case PayPal pp when !pp.isVerified() ->
+            "Unverified PayPal account";
+        case PayPal pp -> "Processing PayPal: " + pp.getEmail();
+        default -> "Standard processing";
+    };
+}
+
+// Pattern matching for instanceof (Java 16+)
+public void processOrder(Object obj) {
+    if (obj instanceof Order order && order.getTotal() > 100) {
+        // order variable automatically available
+        applyDiscount(order);
+    }
+}
+```
+
+**4. Text Blocks (Java 15+):**
+
+```java
+// Old way - ugly escaped strings
+String json = "{\n" +
+              "  \"name\": \"John\",\n" +
+              "  \"age\": 30\n" +
+              "}";
+
+// Modern way - readable
+String jsonNew = """
+    {
+      "name": "John",
+      "age": 30
+    }
+    """;
+
+// SQL queries
+String query = """
+    SELECT u.id, u.name, u.email,
+           COUNT(o.id) as order_count
+    FROM users u
+    LEFT JOIN orders o ON u.id = o.user_id
+    WHERE u.status = 'ACTIVE'
+    GROUP BY u.id, u.name, u.email
+    ORDER BY order_count DESC
+    """;
+```
+
+**5. Enhanced NullPointerException (Java 14+):**
+
+```bash
+# Old error message
+Exception in thread "main" java.lang.NullPointerException
+    at Main.process(Main.java:12)
+
+# New detailed message
+Exception in thread "main" java.lang.NullPointerException: 
+    Cannot invoke "User.getAddress()" because the return value of "Order.getUser()" is null
+    at Main.process(Main.java:12)
+```
+
+**6. Virtual Threads (Java 21 - covered in detail in Question 7)**
+
+**Follow-up Questions:**
+- How do sealed classes improve pattern matching?
+- What are the limitations of records?
+- When would you use records vs traditional classes?
+- How do virtual threads differ from platform threads?
+
+---
+
+# Part 2: Advanced Concurrency
+
+## 4. Thread-Safe Collections
+
+### Question:
 
 ## 2. Explain how ConcurrentHashMap achieves thread-safety and its internal implementation changes from Java 7 to Java 8+.
 
@@ -185,32 +680,94 @@ public V get(Object key) {
 }
 ```
 
-**Key Improvements in Java 8:**
+**Performance Characteristics:**
 
-| Feature | Java 7 | Java 8+ |
-|---------|--------|---------|
-| **Locking** | Segment lock | Per-bucket lock |
-| **Empty bucket insert** | Segment lock | CAS (lock-free) |
-| **Read operations** | Nearly lock-free | Completely lock-free |
-| **Collision handling** | Linked list | Linked list → Red-Black tree |
-| **Tree threshold** | N/A | 8 nodes |
-| **Concurrency** | Fixed (16) | Dynamic (n buckets) |
+| Operation | Java 7 (Segments) | Java 8+ (CAS) |
+|-----------|-------------------|---------------|
+| **Get** | Lock-free | Lock-free |
+| **Put (empty bucket)** | Segment lock | CAS (lock-free) |
+| **Put (collision)** | Segment lock | Bucket lock |
+| **Size** | Sum all segments | Approximate |
+| **Concurrent writes** | Max 16 | Unlimited (per bucket) |
 
-**Atomic Operations in Java 8:**
+**Best Practices:**
 
 ```java
-// Atomic compute operations
-map.compute(key, (k, v) -> v == null ? 1 : v + 1);
-map.computeIfAbsent(key, k -> expensiveComputation(k));
-map.computeIfPresent(key, (k, v) -> v + 1);
-map.merge(key, 1, Integer::sum);
-
-// These are atomic and thread-safe
+@Service
+public class ConcurrentMapService {
+    
+    private final ConcurrentHashMap<String, User> userCache = new ConcurrentHashMap<>();
+    
+    // Atomic compute operations (better than get + put)
+    public void incrementCounter(String key) {
+        // WRONG - not atomic
+        Integer count = userCache.computeIfAbsent(key, k -> 0);
+        userCache.put(key, count + 1);  // Race condition!
+        
+        // CORRECT - atomic
+        userCache.compute(key, (k, v) -> v == null ? 1 : v + 1);
+        // Or even better:
+        userCache.merge(key, 1, Integer::sum);
+    }
+    
+    // Expensive computation - only once
+    public User getOrCreateUser(String userId) {
+        return userCache.computeIfAbsent(userId, id -> {
+            // Called only if absent, and only once even with concurrent access
+            return userRepository.findById(id).orElseThrow();
+        });
+    }
+    
+    // Conditional update
+    public boolean updateIfPresent(String key, User newValue) {
+        return userCache.computeIfPresent(key, (k, oldValue) -> {
+            // Update only if exists
+            return newValue;
+        }) != null;
+    }
+    
+    // Replace only if specific value
+    public boolean replaceUserIfStale(String key, User expected, User newUser) {
+        return userCache.replace(key, expected, newUser);
+    }
+}
 ```
+
+**Other Thread-Safe Collections:**
+
+```java
+// 1. CopyOnWriteArrayList - read-heavy, write-rare scenarios
+private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
+
+public void addListener(Listener listener) {
+    listeners.add(listener);  // Creates new array copy
+}
+
+public void fireEvent(Event event) {
+    listeners.forEach(l -> l.onEvent(event));  // Snapshot iteration, no ConcurrentModificationException
+}
+
+// 2. ConcurrentSkipListMap - sorted concurrent map
+private final ConcurrentSkipListMap<Timestamp, Event> events = new ConcurrentSkipListMap<>();
+
+// 3. ConcurrentLinkedQueue - lock-free queue
+private final ConcurrentLinkedQueue<Task> taskQueue = new ConcurrentLinkedQueue<>();
+
+// 4. LinkedBlockingQueue - bounded blocking queue
+private final BlockingQueue<Order> orders = new LinkedBlockingQueue<>(1000);
+```
+
+**Follow-up Questions:**
+- When would you use ConcurrentHashMap vs Collections.synchronizedMap()?
+- What's the difference between ConcurrentHashMap and Hashtable?
+- How does ConcurrentHashMap size() work and why is it approximate?
+- What are the trade-offs of CopyOnWriteArrayList?
 
 ---
 
-## 3. What is the difference between strong, soft, weak, and phantom references? When would you use each?
+## 5. Fork/Join Framework & Parallel Streams
+
+### Question: Explain the Fork/Join framework and how work-stealing algorithm works.
 
 **Answer:**
 
@@ -446,21 +1003,515 @@ class SumTask extends RecursiveTask<Long> {
         // Compute right task in current thread
         long rightResult = rightTask.compute();
         
-        // Join left task (wait for result)
-        long leftResult = leftTask.join();
+  Best Practices:**
+
+```java
+// DO: Fork-Compute-Join pattern
+leftTask.fork();
+rightResult = rightTask.compute();  // Use current thread
+leftResult = leftTask.join();
+
+// DON'T: Fork both (wastes current thread)
+leftTask.fork();
+rightTask.fork();
+leftResult = leftTask.join();
+rightResult = rightTask.join();
+
+// DO: Use invokeAll for multiple tasks
+invokeAll(task1, task2, task3);
+
+// DO: Choose appropriate threshold
+// Too small = overhead of task creation
+// Too large = poor parallelism
+```
+
+**Parallel Streams (Built on Fork/Join):**
+
+```java
+@Service
+public class DataProcessingService {
+    
+    // Sequential processing
+    public long sumSequential(List<Long> numbers) {
+        return numbers.stream()
+            .mapToLong(Long::longValue)
+            .sum();
+    }
+    
+    // Parallel processing
+    public long sumParallel(List<Long> numbers) {
+        return numbers.parallelStream()
+            .mapToLong(Long::longValue)
+            .sum();
+    }
+    
+    // Custom parallel processing
+    public List<ProcessedData> processLargeDataset(List<RawData> data) {
+        return data.parallelStream()
+            .filter(d -> d.isValid())
+            .map(this::transform)
+            .map(this::enrich)
+            .collect(Collectors.toList());
+    }
+    
+    // Control parallelism level
+    public Result processWithCustomPool(List<Item> items) {
+        ForkJoinPool customPool = new ForkJoinPool(4);
+        try {
+            return customPool.submit(() ->
+                items.parallelStream()
+                    .map(this::process)
+                    .collect(Collectors.toList())
+            ).get();
+        } finally {
+            customPool.shutdown();
+        }
+    }
+}
+```
+
+**When to Use Parallel Streams:**
+
+✅ **Good Use Cases:**
+- Large datasets (>10,000 elements)
+- CPU-intensive operations
+- Independent operations (no shared state)
+- Stateless transformations
+
+❌ **Bad Use Cases:**
+- Small datasets (<1,000 elements)
+- I/O operations (blocking)
+- Synchronized operations
+- Order-dependent operations
+
+**Follow-up Questions:**
+- What's the default parallelism level of ForkJoinPool?
+- How does work-stealing reduce contention?
+- When would you create a custom ForkJoinPool?
+- What are the pitfalls of parallel streams?
+
+---
+
+## 6. CompletableFuture & Reactive Programming
+
+### Question: How do you handle asynchronous processing in Java? Explain CompletableFuture composition and error handling.
+
+**Answer:**
+
+**CompletableFuture Basics:**
+
+```java
+@Service
+public class AsyncOrderService {
+    
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private InventoryService inventoryService;
+    
+    @Autowired
+    private PaymentService paymentService;
+    
+    // Simple async execution
+    public CompletableFuture<Order> createOrderAsync(OrderRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Runs in ForkJoinPool.commonPool()
+            return processOrder(request);
+        });
+    }
+    
+    // Custom executor
+    @Bean
+    public Executor asyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(50);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("async-");
+        executor.initialize();
+        return executor;
+    }
+    
+    public CompletableFuture<Order> createOrderWithCustomExecutor(OrderRequest request) {
+        return CompletableFuture.supplyAsync(() -> 
+            processOrder(request), 
+            asyncExecutor()
+        );
+    }
+}
+```
+
+**Composing Multiple Async Operations:**
+
+```java
+@Service
+public class ComposedAsyncService {
+    
+    // Sequential composition (thenCompose)
+    public CompletableFuture<OrderConfirmation> placeOrder(OrderRequest request) {
+        return validateUser(request.getUserId())
+            .thenCompose(user -> checkInventory(request.getItems()))
+            .thenCompose(inventory -> processPayment(request.getPayment()))
+            .thenCompose(payment -> createOrder(request, payment))
+            .thenApply(order -> new OrderConfirmation(order));
+    }
+    
+    // Parallel execution (thenCombine)
+    public CompletableFuture<CheckoutResult> checkout(String userId, String cartId) {
+        CompletableFuture<User> userFuture = getUserAsync(userId);
+        CompletableFuture<Cart> cartFuture = getCartAsync(cartId);
+        CompletableFuture<Discount> discountFuture = getDiscountsAsync(userId);
         
-        return leftResult + rightResult;
+        return userFuture.thenCombine(cartFuture, (user, cart) -> 
+            new CheckoutContext(user, cart)
+        ).thenCombine(discountFuture, (context, discount) -> {
+            context.setDiscount(discount);
+            return context;
+        }).thenApply(this::calculateTotal);
+    }
+    
+    // Wait for all (allOf)
+    public CompletableFuture<AggregatedData> fetchAllData(String userId) {
+        CompletableFuture<Profile> profileFuture = fetchProfile(userId);
+        CompletableFuture<Orders> ordersFuture = fetchOrders(userId);
+        CompletableFuture<Recommendations> recsFuture = fetchRecommendations(userId);
+        
+        return CompletableFuture.allOf(profileFuture, ordersFuture, recsFuture)
+            .thenApply(v -> new AggregatedData(
+                profileFuture.join(),
+                ordersFuture.join(),
+                recsFuture.join()
+            ));
+    }
+    
+    // Wait for any (anyOf)
+    public CompletableFuture<String> getDataFromMultipleSources() {
+        CompletableFuture<String> source1 = fetchFromSource1();
+        CompletableFuture<String> source2 = fetchFromSource2();
+        CompletableFuture<String> source3 = fetchFromSource3();
+        
+        return CompletableFuture.anyOf(source1, source2, source3)
+            .thenApply(result -> (String) result);
+    }
+}
+```
+
+**Error Handling:**
+
+```java
+@Service
+public class ResilientAsyncService {
+    
+    // Handle exceptions with exceptionally
+    public CompletableFuture<Order> placeOrderWithFallback(OrderRequest request) {
+        return processOrder(request)
+            .exceptionally(ex -> {
+                log.error("Order processing failed", ex);
+                return createFallbackOrder(request);
+            });
+    }
+    
+    // Handle both success and failure with handle
+    public CompletableFuture<Result> processWithRecovery(Request request) {
+        return process(request)
+            .handle((result, ex) -> {
+                if (ex != null) {
+                    log.error("Processing failed", ex);
+                    return Result.failure(ex.getMessage());
+                }
+                return Result.success(result);
+            });
+    }
+    
+    // Conditional recovery with whenComplete
+    public CompletableFuture<Order> placeOrderWithLogging(OrderRequest request) {
+        return processOrder(request)
+            .whenComplete((order, ex) -> {
+                if (ex != null) {
+                    log.error("Order failed for user: {}", request.getUserId(), ex);
+                    metrics.incrementFailureCounter();
+                } else {
+                    log.info("Order created: {}", order.getId());
+                    metrics.incrementSuccessCounter();
+                }
+            });
+    }
+    
+    // Timeout handling
+    public CompletableFuture<Data> fetchDataWithTimeout(String id) {
+        return CompletableFuture.supplyAsync(() -> fetchData(id))
+            .orTimeout(5, TimeUnit.SECONDS)
+            .exceptionally(ex -> {
+                if (ex instanceof TimeoutException) {
+                    log.warn("Data fetch timed out for id: {}", id);
+                    return getDefaultData();
+                }
+                throw new RuntimeException(ex);
+            });
+    }
+    
+    // Retry logic
+    public CompletableFuture<Result> executeWithRetry(Request request, int maxRetries) {
+        return executeAsync(request)
+            .exceptionally(ex -> {
+                if (maxRetries > 0 && isRetriable(ex)) {
+                    log.warn("Retrying... attempts left: {}", maxRetries);
+                    return executeWithRetry(request, maxRetries - 1).join();
+                }
+                throw new RuntimeException(ex);
+            });
+    }
+}
+```
+
+**CompletableFuture vs Reactive Streams:**
+
+```java
+// CompletableFuture - single async value
+CompletableFuture<User> userFuture = fetchUser(id);
+
+// Reactive Streams (Project Reactor) - stream of values
+Flux<Event> events = eventStream()
+    .filter(e -> e.getType() == EventType.ORDER)
+    .map(this::transform)
+    .buffer(Duration.ofSeconds(5))
+    .flatMap(this::processBatch);
+
+// When to use:
+// - CompletableFuture: Single async operation, request-response
+// - Reactive Streams: Streaming data, backpressure, real-time events
+```
+
+**Follow-up Questions:**
+- What's the difference between thenApply and thenCompose?
+- How does CompletableFuture handle thread pools?
+- What are the pitfalls of join() vs get()?
+- When would you use reactive programming over CompletableFuture?
+
+---
+
+## 7. Virtual Threads
+
+### Question: Explain Virtual Threads (Project Loom). How do they differ from platform threads? When should you use them?
+
+**Answer:**
+
+**Virtual Threads Architecture:**
+
+```
+┌──────────────────────────────────────────────────────┐
+│            JVM (1 million virtual threads)           │
+├──────────────────────────────────────────────────────┤
+│  VThread1  VThread2  ...  VThread1000000           │
+└───────┬────────┬──────────────────┬──────────────────┘
+        │        │                  │
+┌───────┴────────┴──────────────────┴──────────────────┐
+│    ForkJoinPool (Carrier Threads = CPU cores)       │
+│        Thread1    Thread2    ...    Thread8         │
+└──────────────────────────────────────────────────────┘
+        │         │                   │
+┌───────┴─────────┴───────────────────┴────────────────┐
+│               Operating System                       │
+└──────────────────────────────────────────────────────┘
+```
+
+**Creating Virtual Threads:**
+
+```java
+@Configuration
+public class VirtualThreadConfig {
+    
+    // Method 1: Direct creation
+    public void createVirtualThread() {
+        Thread vThread = Thread.ofVirtual()
+            .name("virtual-worker")
+            .start(() -> {
+                System.out.println("Running in virtual thread");
+            });
+    }
+    
+    // Method 2: Virtual thread executor
+    @Bean
+    public ExecutorService virtualThreadExecutor() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
+    
+    // Method 3: Configure Tomcat to use virtual threads
+    @Bean
+    public TomcatProtocolHandlerCustomizer<?> protocolHandlerVirtualThreadExecutorCustomizer() {
+        return protocolHandler -> {
+            protocolHandler.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+        };
+    }
+}
+```
+
+**Using Virtual Threads in Spring Boot:**
+
+```java
+@Service
+public class VirtualThreadService {
+    
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    
+    // Handle thousands of concurrent requests
+    public List<Result> processLargeNumberOfRequests(List<Request> requests) {
+        // Create 10,000 virtual threads - cheap!
+        List<CompletableFuture<Result>> futures = requests.stream()
+            .map(req -> CompletableFuture.supplyAsync(
+                () -> processRequest(req),
+                executor
+            ))
+            .toList();
+        
+        return futures.stream()
+            .map(CompletableFuture::join)
+            .toList();
+    }
+    
+    // Blocking I/O is fine with virtual threads
+    public User fetchUserBlocking(String userId) {
+        // This blocks the virtual thread, not platform thread
+        return restTemplate.getForObject(
+            "https://api.example.com/users/" + userId,
+            User.class
+        );
+    }
+    
+    // Structured concurrency (Preview)
+    public Order fetchOrderWithDetails(String orderId) throws ExecutionException, InterruptedException {
+        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+            Future<Order> orderFuture = scope.fork(() -> fetchOrder(orderId));
+            Future<User> userFuture = scope.fork(() -> fetchUser(order.getUserId()));
+            Future<List<Item>> itemsFuture = scope.fork(() -> fetchItems(orderId));
+            
+            scope.join();           // Wait for all
+            scope.throwIfFailed();  // Propagate errors
+            
+            return combineResults(
+                orderFuture.resultNow(),
+                userFuture.resultNow(),
+                itemsFuture.resultNow()
+            );
+        }
+    }
+}
+```
+
+**Platform Threads vs Virtual Threads:**
+
+| Aspect | Platform Threads | Virtual Threads |
+|--------|------------------|-----------------|
+| **OS Resource** | Yes (1:1 mapping) | No (M:N mapping) |
+| **Memory** | ~2MB stack | ~1KB stack |
+| **Creation Cost** | Expensive (~1ms) | Cheap (~1μs) |
+| **Max Count** | Thousands | Millions |
+| **Blocking** | Blocks OS thread | Unmounts from carrier |
+| **Context Switch** | Expensive | Cheap |
+| **Use Case** | CPU-bound, limited count | I/O-bound, high concurrency |
+
+**When to Use Virtual Threads:**
+
+✅ **Good Use Cases:**
+```java
+// 1. High-concurrency I/O operations
+@Service
+public class IoIntensiveService {
+    public List<Data> fetchFromMultipleAPIs(List<String> urls) {
+        // 10,000 concurrent HTTP calls - no problem!
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            return urls.stream()
+                .map(url -> CompletableFuture.supplyAsync(
+                    () -> httpClient.get(url),
+                    executor
+                ))
+                .map(CompletableFuture::join)
+                .toList();
+        }
     }
 }
 
-// Usage
-ForkJoinPool pool = ForkJoinPool.commonPool();
-long[] array = new long[10000000];
-Arrays.fill(array, 1);
+// 2. Database connection pooling
+@Configuration
+public class DataSourceConfig {
+    @Bean
+    public HikariDataSource dataSource() {
+        HikariConfig config = new HikariConfig();
+        config.setMaximumPoolSize(1000);  // Much higher with virtual threads!
+        config.setMinimumIdle(100);
+        return new HikariDataSource(config);
+    }
+}
 
-SumTask task = new SumTask(array, 0, array.length);
-long sum = pool.invoke(task);
-System.out.println("Sum: " + sum);  // 10000000
+// 3. Request handling in web servers
+@RestController
+public class ApiController {
+    // Each request gets its own virtual thread
+    @GetMapping("/users/{id}")
+    public User getUser(@PathVariable String id) {
+        // Blocking calls are OK - virtual thread unmounts
+        return userService.fetchUser(id);
+    }
+}
+```
+
+❌ **Bad Use Cases:**
+```java
+// CPU-intensive computation (no benefit)
+public long calculatePrimes(int n) {
+    // Pure CPU work - virtual threads don't help
+    return IntStream.range(2, n)
+        .filter(this::isPrime)
+        .count();
+}
+
+// Synchronized blocks (pins carrier thread)
+public synchronized void updateCounter() {
+    counter++;  // Pins the carrier thread!
+}
+
+// Native calls (pins carrier thread)
+public void useJNI() {
+    nativeMethod();  // Pins the carrier thread!
+}
+```
+
+**Migration Considerations:**
+
+```java
+// Before: ThreadPoolExecutor
+ExecutorService executor = new ThreadPoolExecutor(
+    10, 100, 60L, TimeUnit.SECONDS,
+    new LinkedBlockingQueue<>(1000)
+);
+
+// After: Virtual threads (simple!)
+ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+
+// ThreadLocal still works but be careful
+ThreadLocal<User> currentUser = new ThreadLocal<>();  // OK but can use millions of instances
+
+// Better: ScopedValue (Preview)
+ScopedValue<User> currentUser = ScopedValue.newInstance();
+ScopedValue.where(currentUser, user).run(() -> {
+    // user available in this scope
+});
+```
+
+**Follow-up Questions:**
+- What happens when a virtual thread blocks?
+- How do virtual threads affect ThreadLocal usage?
+- What is thread pinning and how do you avoid it?
+- When would platform threads still be better than virtual threads?
+
+---
+
+# Part 3: Design Patterns & Best Practices
+
+## 8. Immutability & Thread Safety
+
+### Question:m.out.println("Sum: " + sum);  // 10000000
 ```
 
 **RecursiveAction (no return value):**
