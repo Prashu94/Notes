@@ -4,19 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "ef7018157133e685",
+        "id": "056c3284b0f6ee78",
         "type": "tabs",
         "children": [
           {
-            "id": "52045e55c3ba30ff",
+            "id": "1cf7cc162f926cb6",
             "type": "leaf",
             "state": {
-              "type": "release-notes",
-              "state": {
-                "currentVersion": "1.11.5"
-              },
-              "icon": "lucide-book-up",
-              "title": "Release Notes 1.11.5"
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -176,7 +174,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "52045e55c3ba30ff",
+  "active": "1cf7cc162f926cb6",
   "lastOpenFiles": [
     "netflix-system-design/02-storage-architecture.md",
     "netflix-system-design/01-content-ingestion-pipeline.md",
