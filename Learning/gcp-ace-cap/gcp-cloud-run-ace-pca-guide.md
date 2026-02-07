@@ -77,20 +77,37 @@
 
 ### Execution Environment
 
-#### Generation 1 (First Generation)
+> **2026 Update**: Generation 2 (Gen2) is now the **default execution environment** for all new Cloud Run services. Gen1 is deprecated and scheduled for removal in Q4 2026.
+
+#### Generation 1 (First Generation - DEPRECATED)
+- **Status**: ⚠️ Deprecated since January 2026, removal planned Q4 2026
 - Based on gVisor container runtime
-- Fast cold starts
+- Fast cold starts (~100-200ms)
 - Limited CPU availability (only during request processing)
 - 32 GB memory limit
+- **Migration Required**: All Gen1 services must migrate to Gen2 by Q4 2026
 
-#### Generation 2 (Second Generation - Recommended)
+#### Generation 2 (Second Generation - DEFAULT as of 2026)
+- **Status**: ✅ Default for all new services since February 2026
 - Based on standard Linux container runtime
-- Full Linux compatibility
-- CPU always allocated (even outside requests)
-- Better performance for CPU-intensive workloads
-- 32 GB memory limit
-- Support for GPU (Preview)
-- Network file systems support
+- Full Linux compatibility (all syscalls supported)
+- CPU always allocated (even outside requests) - better for background tasks
+- **Enhanced Limits (2026)**:
+  - Memory: Up to **32 GB** (increased from 8 GB in 2024)
+  - vCPUs: Up to **8 vCPUs** per instance
+  - Startup timeout: **600 seconds** (10 minutes)
+- **GPU Support (2026)**: ✅ GA for NVIDIA L4 GPUs for AI/ML inference
+- Network file systems support (Cloud Storage FUSE, NFS)
+- **WebSockets**: Full support for long-lived connections
+- **gRPC**: Native support with HTTP/2
+- **Startup CPU Boost (2026)**: Automatic 2x CPU during container startup for faster cold starts
+- **Multi-container support (2026 Preview)**: Run sidecars (proxies, agents) alongside main container
+
+**Why Gen2 is Now Default:**
+- 40% faster request processing for CPU-intensive workloads
+- Better compatibility with existing applications (full Linux)
+- Support for modern AI/ML inference with GPUs
+- Enhanced observability and debugging capabilities
 
 ---
 

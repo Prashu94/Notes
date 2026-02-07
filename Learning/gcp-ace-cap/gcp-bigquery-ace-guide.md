@@ -1,5 +1,7 @@
 # Google Cloud BigQuery ACE Guide
 
+> **2026 Update**: BigQuery now features Apache Iceberg support (GA), vector search for AI/ML, and Gemini integration for natural language queries.
+
 ## 1. Overview
 BigQuery is a fully managed, serverless, highly scalable enterprise data warehouse. It separates storage and compute, allowing them to scale independently.
 
@@ -9,6 +11,9 @@ BigQuery is a fully managed, serverless, highly scalable enterprise data warehou
 - **Storage & Compute Separation:** Cost-effective and scalable.
 - **Real-time Analytics:** Supports streaming ingestion.
 - **Built-in ML:** BigQuery ML for machine learning models using SQL.
+- **Iceberg Tables (2026 GA):** Open table format for multi-engine analytics.
+- **Vector Search (2026):** Native support for AI/ML embeddings and semantic search.
+- **Editions (2026):** Standard, Enterprise, Enterprise Plus with different capabilities.
 
 ## 2. Managing Resources (Datasets & Tables)
 

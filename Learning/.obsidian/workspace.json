@@ -20,8 +20,21 @@
               "icon": "lucide-file",
               "title": "commands"
             }
+          },
+          {
+            "id": "fce266cbee35017a",
+            "type": "leaf",
+            "state": {
+              "type": "release-notes",
+              "state": {
+                "currentVersion": "1.11.7"
+              },
+              "icon": "lucide-book-up",
+              "title": "Release Notes 1.11.7"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -177,7 +190,7 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "1cf7cc162f926cb6",
+  "active": "fce266cbee35017a",
   "lastOpenFiles": [
     "netflix-system-design/02-storage-architecture.md",
     "netflix-system-design/01-content-ingestion-pipeline.md",

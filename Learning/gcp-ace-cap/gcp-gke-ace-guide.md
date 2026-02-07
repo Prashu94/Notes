@@ -92,22 +92,31 @@ Nodes are Compute Engine VMs that run containerized workloads:
 
 ### GKE Autopilot
 
+> **2026 Update**: Autopilot is now the **recommended mode** for most GKE workloads with GA support for GPUs and ARM-based nodes.
+
 **Fully Managed Infrastructure:**
 - Google manages nodes, scaling, upgrades, repairs, health checks
-- No SSH access to nodes
+- No SSH access to nodes (security best practice)
 - Automatic node provisioning based on Pod resource requests
 - Security hardened by default (Shielded GKE nodes, Workload Identity enabled)
 
 **Benefits:**
 - **Reduced Operational Overhead**: No node pool management
-- **Automatic Scaling**: Nodes scale automatically with workload demands
+- **Automatic Scaling**: Nodes scale automatically with workload demands (< 60s)
 - **Cost Optimization**: Pay only for Pod resources (vCPU, memory, storage), not idle nodes
 - **Security**: Hardened configuration with many security settings enabled by default
-- **SLA**: Covers both control plane and compute capacity
+- **SLA**: 99.9% uptime for both control plane and pods
+
+**2026 Enhancements:**
+- ✅ **GPU Support (GA)**: NVIDIA L4, T4, A100 for AI/ML workloads
+- ✅ **ARM Support**: Tau T2A nodes for cost savings (up to 50% cheaper)
+- ✅ **Spot Pods**: Up to 91% discount for fault-tolerant workloads
+- ✅ **Faster Scaling**: Sub-60 second pod startup times
 
 **Pricing Model:**
 - **General-Purpose Pods**: Pod-based billing (pay for vCPU, memory, ephemeral storage)
-- **Specific Hardware Pods** (GPUs, specific machine types): Node-based billing with management premium
+- **GPU/ARM Pods**: Pod-based billing with hardware-specific pricing
+- **Spot Pods**: 60-91% discount (can be preempted)
 
 **Create Autopilot Cluster:**
 ```bash

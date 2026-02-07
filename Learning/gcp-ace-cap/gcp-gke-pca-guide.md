@@ -33,13 +33,26 @@
 
 ### GKE Modes: Autopilot vs Standard (Architectural View)
 
-| Feature | Autopilot | Standard |
+> **2026 Update**: GKE Autopilot has become the recommended mode for most workloads with significant enhancements in GPU support, ARM-based nodes, and improved cost optimization.
+
+| Feature | Autopilot (2026 Enhanced) | Standard |
 |---------|-----------|----------|
 | **Responsibility** | Google manages nodes, security, scaling. | User manages nodes, system pods, OS config. |
-| **SLA** | Covers Pods and Control Plane. | Covers Control Plane (and Nodes if Regional). |
-| **Security** | Hardened by default (no SSH, Workload Identity). | Configurable (can be insecure if misconfigured). |
-| **Cost Model** | Pay per Pod (vCPU/RAM). Higher unit cost, zero waste. | Pay per Node (VM). Lower unit cost, potential bin-packing waste. |
-| **Best For** | Most production workloads, variable traffic, low ops teams. | Specific hardware needs, custom kernel modules, legacy apps requiring node access. |
+| **SLA** | Covers Pods and Control Plane (99.9% uptime). | Covers Control Plane (and Nodes if Regional). |
+| **Security** | Hardened by default (no SSH, Workload Identity, automatic security patches). | Configurable (can be insecure if misconfigured). |
+| **Cost Model** | Pay per Pod (vCPU/RAM). Higher unit cost, zero waste. Resource-based pricing. | Pay per Node (VM). Lower unit cost, potential bin-packing waste. |
+| **GPU Support (2026)** | ✅ NVIDIA L4, T4, A100 GPUs (GA), ARM-based Tau T2A (preview) | ✅ All GPU types |
+| **ARM Support (2026)** | ✅ Tau T2A ARM-based nodes for cost optimization | ✅ All architectures |
+| **Sustainability (2026)** | ✅ Carbon-aware scheduling, automatic workload placement for reduced emissions | Manual configuration |
+| **Best For** | Most production workloads, variable traffic, low ops teams, AI/ML workloads (2026: GPU support) | Specific hardware needs, custom kernel modules, legacy apps requiring node access. |
+
+**2026 Autopilot Enhancements:**
+- **GPU Workloads**: Native support for AI/ML training and inference
+- **ARM Architecture**: Cost-effective Tau T2A nodes (up to 50% cheaper)
+- **Spot Pods**: Up to 91% discount for fault-tolerant workloads
+- **Faster Scaling**: Sub-60 second pod startup for new nodes
+- **Enhanced Security**: Automatic Binary Authorization, GKE Security Posture
+- **Carbon Optimization**: Automatic scheduling to lower-carbon regions/times
 
 ### Version Management
 

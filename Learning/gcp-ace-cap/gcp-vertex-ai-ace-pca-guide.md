@@ -983,68 +983,311 @@ model.update(version_aliases=["production", "stable"])
 
 ---
 
-## Generative AI on Vertex AI
+## Generative AI on Vertex AI (2026 Comprehensive Update)
 
-### Foundation Models
+> **2026 Major Update**: Gemini models are now the primary foundation models on Vertex AI, with PaLM 2 models in maintenance mode. Significant improvements in multimodal capabilities, function calling, and enterprise features.
 
-#### PaLM API / Gemini
+### Foundation Models (2026 Model Lineup)
+
+#### Gemini Models (Current Recommended - 2026)
+
+**Model Tiers:**
+- **Gemini 1.5 Pro** (Latest): Best for complex reasoning, long context (2M tokens)
+- **Gemini 1.5 Flash**: Fastest, cost-effective for high-volume tasks
+- **Gemini 1.0 Pro**: Stable, production-grade for general tasks
+- **Gemini 1.0 Ultra**: Most capable (limited availability)
+
+**PaLM 2 Models (Legacy - Maintenance Mode):**
+- text-bison@002, chat-bison@002, code-bison@002
+- ⚠️ End of support: December 2026
+- Migrate to Gemini equivalents
+
+#### Text Generation with Gemini 1.5 (2026)
 
 ```python
 import vertexai
-from vertexai.language_models import TextGenerationModel
-from vertexai.generative_models import GenerativeModel
+from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
 
 # Initialize
 vertexai.init(project="my-project", location="us-central1")
 
-# Text generation with Gemini
-model = GenerativeModel("gemini-1.0-pro")
+# Latest Gemini 1.5 Pro with extended context
+model = GenerativeModel(
+    "gemini-1.5-pro-002",  # Latest stable version
+    generation_config=GenerationConfig(
+        temperature=0.7,
+        max_output_tokens=8192,
+        top_p=0.95,
+    )
+)
+
+# Text generation
 response = model.generate_content("Explain machine learning in simple terms")
 print(response.text)
 
-# Chat
+# Multi-turn chat with history
 chat = model.start_chat()
 response = chat.send_message("What is Vertex AI?")
 print(response.text)
 response = chat.send_message("How does it compare to SageMaker?")
 print(response.text)
+
+# Long context (2026): Up to 2M tokens!
+with open("large_document.txt", "r") as f:
+    long_text = f.read()  # Can be up to 2M tokens
+response = model.generate_content(f"Summarize this document: {long_text}")
 ```
 
-#### Embeddings
+#### Multimodal Capabilities (2026 Enhanced)
 
 ```python
-from vertexai.language_models import TextEmbeddingModel
+from vertexai.generative_models import GenerativeModel, Part
+import vertexai
 
-model = TextEmbeddingModel.from_pretrained("textembedding-gecko@001")
-embeddings = model.get_embeddings(["Hello world", "Vertex AI is great"])
-for embedding in embeddings:
-    print(f"Vector dimension: {len(embedding.values)}")
-```
+vertexai.init(project="my-project", location="us-central1")
 
-#### Code Generation
+# Gemini 1.5 Pro supports text, images, video, audio
+model = GenerativeModel("gemini-1.5-pro-002")
 
-```python
-from vertexai.language_models import CodeGenerationModel
-
-model = CodeGenerationModel.from_pretrained("code-bison@001")
-response = model.predict(
-    prefix="Write a Python function to calculate fibonacci numbers:"
+# Image + Text
+image = Part.from_uri(
+    "gs://my-bucket/image.jpg",
+    mime_type="image/jpeg"
 )
-print(response.text)
+response = model.generate_content([
+    image,
+    "What's in this image? Provide detailed analysis."
+])
+
+# Video analysis (2026 new)
+video = Part.from_uri(
+    "gs://my-bucket/video.mp4",
+    mime_type="video/mp4"
+)
+response = model.generate_content([
+    video,
+    "Summarize the key events in this video."
+])
+
+# Audio transcription + analysis (2026 new)
+audio = Part.from_uri(
+    "gs://my-bucket/audio.mp3",
+    mime_type="audio/mpeg"
+)
+response = model.generate_content([
+    audio,
+    "Transcribe and analyze the sentiment of this audio."
+])
+
+# Multi-modal: Image + Video + Text
+response = model.generate_content([
+    "Compare these two:",
+    Part.from_uri("gs://bucket/image.jpg", mime_type="image/jpeg"),
+    Part.from_uri("gs://bucket/video.mp4", mime_type="video/mp4"),
+    "What are the differences?"
+])
 ```
 
-### Model Tuning
+#### Function Calling (2026 Enhanced)
 
 ```python
-from vertexai.language_models import TextGenerationModel
+from vertexai.generative_models import (
+    GenerativeModel,
+    Tool,
+    FunctionDeclaration,
+    GenerationConfig
+)
 
-# Supervised tuning
-model = TextGenerationModel.from_pretrained("text-bison@001")
-tuning_job = model.tune_model(
-    training_data="gs://my-bucket/tuning_data.jsonl",
-    tuned_model_display_name="my-tuned-model",
-    epochs=4,
-    learning_rate_multiplier=1.0
+# Define functions that the model can call
+get_weather_func = FunctionDeclaration(
+    name="get_weather",
+    description="Get current weather for a location",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {"type": "string", "description": "City name"},
+            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+        },
+        "required": ["location"]
+    }
+)
+
+weather_tool = Tool(function_declarations=[get_weather_func])
+
+# Model with function calling
+model = GenerativeModel(
+    "gemini-1.5-pro-002",
+    tools=[weather_tool]
+)
+
+response = model.generate_content("What's the weather in San Francisco?")
+
+# Model will return a function call
+if response.candidates[0].function_calls:
+    function_call = response.candidates[0].function_calls[0]
+    print(f"Function: {function_call.name}")
+    print(f"Arguments: {function_call.args}")
+    
+    # Execute the function and return result
+    weather_data = get_weather(function_call.args["location"])
+    
+    # Send function response back to model
+    final_response = model.generate_content(
+        [response, {"function_response": {"name": "get_weather", "response": weather_data}}]
+    )
+    print(final_response.text)
+```
+
+#### Embeddings (2026 Latest Models)
+
+```python
+from vertexai.language_models import TextEmbeddingModel, TextEmbeddingInput
+
+# Latest embedding model (2026)
+model = TextEmbeddingModel.from_pretrained("text-embedding-004")  # Latest
+
+# Single embedding
+embeddings = model.get_embeddings(["Hello world"])
+print(f"Vector dimension: {len(embeddings[0].values)}")  # 768 dimensions
+
+# Batch embeddings for RAG (2026 optimized)
+texts = ["Vertex AI is great", "Machine learning platform", "Google Cloud AI"]
+inputs = [TextEmbeddingInput(text, task_type="RETRIEVAL_DOCUMENT") for text in texts]
+embeddings = model.get_embeddings(inputs)
+
+# Query embedding (different task type for better retrieval)
+query_input = TextEmbeddingInput("What is Vertex AI?", task_type="RETRIEVAL_QUERY")
+query_embedding = model.get_embeddings([query_input])[0]
+
+# Multimodal embeddings (2026 new)
+from vertexai.vision_models import MultiModalEmbeddingModel
+
+multimodal_model = MultiModalEmbeddingModel.from_pretrained("multimodalembedding@001")
+image_embedding = multimodal_model.get_embeddings(
+    image=Part.from_uri("gs://bucket/image.jpg", mime_type="image/jpeg")
+)
+text_embedding = multimodal_model.get_embeddings(contextual_text="A photo of a cat")
+```
+
+#### Code Generation with Gemini Code (2026)
+
+```python
+from vertexai.generative_models import GenerativeModel
+
+# Gemini Pro optimized for code
+model = GenerativeModel("gemini-1.5-pro-002")
+
+# Code generation with context
+prompt = """
+Write a Python function to:
+1. Connect to BigQuery
+2. Query a table for user analytics
+3. Return results as pandas DataFrame
+4. Include error handling
+"""
+
+response = model.generate_content(prompt)
+print(response.text)
+
+# Code explanation
+code = """def fibonacci(n): return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"""
+response = model.generate_content(f"Explain this code and suggest improvements:\n{code}")
+
+# Code completion (2026 enhanced)
+partial_code = """
+def process_data(df):
+    # Remove duplicates
+    df = df.drop_duplicates()
+    # TODO: Add data validation
+"""
+response = model.generate_content(f"Complete this function:\n{partial_code}")
+```
+
+### Model Tuning (2026 Updates)
+
+```python
+from vertexai.generative_models import GenerativeModel
+from vertexai.preview.tuning import sft
+
+# Supervised Fine-Tuning (SFT) for Gemini
+base_model = "gemini-1.5-pro-002"
+
+# Prepare tuning data (JSONL format)
+tuning_data = "gs://my-bucket/tuning_data.jsonl"
+# Format: {"messages": [{"role": "user", "content": "..."}, {"role": "model", "content": "..."}]}
+
+# Start tuning job (2026: faster and more efficient)
+tuning_job = sft.train(
+    source_model=base_model,
+    train_dataset=tuning_data,
+    validation_dataset="gs://my-bucket/validation_data.jsonl",
+    epochs=3,
+    learning_rate=0.001,
+    tuned_model_display_name="my-custom-gemini-model",
+    # 2026 new parameters
+    adapter_size="ADAPTER_SIZE_SIXTEEN",  # LoRA adapter size
+    enable_checkpoint_selection=True,      # Auto-select best checkpoint
+)
+
+print(f"Tuning job: {tuning_job.resource_name}")
+
+# Use tuned model
+tuned_model = GenerativeModel(f"projects/my-project/locations/us-central1/models/{tuning_job.tuned_model_id}")
+response = tuned_model.generate_content("Your custom prompt")
+```
+
+### Grounding with Google Search (2026 GA)
+
+```python
+from vertexai.generative_models import (
+    GenerativeModel,
+    Tool,
+    grounding
+)
+
+# Enable Google Search grounding (2026 feature)
+model = GenerativeModel(
+    "gemini-1.5-pro-002",
+    tools=[Tool.from_google_search_retrieval(grounding.GoogleSearchRetrieval())]
+)
+
+# Model will search Google and ground responses in real-time data
+response = model.generate_content("What are the latest developments in quantum computing in 2026?")
+print(response.text)
+
+# Check grounding metadata
+if response.candidates[0].grounding_metadata:
+    print("Grounded with sources:")
+    for source in response.candidates[0].grounding_metadata.grounding_supports:
+        print(f"  - {source.segment.text}: {source.grounding_chunk.web.uri}")
+```
+
+### Enterprise Features (2026)
+
+```python
+# Customer-Managed Encryption Keys (CMEK)
+from google.cloud import aiplatform
+
+aiplatform.init(
+    project="my-project",
+    location="us-central1",
+    encryption_spec_key_name="projects/my-project/locations/us-central1/keyRings/my-ring/cryptoKeys/my-key"
+)
+
+# VPC Service Controls (2026)
+# Prevent data exfiltration - configure in GCP Console
+
+# Private endpoints (2026)
+endpoint = aiplatform.PrivateEndpoint.create(
+    display_name="private-gemini-endpoint",
+    network="projects/my-project/global/networks/my-vpc"
+)
+
+# Deploy with private endpoint
+model.deploy(
+    endpoint=endpoint,
+    traffic_percentage=100,
+    machine_type="n1-standard-4"
 )
 ```
 

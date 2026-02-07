@@ -12,26 +12,60 @@ BigQuery's architecture is based on the separation of storage and compute, conne
 - **Slots:** The unit of computational capacity (CPU, RAM, I/O).
 - **Query Execution:** Queries are broken down into stages and executed in parallel across thousands of slots.
 
-## 2. Capacity Planning & Pricing Models
+## 2. Capacity Planning & Pricing Models (2026 Updated)
+
+> **2026 Major Update**: BigQuery Editions is now the recommended pricing model, with enhanced features for AI/ML workloads including vector search and Iceberg table support.
 
 ### Pricing Models
-1.  **On-Demand (Default):**
-    - Pay per TB of data processed.
+1.  **On-Demand (Pay-per-Query):**
+    - Pay per TB of data processed ($6.25/TB in US multi-region as of 2026).
     - Shared pool of slots (up to 2000 concurrent slots per project by default).
-    - Best for unpredictable workloads.
+    - First 1 TB/month free.
+    - Best for unpredictable workloads, ad-hoc queries, small-scale analytics.
 
-2.  **Capacity-Based (Editions):**
-    - Pay for slot capacity (measured in slots/hour).
-    - **Standard:** Basic SQL, standard concurrency.
-    - **Enterprise:** Advanced features, higher concurrency, autoscaling.
-    - **Enterprise Plus:** Mission-critical, highest concurrency, disaster recovery.
-    - **Autoscaling:** Automatically adds slots to handle load spikes.
+2.  **Capacity-Based (Editions - Recommended for Production):**
+    - Pay for reserved slot capacity (continuous availability).
+    - **Standard Edition** ($0.04/slot/hour = $29/slot/month):
+      - Basic SQL, streaming inserts, standard concurrency
+      - 100 slot minimum purchase
+      - Best for: Predictable workloads, development/testing
+    
+    - **Enterprise Edition** ($0.06/slot/hour = $43.20/slot/month):
+      - All Standard features +
+      - **Autoscaling** (automatically add/remove slots based on demand)
+      - Higher concurrency (2x Standard)
+      - Machine Learning features (BigQuery ML)
+      - 100 slot minimum, scales automatically
+      - Best for: Production workloads with variable demand
+    
+    - **Enterprise Plus Edition** ($0.10/slot/hour = $72/slot/month):
+      - All Enterprise features +
+      - **Cross-region disaster recovery** (automatic replication)
+      - Highest concurrency (5x Standard)
+      - **Vector Search (2026)**: Native support for AI/ML embeddings
+      - **Iceberg Table Support (2026 GA)**: Open table format compatibility
+      - Dedicated technical support
+      - 100 slot minimum
+      - Best for: Mission-critical workloads, AI/ML pipelines, multi-region apps
 
-### Reservations
+### 2026 New Features by Edition
+
+| Feature | Standard | Enterprise | Enterprise Plus |
+|---------|----------|------------|------------------|
+| **Vector Search (2026)** | ❌ | ✅ Preview | ✅ GA |
+| **Iceberg Tables (2026)** | ❌ | ✅ Limited | ✅ Full Support |
+| **BigQuery Apache Iceberg (2026)** | ❌ | ✅ Read-only | ✅ Read/Write |
+| **Cross-region DR** | ❌ | ❌ | ✅ |
+| **Autoscaling** | ❌ | ✅ | ✅ |
+| **Gemini in BigQuery (2026)** | Limited | ✅ | ✅ Full |
+
+### Reservations (Enhanced 2026)
 - Isolate capacity for specific workloads or departments.
-- **Baseline:** Guaranteed slots.
-- **Autoscaling:** Additional slots added as needed.
-- **Idle Slot Sharing:** Unused slots from one reservation can be used by others.
+- **Baseline:** Guaranteed slots (always available).
+- **Autoscaling** (Enterprise/Enterprise Plus): Automatically add slots during demand spikes.
+- **Idle Slot Sharing**: Unused slots from one reservation can be used by others (organization-wide).
+- **Flex Slots (2026)**: Commit for 60 seconds minimum (vs 365 days), pay $0.08/slot/hour.
+- **Sustainability Credits (2026)**: 5% discount for using carbon-free energy regions.
 
 ## 3. Performance Optimization Strategies
 
@@ -82,6 +116,399 @@ BigQuery's architecture is based on the separation of storage and compute, conne
 | **Latency** | Seconds/Minutes | Milliseconds | Milliseconds | Milliseconds |
 | **Throughput** | Massive (Petabytes) | Moderate | High (Millions OPS) | High |
 | **Use Case** | Analytics, Reporting, ML | Web Apps, CRM, ERP | IoT, Time-series, AdTech | Global Banking, Inventory |
+
+---
+
+## 6.5. BigQuery 2026 New Capabilities
+
+### Apache Iceberg Tables (GA 2026)
+
+**What are Iceberg Tables?**
+- Open table format created by Netflix, now Apache project
+- Enables interoperability between BigQuery and other analytics engines (Spark, Trino, Flink)
+- ACID transactions with snapshot isolation
+- Schema evolution and partition evolution
+- Time travel and rollback
+
+**Why Use Iceberg in BigQuery?**
+```
+Use Case 1: Multi-Engine Analytics
+┌──────────────────────────────────────────────────────────┐
+│  Lakehouse Architecture (2026 Pattern)                   │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Data Lake (Cloud Storage)                               │
+│    │                                                      │
+│    ├── Iceberg Tables (Parquet files + metadata)         │
+│    │                                                      │
+│    ├─► BigQuery (SQL analytics)                          │
+│    ├─► Dataproc/Spark (data processing)                  │
+│    ├─► Vertex AI (ML training)                           │
+│    └─► External tools (Trino, Presto)                    │
+│                                                           │
+│  Benefit: Single source of truth, no data duplication    │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Creating Iceberg Tables in BigQuery:**
+
+```sql
+-- Method 1: Create BigQuery-managed Iceberg table
+CREATE TABLE my_dataset.iceberg_table
+WITH CONNECTION `my-project.us.my_connection`
+OPTIONS (
+  table_format = 'ICEBERG',
+  storage_base_uri = 'gs://my-bucket/iceberg/my_table'
+)
+AS
+SELECT * FROM my_dataset.source_table;
+
+-- Method 2: Create external Iceberg table (data in Cloud Storage)
+CREATE EXTERNAL TABLE my_dataset.external_iceberg
+WITH CONNECTION `my-project.us.my_connection`
+OPTIONS (
+  table_format = 'ICEBERG',
+  uris = ['gs://my-bucket/iceberg/external_table/metadata/*.json']
+);
+
+-- Query Iceberg table (same as regular BigQuery table)
+SELECT 
+  DATE(timestamp) as date,
+  COUNT(*) as events,
+  AVG(value) as avg_value
+FROM my_dataset.iceberg_table
+WHERE DATE(timestamp) >= '2026-01-01'
+GROUP BY date
+ORDER BY date DESC;
+
+-- Time travel with Iceberg
+SELECT *
+FROM my_dataset.iceberg_table
+  FOR SYSTEM_TIME AS OF TIMESTAMP '2026-02-01 00:00:00';
+
+-- Iceberg metadata queries
+SELECT *
+FROM my_dataset.iceberg_table.SNAPSHOT_METADATA
+ORDER BY committed_at DESC
+LIMIT 10;
+```
+
+**Iceberg Table Management:**
+
+```sql
+-- Create new snapshot (manual compaction)
+ALTER TABLE my_dataset.iceberg_table
+SET OPTIONS (iceberg.auto_compaction = true);
+
+-- Expire old snapshots (data retention)
+ALTER TABLE my_dataset.iceberg_table
+SET OPTIONS (iceberg.expire_snapshots_older_than_days = 7);
+
+-- Schema evolution (add column)
+ALTER TABLE my_dataset.iceberg_table
+ADD COLUMN new_field STRING;
+
+-- Partition evolution (change partitioning without rewriting data!)
+ALTER TABLE my_dataset.iceberg_table
+SET OPTIONS (
+  iceberg.partition_fields = ['MONTH(timestamp)', 'region']
+);
+```
+
+**Iceberg vs Native BigQuery Tables:**
+
+| Feature | Native BigQuery | Iceberg on BigQuery |
+|---------|-----------------|---------------------|
+| **Query Performance** | Faster (native) | Good (external) |
+| **Interoperability** | BigQuery only | All Apache engines |
+| **ACID Transactions** | Yes | Yes |
+| **Time Travel** | 7 days | Unlimited (configurable) |
+| **Schema Evolution** | Limited | Full support |
+| **Partition Evolution** | Requires rewrite | No rewrite needed |
+| **Storage Cost** | BigQuery pricing | Cloud Storage pricing (cheaper) |
+| **Best For** | BigQuery-only | Multi-engine, open standards |
+
+### Vector Search in BigQuery (2026 GA - Enterprise Plus)
+
+**What is Vector Search in BigQuery?**
+- Native support for storing and querying high-dimensional vectors (embeddings)
+- Enables similarity search for AI/ML applications (RAG, recommendation systems)
+- Powered by Google's ScaNN (Scalable Nearest Neighbors) algorithm
+- Integrated with Vertex AI for embedding generation
+
+**Use Cases:**
+- **Semantic Search**: Find similar documents, images, or products
+- **RAG (Retrieval-Augmented Generation)**: Enhance LLM responses with relevant context
+- **Recommendation Systems**: Find similar items or users
+- **Anomaly Detection**: Identify outliers based on vector distance
+
+**Creating Vector Columns:**
+
+```sql
+-- Create table with vector column
+CREATE TABLE my_dataset.product_embeddings (
+  product_id INT64,
+  product_name STRING,
+  description STRING,
+  -- Vector column (768 dimensions for text-embedding-004)
+  embedding ARRAY<FLOAT64>,
+  category STRING,
+  price FLOAT64
+)
+PARTITION BY DATE(update_timestamp);
+
+-- Generate embeddings using Vertex AI (through BigQuery ML)
+CREATE MODEL my_dataset.embedding_model
+  REMOTE WITH CONNECTION `my-project.us.my_vertex_connection`
+  OPTIONS (
+    endpoint = 'text-embedding-004'  -- Vertex AI embedding model
+  );
+
+-- Populate embeddings
+INSERT INTO my_dataset.product_embeddings (product_id, product_name, description, embedding)
+SELECT 
+  product_id,
+  product_name,
+  description,
+  (SELECT ml_generate_embedding_result 
+   FROM ML.GENERATE_EMBEDDING(
+     MODEL my_dataset.embedding_model,
+     (SELECT description as content)
+   )
+  ) as embedding
+FROM my_dataset.products;
+```
+
+**Vector Similarity Search:**
+
+```sql
+-- Find similar products using cosine similarity
+DECLARE query_embedding ARRAY<FLOAT64>;
+
+-- Get embedding for query text
+SET query_embedding = (
+  SELECT ml_generate_embedding_result
+  FROM ML.GENERATE_EMBEDDING(
+    MODEL my_dataset.embedding_model,
+    (SELECT "wireless headphones with noise cancellation" as content)
+  )
+);
+
+-- Similarity search (top 10 most similar products)
+SELECT
+  product_id,
+  product_name,
+  description,
+  -- Cosine similarity
+  (
+    SELECT SUM(a * b) / (
+      SQRT(SUM(a * a)) * SQRT(SUM(b * b))
+    )
+    FROM UNNEST(embedding) AS a WITH OFFSET pos
+    JOIN UNNEST(query_embedding) AS b WITH OFFSET pos2
+      ON pos = pos2
+  ) AS similarity_score
+FROM my_dataset.product_embeddings
+WHERE category = 'Electronics'  -- Filter first for performance
+ORDER BY similarity_score DESC
+LIMIT 10;
+
+-- Alternative: Use VECTOR_SEARCH function (2026 optimized)
+SELECT
+  base.product_id,
+  base.product_name,
+  base.description,
+  distance
+FROM VECTOR_SEARCH(
+  TABLE my_dataset.product_embeddings,
+  'embedding',
+  (
+    SELECT ml_generate_embedding_result
+    FROM ML.GENERATE_EMBEDDING(
+      MODEL my_dataset.embedding_model,
+      (SELECT "wireless headphones" as content)
+    )
+  ),
+  distance_type => 'COSINE',
+  top_k => 10,
+  options => JSON '{"fraction_lists_to_search": 0.01}'  -- HNSW parameter
+) AS base;
+```
+
+**Building a RAG System with BigQuery:**
+
+```sql
+-- Step 1: Store document chunks with embeddings
+CREATE TABLE my_dataset.knowledge_base (
+  doc_id STRING,
+  chunk_id INT64,
+  chunk_text STRING,
+  embedding ARRAY<FLOAT64>,
+  metadata JSON,
+  source_url STRING
+);
+
+-- Step 2: Query for relevant context
+CREATE TEMP FUNCTION get_relevant_context(user_query STRING)
+RETURNS ARRAY<STRING>
+AS (
+  ARRAY(
+    SELECT chunk_text
+    FROM VECTOR_SEARCH(
+      TABLE my_dataset.knowledge_base,
+      'embedding',
+      (SELECT ml_generate_embedding_result 
+       FROM ML.GENERATE_EMBEDDING(
+         MODEL my_dataset.embedding_model,
+         (SELECT user_query as content)
+       )),
+      distance_type => 'COSINE',
+      top_k => 5
+    )
+  )
+);
+
+-- Step 3: Generate answer with context (use with Vertex AI Gemini)
+SELECT
+  user_query,
+  get_relevant_context(user_query) AS context_chunks,
+  -- Send to Gemini via BigQuery ML
+  ml_generate_text_result AS generated_answer
+FROM ML.GENERATE_TEXT(
+  MODEL my_dataset.gemini_model,
+  (
+    SELECT CONCAT(
+      'Context: ', 
+      ARRAY_TO_STRING(get_relevant_context("What is BigQuery?"), '\n'),
+      '\n\nQuestion: What is BigQuery?',
+      '\n\nAnswer based on the context above:'
+    ) AS prompt
+  ),
+  STRUCT(
+    0.2 AS temperature,
+    1024 AS max_output_tokens
+  )
+);
+```
+
+**Vector Index Optimization (2026):**
+
+```sql
+-- Create approximate nearest neighbor (ANN) index for faster queries
+CREATE SEARCH INDEX product_vector_index
+ON my_dataset.product_embeddings(embedding)
+OPTIONS (
+  index_type = 'HNSW',  -- Hierarchical Navigable Small World
+  distance_type = 'COSINE',
+  -- HNSW parameters
+  ef_construction = 40,
+  m = 16
+);
+
+-- Query performance comparison:
+-- Without index: 10-30 seconds for 1M vectors
+-- With HNSW index: 100-500ms for 1M vectors (20-100x faster!)
+
+-- Monitor index usage
+SELECT
+  table_name,
+  index_name,
+  index_type,
+  coverage_percentage,
+  last_refresh_time
+FROM my_dataset.INFORMATION_SCHEMA.SEARCH_INDEXES
+WHERE table_name = 'product_embeddings';
+```
+
+**Vector Search Cost Optimization:**
+
+```sql
+-- Use APPROXIMATE search for cost savings
+SELECT product_id, product_name
+FROM VECTOR_SEARCH(
+  TABLE my_dataset.product_embeddings,
+  'embedding',
+  query_embedding,
+  distance_type => 'COSINE',
+  top_k => 10,
+  options => JSON '{
+    "use_approximate_search": true,
+    "fraction_lists_to_search": 0.01  -- Search 1% of data (100x faster, slight accuracy trade-off)
+  }'
+);
+
+-- Pricing (2026):
+-- On-demand: $5 per TB scanned (same as regular queries)
+-- Enterprise Plus: Included in base edition pricing
+-- Vector index storage: $0.02 per GB/month
+```
+
+**Integration with Gemini (2026 Pattern):**
+
+```python
+from google.cloud import bigquery
+from vertexai.generative_models import GenerativeModel
+import vertexai
+
+# Initialize
+vertexai.init(project="my-project", location="us-central1")
+bq_client = bigquery.Client()
+
+def rag_query(user_question):
+    # Step 1: Vector search in BigQuery for relevant context
+    query = f"""
+    SELECT chunk_text
+    FROM VECTOR_SEARCH(
+        TABLE my_dataset.knowledge_base,
+        'embedding',
+        (SELECT ml_generate_embedding_result 
+         FROM ML.GENERATE_EMBEDDING(
+           MODEL my_dataset.embedding_model,
+           (SELECT '{user_question}' as content)
+         )),
+        distance_type => 'COSINE',
+        top_k => 5
+    )
+    """
+    
+    results = bq_client.query(query).result()
+    context_chunks = [row.chunk_text for row in results]
+    
+    # Step 2: Generate answer with Gemini
+    model = GenerativeModel("gemini-1.5-pro-002")
+    prompt = f"""
+    Context from knowledge base:
+    {chr(10).join(context_chunks)}
+    
+    Question: {user_question}
+    
+    Answer based on the context above:
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text
+
+# Usage
+answer = rag_query("What are BigQuery Editions?")
+print(answer)
+```
+
+### 2026 Best Practices Summary
+
+**For Iceberg Tables:**
+- ✅ Use for multi-engine analytics (Spark + BigQuery)
+- ✅ Use for open data lake architectures
+- ✅ Enable auto-compaction to maintain performance
+- ⚠️ Slightly slower than native BigQuery tables
+- ⚠️ Requires BigQuery connection to Cloud Storage
+
+**For Vector Search:**
+- ✅ Use Enterprise Plus edition for production (included features)
+- ✅ Create HNSW indexes for large datasets (>100K vectors)
+- ✅ Use approximate search for cost/performance balance
+- ✅ Partition tables by date/category for better filtering
+- ⚠️ Vector dimensions should match embedding model (768 for text-embedding-004)
+- ⚠️ Index rebuilds can be expensive on frequently updated tables
 
 ---
 
