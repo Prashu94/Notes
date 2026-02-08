@@ -13,7 +13,8 @@
 10. [Common Use Cases](#common-use-cases)
 11. [Monitoring and Logging](#monitoring-and-logging)
 12. [Troubleshooting](#troubleshooting)
-13. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 
 ---
 
@@ -591,6 +592,424 @@ Consolidated billing is automatically enabled when you create an organization. I
 - Track policy changes and their impact
 - Identify access patterns
 - Audit organizational changes
+
+---
+
+## AWS CLI Commands Reference
+
+### Organization Management
+
+#### Create an Organization
+
+```bash
+# Create a new organization with all features enabled
+aws organizations create-organization \
+  --feature-set ALL
+
+# Create organization with consolidated billing only
+aws organizations create-organization \
+  --feature-set CONSOLIDATED_BILLING
+
+# Describe your organization
+aws organizations describe-organization
+```
+
+#### Invite AWS Accounts
+
+```bash
+# Send invitation to an AWS account
+aws organizations invite-account-to-organization \
+  --target Id=123456789012,Type=ACCOUNT \
+  --notes "Please join our organization"
+
+# List pending invitations
+aws organizations list-handshakes-for-organization \
+  --filter Action=INVITE,State=OPEN
+
+# Accept invitation (run from invited account)
+aws organizations accept-handshake \
+  --handshake-id h-examplehandshakeid123
+
+# Decline invitation (run from invited account)
+aws organizations decline-handshake \
+  --handshake-id h-examplehandshakeid123
+
+# Cancel pending invitation (run from management account)
+aws organizations cancel-handshake \
+  --handshake-id h-examplehandshakeid123
+```
+
+#### Create New Accounts
+
+```bash
+# Create a new AWS account in the organization
+aws organizations create-account \
+  --email new-account@example.com \
+  --account-name "Production Account" \
+  --role-name OrganizationAccountAccessRole \
+  --iam-user-access-to-billing ALLOW
+
+# Check account creation status
+aws organizations describe-create-account-status \
+  --create-account-request-id car-exampleid123456
+
+# List all account creation requests
+aws organizations list-create-account-status \
+  --states IN_PROGRESS,SUCCEEDED,FAILED
+```
+
+### Organizational Units (OUs)
+
+#### Create Organizational Units
+
+```bash
+# Get the root ID first
+ROOT_ID=$(aws organizations list-roots --query 'Roots[0].Id' --output text)
+
+# Create an OU under root
+aws organizations create-organizational-unit \
+  --parent-id $ROOT_ID \
+  --name "Production"
+
+# Create nested OU
+PROD_OU_ID=$(aws organizations list-organizational-units-for-parent \
+  --parent-id $ROOT_ID \
+  --query 'OrganizationalUnits[?Name==`Production`].Id' \
+  --output text)
+
+aws organizations create-organizational-unit \
+  --parent-id $PROD_OU_ID \
+  --name "WebServices"
+
+# List all OUs under a parent
+aws organizations list-organizational-units-for-parent \
+  --parent-id $ROOT_ID
+
+# Describe an OU
+aws organizations describe-organizational-unit \
+  --organizational-unit-id ou-exampleouid111
+```
+
+#### Move Accounts Between OUs
+
+```bash
+# Move account to different OU
+aws organizations move-account \
+  --account-id 123456789012 \
+  --source-parent-id ou-exampleouid111 \
+  --destination-parent-id ou-exampleouid222
+
+# List accounts in an OU
+aws organizations list-accounts-for-parent \
+  --parent-id ou-exampleouid111
+
+# List all accounts in organization
+aws organizations list-accounts
+```
+
+### Service Control Policies (SCPs)
+
+#### Create and Manage SCPs
+
+```bash
+# Create a new SCP
+aws organizations create-policy \
+  --content file://deny-s3-public-access.json \
+  --description "Deny public S3 bucket access" \
+  --name "DenyS3Public" \
+  --type SERVICE_CONTROL_POLICY
+
+# List all SCPs
+aws organizations list-policies \
+  --filter SERVICE_CONTROL_POLICY
+
+# Describe a specific policy
+aws organizations describe-policy \
+  --policy-id p-examplepolicyid123
+
+# Update an SCP
+aws organizations update-policy \
+  --policy-id p-examplepolicyid123 \
+  --content file://updated-policy.json \
+  --description "Updated policy description"
+```
+
+**Example SCP Policy File (deny-s3-public-access.json):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Action": [
+        "s3:PutBucketPublicAccessBlock",
+        "s3:DeleteBucketPublicAccessBlock",
+        "s3:PutAccountPublicAccessBlock"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "s3:x-amz-acl": "private"
+        }
+      }
+    }
+  ]
+}
+```
+
+#### Attach and Detach SCPs
+
+```bash
+# Attach SCP to an OU
+aws organizations attach-policy \
+  --policy-id p-examplepolicyid123 \
+  --target-id ou-exampleouid111
+
+# Attach SCP to an account
+aws organizations attach-policy \
+  --policy-id p-examplepolicyid123 \
+  --target-id 123456789012
+
+# Attach SCP to root
+aws organizations attach-policy \
+  --policy-id p-examplepolicyid123 \
+  --target-id r-examplerootid111
+
+# List policies attached to a target
+aws organizations list-policies-for-target \
+  --target-id ou-exampleouid111 \
+  --filter SERVICE_CONTROL_POLICY
+
+# List targets for a policy
+aws organizations list-targets-for-policy \
+  --policy-id p-examplepolicyid123
+
+# Detach SCP from target
+aws organizations detach-policy \
+  --policy-id p-examplepolicyid123 \
+  --target-id ou-exampleouid111
+
+# Delete an SCP (must detach from all targets first)
+aws organizations delete-policy \
+  --policy-id p-examplepolicyid123
+```
+
+### Tag Policies
+
+```bash
+# Enable tag policies in organization
+aws organizations enable-policy-type \
+  --root-id r-examplerootid111 \
+  --policy-type TAG_POLICY
+
+# Create tag policy
+aws organizations create-policy \
+  --content file://tag-policy.json \
+  --description "Enforce consistent tagging" \
+  --name "StandardTags" \
+  --type TAG_POLICY
+
+# Attach tag policy
+aws organizations attach-policy \
+  --policy-id p-exampletagpolicy123 \
+  --target-id ou-exampleouid111
+
+# List effective tag policy for account
+aws organizations describe-effective-policy \
+  --policy-type TAG_POLICY \
+  --target-id 123456789012
+```
+
+**Example Tag Policy (tag-policy.json):**
+
+```json
+{
+  "tags": {
+    "Environment": {
+      "tag_key": {
+        "@@assign": "Environment"
+      },
+      "tag_value": {
+        "@@assign": ["Production", "Development", "Staging"]
+      },
+      "enforced_for": {
+        "@@assign": ["ec2:instance", "s3:bucket"]
+      }
+    },
+    "CostCenter": {
+      "tag_key": {
+        "@@assign": "CostCenter"
+      },
+      "enforced_for": {
+        "@@assign": ["*"]
+      }
+    }
+  }
+}
+```
+
+### Enable AWS Services
+
+```bash
+# Enable AWS service access for organization
+aws organizations enable-aws-service-access \
+  --service-principal cloudtrail.amazonaws.com
+
+# Enable multiple services
+for service in cloudtrail.amazonaws.com \
+               config.amazonaws.com \
+               sso.amazonaws.com \
+               securityhub.amazonaws.com; do
+  aws organizations enable-aws-service-access \
+    --service-principal $service
+done
+
+# List enabled AWS services
+aws organizations list-aws-service-access-for-organization
+
+# Disable AWS service access
+aws organizations disable-aws-service-access \
+  --service-principal cloudtrail.amazonaws.com
+```
+
+### Delegated Administrators
+
+```bash
+# Register delegated administrator for a service
+aws organizations register-delegated-administrator \
+  --account-id 123456789012 \
+  --service-principal securityhub.amazonaws.com
+
+# List delegated administrators
+aws organizations list-delegated-administrators
+
+# List delegated administrators for specific service
+aws organizations list-delegated-administrators \
+  --service-principal securityhub.amazonaws.com
+
+# List services for which account is delegated admin
+aws organizations list-delegated-services-for-account \
+  --account-id 123456789012
+
+# Deregister delegated administrator
+aws organizations deregister-delegated-administrator \
+  --account-id 123456789012 \
+  --service-principal securityhub.amazonaws.com
+```
+
+### Account Operations
+
+#### Close Accounts
+
+```bash
+# Close an account (must be run from management account)
+aws organizations close-account \
+  --account-id 123456789012
+
+# Note: Account closure is irreversible after 90 days
+# During 90-day grace period, contact AWS Support to reopen
+```
+
+#### Leave Organization
+
+```bash
+# Remove account from organization (run from member account)
+aws organizations leave-organization
+
+# Remove account from organization (run from management account)
+aws organizations remove-account-from-organization \
+  --account-id 123456789012
+```
+
+### Tagging Resources
+
+```bash
+# Tag an account
+aws organizations tag-resource \
+  --resource-id 123456789012 \
+  --tags Key=Environment,Value=Production Key=Owner,Value=TeamA
+
+# List tags for a resource
+aws organizations list-tags-for-resource \
+  --resource-id 123456789012
+
+# Untag a resource
+aws organizations untag-resource \
+  --resource-id 123456789012 \
+  --tag-keys Environment Owner
+```
+
+### Query and Reporting
+
+```bash
+# List all accounts with their status
+aws organizations list-accounts \
+  --query 'Accounts[*].[Id,Name,Status,Email]' \
+  --output table
+
+# List accounts in specific OU with details
+aws organizations list-accounts-for-parent \
+  --parent-id ou-exampleouid111 \
+  --query 'Accounts[*].[Name,Id,Email,JoinedMethod]' \
+  --output table
+
+# Get organization hierarchy
+ROOT_ID=$(aws organizations list-roots --query 'Roots[0].Id' --output text)
+echo "Root: $ROOT_ID"
+aws organizations list-organizational-units-for-parent \
+  --parent-id $ROOT_ID \
+  --query 'OrganizationalUnits[*].[Name,Id]' \
+  --output table
+
+# List all SCPs and their attachments
+aws organizations list-policies \
+  --filter SERVICE_CONTROL_POLICY \
+  --query 'Policies[*].[Name,Id,Description]' \
+  --output table
+
+# Get effective policies for an account
+aws organizations describe-effective-policy \
+  --policy-type SERVICE_CONTROL_POLICY \
+  --target-id 123456789012
+```
+
+### Bulk Operations Script Example
+
+```bash
+#!/bin/bash
+# Bulk account tagging script
+
+# Get all accounts in organization
+ACCOUNTS=$(aws organizations list-accounts \
+  --query 'Accounts[?Status==`ACTIVE`].Id' \
+  --output text)
+
+# Tag each account
+for ACCOUNT in $ACCOUNTS; do
+  echo "Tagging account: $ACCOUNT"
+  aws organizations tag-resource \
+    --resource-id $ACCOUNT \
+    --tags Key=ManagedBy,Value=Organizations Key=Backup,Value=Enabled
+  
+  if [ $? -eq 0 ]; then
+    echo "Successfully tagged $ACCOUNT"
+  else
+    echo "Failed to tag $ACCOUNT"
+  fi
+done
+```
+
+### Policy Testing
+
+```bash
+# Test what actions are allowed/denied
+# Use IAM Policy Simulator (requires switching to target account)
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::123456789012:user/testuser \
+  --action-names s3:CreateBucket s3:PutBucketPublicAccessBlock \
+  --resource-arns arn:aws:s3:::test-bucket
+```
 
 ---
 

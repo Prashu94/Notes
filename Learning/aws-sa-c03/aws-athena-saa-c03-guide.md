@@ -12,7 +12,8 @@
 9. [Cost Management](#cost-management)
 10. [Best Practices](#best-practices)
 11. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-12. [Practice Questions](#practice-questions)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Practice Questions](#practice-questions)
 
 ---
 
@@ -839,6 +840,565 @@ Savings: $150 - $1.80 = $148.20/month (~99%)
 │   • Log analysis                                                │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Prerequisites
+
+```bash
+# Install AWS CLI
+# Visit: https://aws.amazon.com/cli/
+
+# Configure AWS CLI
+aws configure
+
+# Verify configuration
+aws sts get-caller-identity
+```
+
+### Database Operations
+
+#### Create Database
+
+```bash
+# Create a database in the Glue Data Catalog
+aws athena start-query-execution \
+    --query-string "CREATE DATABASE IF NOT EXISTS sales_db" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Create database with comment
+aws athena start-query-execution \
+    --query-string "CREATE DATABASE analytics_db COMMENT 'Analytics database'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Create database with specific location
+aws athena start-query-execution \
+    --query-string "CREATE DATABASE logs_db LOCATION 's3://my-logs-bucket/'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+#### List Databases
+
+```bash
+# List all databases
+aws glue get-databases
+
+# List databases with specific pattern
+aws glue get-databases \
+    --query "DatabaseList[?contains(Name, 'prod')]"
+```
+
+#### Delete Database
+
+```bash
+# Drop a database (must be empty)
+aws athena start-query-execution \
+    --query-string "DROP DATABASE IF EXISTS old_db" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Drop database with CASCADE (deletes all tables)
+aws athena start-query-execution \
+    --query-string "DROP DATABASE IF EXISTS old_db CASCADE" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+### Table Operations
+
+#### Create External Table
+
+```bash
+# Create external table for CSV data
+aws athena start-query-execution \
+    --query-string "CREATE EXTERNAL TABLE IF NOT EXISTS sales_db.orders (
+        order_id INT,
+        customer_id INT,
+        order_date DATE,
+        amount DECIMAL(10,2),
+        status STRING
+    )
+    ROW FORMAT DELIMITED
+    FIELDS TERMINATED BY ','
+    LOCATION 's3://my-data-bucket/orders/'
+    TBLPROPERTIES ('skip.header.line.count'='1')" \
+    --result-configuration "OutputLocation=s3://my-athena-results/" \
+    --region us-east-1
+
+# Create table for Parquet data
+aws athena start-query-execution \
+    --query-string "CREATE EXTERNAL TABLE sales_db.transactions (
+        transaction_id BIGINT,
+        user_id INT,
+        amount DECIMAL(10,2),
+        timestamp TIMESTAMP
+    )
+    STORED AS PARQUET
+    LOCATION 's3://my-data-bucket/transactions/'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Create table for JSON data
+aws athena start-query-execution \
+    --query-string "CREATE EXTERNAL TABLE logs_db.application_logs (
+        timestamp STRING,
+        level STRING,
+        message STRING,
+        user_id INT
+    )
+    ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+    LOCATION 's3://my-logs-bucket/app-logs/'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+#### Create Partitioned Table
+
+```bash
+# Create partitioned table
+aws athena start-query-execution \
+    --query-string "CREATE EXTERNAL TABLE sales_db.sales (
+        sale_id BIGINT,
+        product_id INT,
+        quantity INT,
+        amount DECIMAL(10,2)
+    )
+    PARTITIONED BY (
+        year INT,
+        month INT,
+        day INT
+    )
+    STORED AS PARQUET
+    LOCATION 's3://my-data-bucket/sales/'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Add partition
+aws athena start-query-execution \
+    --query-string "ALTER TABLE sales_db.sales
+    ADD PARTITION (year=2024, month=1, day=15)
+    LOCATION 's3://my-data-bucket/sales/year=2024/month=1/day=15/'" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Run partition discovery (for Hive-style partitions)
+aws athena start-query-execution \
+    --query-string "MSCK REPAIR TABLE sales_db.sales" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+#### List and Describe Tables
+
+```bash
+# List tables in a database
+aws glue get-tables --database-name sales_db
+
+# Get specific table details
+aws glue get-table \
+    --database-name sales_db \
+    --name orders
+
+# Show create table statement
+aws athena start-query-execution \
+    --query-string "SHOW CREATE TABLE sales_db.orders" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Describe table
+aws athena start-query-execution \
+    --query-string "DESCRIBE sales_db.orders" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+#### Drop Table
+
+```bash
+# Drop table (doesn't delete data in S3)
+aws athena start-query-execution \
+    --query-string "DROP TABLE IF EXISTS sales_db.old_orders" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+```
+
+### Query Execution
+
+#### Run Queries
+
+```bash
+# Execute a simple query
+aws athena start-query-execution \
+    --query-string "SELECT * FROM sales_db.orders WHERE order_date >= CURRENT_DATE - INTERVAL '7' DAY" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Execute query with specific workgroup
+aws athena start-query-execution \
+    --query-string "SELECT customer_id, COUNT(*) as order_count FROM sales_db.orders GROUP BY customer_id" \
+    --work-group "analytics-workgroup" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Execute query with execution context
+aws athena start-query-execution \
+    --query-string "SELECT * FROM orders LIMIT 10" \
+    --query-execution-context "Database=sales_db" \
+    --result-configuration "OutputLocation=s3://my-athena-results/"
+
+# Execute query with result reuse (saves cost)
+aws athena start-query-execution \
+    --query-string "SELECT * FROM sales_db.products" \
+    --result-configuration "OutputLocation=s3://my-athena-results/" \
+    --result-reuse-configuration "ResultReuseByAgeConfiguration={Enabled=true,MaxAgeInMinutes=60}"
+```
+
+#### Check Query Status
+
+```bash
+# Get query execution status
+aws athena get-query-execution \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc"
+
+# Wait for query to complete
+aws athena get-query-execution \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc" \
+    --query "QueryExecution.Status.State"
+
+# List recent query executions
+aws athena list-query-executions \
+    --max-results 50
+
+# List query executions in specific workgroup
+aws athena list-query-executions \
+    --work-group "analytics-workgroup" \
+    --max-results 50
+```
+
+#### Get Query Results
+
+```bash
+# Get query results
+aws athena get-query-results \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc"
+
+# Get query results with pagination
+aws athena get-query-results \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc" \
+    --max-results 100
+
+# Get query results (next page)
+aws athena get-query-results \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc" \
+    --next-token "TOKEN_FROM_PREVIOUS_RESPONSE"
+```
+
+#### Stop Query
+
+```bash
+# Stop a running query
+aws athena stop-query-execution \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc"
+```
+
+### Named Queries
+
+#### Create Named Query
+
+```bash
+# Create a named query
+aws athena create-named-query \
+    --name "Top Customers Report" \
+    --description "Get top 10 customers by order value" \
+    --database "sales_db" \
+    --query-string "SELECT customer_id, SUM(amount) as total_spent FROM orders GROUP BY customer_id ORDER BY total_spent DESC LIMIT 10"
+
+# Create named query in specific workgroup
+aws athena create-named-query \
+    --name "Daily Sales Summary" \
+    --database "sales_db" \
+    --query-string "SELECT DATE(order_date) as date, COUNT(*) as orders, SUM(amount) as revenue FROM orders GROUP BY DATE(order_date)" \
+    --work-group "analytics-workgroup"
+```
+
+#### List Named Queries
+
+```bash
+# List all named queries
+aws athena list-named-queries
+
+# List named queries with pagination
+aws athena list-named-queries --max-results 50
+
+# Get named query details
+aws athena get-named-query \
+    --named-query-id "12345678-1234-1234-1234-123456789abc"
+```
+
+#### Delete Named Query
+
+```bash
+# Delete a named query
+aws athena delete-named-query \
+    --named-query-id "12345678-1234-1234-1234-123456789abc"
+```
+
+### Workgroup Operations
+
+#### Create Workgroup
+
+```bash
+# Create a workgroup
+aws athena create-work-group \
+    --name "analytics-workgroup" \
+    --description "Workgroup for analytics team" \
+    --configuration "{
+        \"ResultConfigurationUpdates\": {
+            \"OutputLocation\": \"s3://my-athena-results/analytics/\"
+        },
+        \"EnforceWorkGroupConfiguration\": true,
+        \"PublishCloudWatchMetricsEnabled\": true
+    }"
+
+# Create workgroup with query limits
+aws athena create-work-group \
+    --name "limited-workgroup" \
+    --configuration "{
+        \"ResultConfigurationUpdates\": {
+            \"OutputLocation\": \"s3://my-athena-results/limited/\"
+        },
+        \"BytesScannedCutoffPerQuery\": 1000000000,
+        \"EnforceWorkGroupConfiguration\": true
+    }"
+
+# Create workgroup with encryption
+aws athena create-work-group \
+    --name "secure-workgroup" \
+    --configuration "{
+        \"ResultConfigurationUpdates\": {
+            \"OutputLocation\": \"s3://my-athena-results/secure/\",
+            \"EncryptionConfiguration\": {
+                \"EncryptionOption\": \"SSE_KMS\",
+                \"KmsKey\": \"arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789abc\"
+            }
+        },
+        \"EnforceWorkGroupConfiguration\": true
+    }"
+```
+
+#### List and Describe Workgroups
+
+```bash
+# List all workgroups
+aws athena list-work-groups
+
+# Get workgroup details
+aws athena get-work-group \
+    --work-group "analytics-workgroup"
+```
+
+#### Update Workgroup
+
+```bash
+# Update workgroup configuration
+aws athena update-work-group \
+    --work-group "analytics-workgroup" \
+    --configuration-updates "{
+        \"BytesScannedCutoffPerQuery\": 5000000000,
+        \"ResultConfigurationUpdates\": {
+            \"OutputLocation\": \"s3://my-athena-results/analytics-v2/\"
+        }
+    }"
+
+# Update workgroup state
+aws athena update-work-group \
+    --work-group "analytics-workgroup" \
+    --state "DISABLED"
+```
+
+#### Delete Workgroup
+
+```bash
+# Delete a workgroup
+aws athena delete-work-group \
+    --work-group "old-workgroup" \
+    --recursive-delete-option
+```
+
+### Data Catalog Operations
+
+#### List Data Catalogs
+
+```bash
+# List all data catalogs
+aws athena list-data-catalogs
+
+# Get data catalog details
+aws athena get-data-catalog \
+    --name "AwsDataCatalog"
+```
+
+#### Create Data Catalog
+
+```bash
+# Create a data catalog for external Hive metastore
+aws athena create-data-catalog \
+    --name "external-hive-catalog" \
+    --type "HIVE" \
+    --description "External Hive metastore" \
+    --parameters "metadata-function=arn:aws:lambda:us-east-1:123456789012:function:hive-metastore-function"
+
+# Create data catalog for AWS Glue in another account
+aws athena create-data-catalog \
+    --name "cross-account-catalog" \
+    --type "GLUE" \
+    --description "Glue catalog in another account" \
+    --parameters "catalog-id=987654321098"
+```
+
+#### Delete Data Catalog
+
+```bash
+# Delete a data catalog
+aws athena delete-data-catalog \
+    --name "old-catalog"
+```
+
+### Prepared Statements
+
+#### Create Prepared Statement
+
+```bash
+# Create a prepared statement
+aws athena create-prepared-statement \
+    --statement-name "get-orders-by-customer" \
+    --work-group "analytics-workgroup" \
+    --query-statement "SELECT * FROM sales_db.orders WHERE customer_id = ?" \
+    --description "Get orders for a specific customer"
+
+# Create prepared statement with multiple parameters
+aws athena create-prepared-statement \
+    --statement-name "sales-report" \
+    --work-group "analytics-workgroup" \
+    --query-statement "SELECT * FROM sales_db.orders WHERE order_date BETWEEN ? AND ? AND status = ?"
+```
+
+#### List Prepared Statements
+
+```bash
+# List prepared statements in a workgroup
+aws athena list-prepared-statements \
+    --work-group "analytics-workgroup"
+
+# Get prepared statement details
+aws athena get-prepared-statement \
+    --statement-name "get-orders-by-customer" \
+    --work-group "analytics-workgroup"
+```
+
+#### Update Prepared Statement
+
+```bash
+# Update a prepared statement
+aws athena update-prepared-statement \
+    --statement-name "get-orders-by-customer" \
+    --work-group "analytics-workgroup" \
+    --query-statement "SELECT order_id, order_date, amount FROM sales_db.orders WHERE customer_id = ?"
+```
+
+#### Delete Prepared Statement
+
+```bash
+# Delete a prepared statement
+aws athena delete-prepared-statement \
+    --statement-name "old-statement" \
+    --work-group "analytics-workgroup"
+```
+
+### Query Execution Parameters
+
+#### Execute Query with Parameters
+
+```bash
+# Execute parameterized query (using prepared statement)
+aws athena start-query-execution \
+    --query-string "EXECUTE get-orders-by-customer USING 12345" \
+    --work-group "analytics-workgroup"
+
+# Execute with multiple parameters
+aws athena start-query-execution \
+    --query-string "EXECUTE sales-report USING DATE '2024-01-01', DATE '2024-01-31', 'completed'" \
+    --work-group "analytics-workgroup"
+```
+
+### Advanced Operations
+
+#### Batch Operations
+
+```bash
+# Batch create tables using a script
+for table in orders customers products; do
+    aws athena start-query-execution \
+        --query-string "CREATE EXTERNAL TABLE IF NOT EXISTS sales_db.$table
+        LOCATION 's3://my-data-bucket/$table/'" \
+        --result-configuration "OutputLocation=s3://my-athena-results/"
+    echo "Created table: $table"
+done
+
+# Batch get query execution statuses
+for query_id in $(aws athena list-query-executions --max-results 10 --query 'QueryExecutionIds[]' --output text); do
+    echo "Query: $query_id"
+    aws athena get-query-execution \
+        --query-execution-id "$query_id" \
+        --query "QueryExecution.Status.State" \
+        --output text
+done
+```
+
+#### Export Query Results to CSV
+
+```bash
+# Get query results and save to CSV
+QUERY_ID="12345678-1234-1234-1234-123456789abc"
+
+aws athena get-query-results \
+    --query-execution-id "$QUERY_ID" \
+    --query 'ResultSet.Rows[*].Data[*].VarCharValue' \
+    --output text > results.csv
+
+# Alternative: Download from S3 result location
+aws athena get-query-execution \
+    --query-execution-id "$QUERY_ID" \
+    --query 'QueryExecution.ResultConfiguration.OutputLocation' \
+    --output text | xargs aws s3 cp - results.csv
+```
+
+#### Monitor Query Performance
+
+```bash
+# Get query execution statistics
+aws athena get-query-execution \
+    --query-execution-id "12345678-1234-1234-1234-123456789abc" \
+    --query 'QueryExecution.Statistics'
+
+# Get workgroup query metrics
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/Athena \
+    --metric-name DataScannedInBytes \
+    --dimensions Name=WorkGroup,Value=analytics-workgroup \
+    --start-time 2024-01-01T00:00:00Z \
+    --end-time 2024-01-31T23:59:59Z \
+    --period 86400 \
+    --statistics Sum
+```
+
+### Tagging Operations
+
+```bash
+# Tag a workgroup
+aws athena tag-resource \
+    --resource-arn "arn:aws:athena:us-east-1:123456789012:workgroup/analytics-workgroup" \
+    --tags Key=Environment,Value=Production Key=Team,Value=Analytics
+
+# List tags
+aws athena list-tags-for-resource \
+    --resource-arn "arn:aws:athena:us-east-1:123456789012:workgroup/analytics-workgroup"
+
+# Untag a resource
+aws athena untag-resource \
+    --resource-arn "arn:aws:athena:us-east-1:123456789012:workgroup/analytics-workgroup" \
+    --tag-keys "OldTag"
 ```
 
 ---

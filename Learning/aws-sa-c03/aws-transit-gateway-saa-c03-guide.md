@@ -11,8 +11,9 @@
 8. [Pricing and Cost Optimization](#pricing-and-cost-optimization)
 9. [Best Practices](#best-practices)
 10. [Common Exam Scenarios](#common-exam-scenarios)
-11. [Hands-on Labs](#hands-on-labs)
-12. [Exam Tips](#exam-tips)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [Hands-on Labs](#hands-on-labs)
+13. [Exam Tips](#exam-tips)
 
 ## Overview
 
@@ -495,6 +496,498 @@ Secondary Region (us-west-2):
 3. Update route tables to use Transit Gateway routes
 4. Remove VPC peering connections once traffic is flowing through Transit Gateway
 5. Test connectivity at each step
+
+---
+
+## AWS CLI Commands Reference
+
+### Create Transit Gateway
+
+```bash
+# Create a basic Transit Gateway
+aws ec2 create-transit-gateway \
+    --description "Production Transit Gateway" \
+    --options \
+        AmazonSideAsn=64512,\
+        AutoAcceptSharedAttachments=disable,\
+        DefaultRouteTableAssociation=enable,\
+        DefaultRouteTablePropagation=enable,\
+        VpnEcmpSupport=enable,\
+        DnsSupport=enable \
+    --tag-specifications \
+        'ResourceType=transit-gateway,Tags=[{Key=Name,Value=MyTGW},{Key=Environment,Value=Production}]'
+
+# Create Transit Gateway with multicast support
+aws ec2 create-transit-gateway \
+    --description "Transit Gateway with Multicast" \
+    --options \
+        AmazonSideAsn=64513,\
+        MulticastSupport=enable,\
+        AutoAcceptSharedAttachments=enable,\
+        DnsSupport=enable \
+    --tag-specifications \
+        'ResourceType=transit-gateway,Tags=[{Key=Name,Value=MulticastTGW}]'
+
+# Describe Transit Gateways
+aws ec2 describe-transit-gateways
+
+# Describe specific Transit Gateway
+aws ec2 describe-transit-gateways \
+    --transit-gateway-ids tgw-1234567890abcdef0
+
+# Modify Transit Gateway
+aws ec2 modify-transit-gateway \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options "AutoAcceptSharedAttachments=enable"
+
+# Delete Transit Gateway
+aws ec2 delete-transit-gateway \
+    --transit-gateway-id tgw-1234567890abcdef0
+```
+
+### Create VPC Attachments
+
+```bash
+# Create VPC attachment
+aws ec2 create-transit-gateway-vpc-attachment \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --vpc-id vpc-0abcdef1234567890 \
+    --subnet-ids subnet-111111111 subnet-222222222 \
+    --options \
+        DnsSupport=enable,\
+        Ipv6Support=disable,\
+        ApplianceModeSupport=disable \
+    --tag-specifications \
+        'ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=ProdVPC},{Key=Environment,Value=Production}]'
+
+# Create VPC attachment with appliance mode (for firewall inspection)
+aws ec2 create-transit-gateway-vpc-attachment \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --vpc-id vpc-firewall123456 \
+    --subnet-ids subnet-firewall1 subnet-firewall2 \
+    --options ApplianceModeSupport=enable
+
+# Describe VPC attachments
+aws ec2 describe-transit-gateway-vpc-attachments
+
+# Describe specific attachment
+aws ec2 describe-transit-gateway-vpc-attachments \
+    --transit-gateway-attachment-ids tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Modify VPC attachment
+aws ec2 modify-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --options "DnsSupport=disable"
+
+# Add subnets to VPC attachment
+aws ec2 modify-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --add-subnet-ids subnet-333333333
+
+# Remove subnets from VPC attachment
+aws ec2 modify-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --remove-subnet-ids subnet-111111111
+
+# Delete VPC attachment
+aws ec2 delete-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+```
+
+### Create VPN Attachments
+
+```bash
+# Create Customer Gateway first
+aws ec2 create-customer-gateway \
+    --type ipsec.1 \
+    --public-ip 198.51.100.1 \
+    --bgp-asn 65000 \
+    --tag-specifications \
+        'ResourceType=customer-gateway,Tags=[{Key=Name,Value=OnPremGW}]'
+
+# Create VPN connection attached to Transit Gateway
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options \
+        TunnelInsideIpVersion=ipv4,\
+        StaticRoutesOnly=false \
+    --tag-specifications \
+        'ResourceType=vpn-connection,Tags=[{Key=Name,Value=OnPremVPN}]'
+
+# Create VPN with static routes
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options StaticRoutesOnly=true \
+    --tag-specifications \
+        'ResourceType=vpn-connection,Tags=[{Key=Name,Value=StaticVPN}]'
+
+# Add static route to VPN
+aws ec2 create-vpn-connection-route \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16
+
+# Describe VPN connections
+aws ec2 describe-vpn-connections
+
+# Describe Transit Gateway VPN attachments
+aws ec2 describe-transit-gateway-attachments \
+    --filters "Name=resource-type,Values=vpn"
+
+# Delete VPN connection route
+aws ec2 delete-vpn-connection-route \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16
+```
+
+### Create Direct Connect Gateway Attachments
+
+```bash
+# Create Direct Connect Gateway (if not exists)
+aws directconnect create-direct-connect-gateway \
+    --direct-connect-gateway-name MyDXGateway \
+    --amazon-side-asn 64512
+
+# Associate Direct Connect Gateway with Transit Gateway
+aws ec2 create-transit-gateway-connect \
+    --transport-transit-gateway-attachment-id tgw-attach-dx123456 \
+    --options Protocol=gre \
+    --tag-specifications \
+        'ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=DX-Connect}]'
+
+# Associate Transit Gateway with Direct Connect Gateway
+aws directconnect create-direct-connect-gateway-association \
+    --direct-connect-gateway-id dcgw-1234567890abcdef \
+    --gateway-id tgw-1234567890abcdef0 \
+    --add-allowed-prefixes-to-direct-connect-gateway \
+        cidr=10.0.0.0/8 cidr=172.16.0.0/12
+
+# Describe Direct Connect Gateway associations
+aws directconnect describe-direct-connect-gateway-associations \
+    --direct-connect-gateway-id dcgw-1234567890abcdef
+
+# Update allowed prefixes
+aws directconnect update-direct-connect-gateway-association \
+    --association-id arn:aws:directconnect:us-east-1:123456789012:association/abc123 \
+    --add-allowed-prefixes-to-direct-connect-gateway cidr=192.168.0.0/16 \
+    --remove-allowed-prefixes-to-direct-connect-gateway cidr=10.0.0.0/8
+
+# Delete Direct Connect Gateway association
+aws directconnect delete-direct-connect-gateway-association \
+    --association-id arn:aws:directconnect:us-east-1:123456789012:association/abc123
+```
+
+### Create Peering Attachments
+
+```bash
+# Create Transit Gateway peering attachment (same or different regions)
+aws ec2 create-transit-gateway-peering-attachment \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --peer-transit-gateway-id tgw-9876543210fedcba0 \
+    --peer-account-id 123456789012 \
+    --peer-region us-west-2 \
+    --tag-specifications \
+        'ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=CrossRegionPeering}]'
+
+# Accept Transit Gateway peering attachment (in peer region/account)
+aws ec2 accept-transit-gateway-peering-attachment \
+    --transit-gateway-attachment-id tgw-attach-peering123 \
+    --region us-west-2
+
+# Describe peering attachments
+aws ec2 describe-transit-gateway-peering-attachments
+
+# Describe specific peering attachment
+aws ec2 describe-transit-gateway-peering-attachments \
+    --transit-gateway-attachment-ids tgw-attach-peering123
+
+# Reject peering attachment
+aws ec2 reject-transit-gateway-peering-attachment \
+    --transit-gateway-attachment-id tgw-attach-peering123
+
+# Delete peering attachment
+aws ec2 delete-transit-gateway-peering-attachment \
+    --transit-gateway-attachment-id tgw-attach-peering123
+```
+
+### Route Tables
+
+```bash
+# Create Transit Gateway route table
+aws ec2 create-transit-gateway-route-table \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --tag-specifications \
+        'ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=ProdRouteTable}]'
+
+# Create route table for specific segment
+aws ec2 create-transit-gateway-route-table \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --tag-specifications \
+        'ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=DevRouteTable},{Key=Segment,Value=Development}]'
+
+# Describe route tables
+aws ec2 describe-transit-gateway-route-tables
+
+# Describe specific route table
+aws ec2 describe-transit-gateway-route-tables \
+    --transit-gateway-route-table-ids tgw-rtb-0a1b2c3d4e5f6g7h8
+
+# Search route tables
+aws ec2 search-transit-gateway-routes \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --filters "Name=state,Values=active"
+
+# Export route table
+aws ec2 export-transit-gateway-routes \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --s3-bucket my-tgw-routes-bucket \
+    --filters "Name=state,Values=active"
+
+# Delete route table
+aws ec2 delete-transit-gateway-route-table \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8
+```
+
+### Route Table Associations and Propagations
+
+```bash
+# Associate attachment with route table
+aws ec2 associate-transit-gateway-route-table \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Disassociate attachment from route table
+aws ec2 disassociate-transit-gateway-route-table \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Enable route propagation
+aws ec2 enable-transit-gateway-route-table-propagation \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Disable route propagation
+aws ec2 disable-transit-gateway-route-table-propagation \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Get route table associations
+aws ec2 get-transit-gateway-route-table-associations \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8
+
+# Get route table propagations
+aws ec2 get-transit-gateway-route-table-propagations \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8
+
+# Create static route
+aws ec2 create-transit-gateway-route \
+    --destination-cidr-block 10.0.0.0/16 \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Create blackhole route
+aws ec2 create-transit-gateway-route \
+    --destination-cidr-block 192.168.100.0/24 \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --blackhole
+
+# Delete route
+aws ec2 delete-transit-gateway-route \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16
+```
+
+### Multicast Domains
+
+```bash
+# Create multicast domain
+aws ec2 create-transit-gateway-multicast-domain \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options \
+        Igmpv2Support=enable,\
+        StaticSourcesSupport=disable,\
+        AutoAcceptSharedAssociations=disable \
+    --tag-specifications \
+        'ResourceType=transit-gateway-multicast-domain,Tags=[{Key=Name,Value=MyMulticastDomain}]'
+
+# Associate VPC with multicast domain
+aws ec2 associate-transit-gateway-multicast-domain \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --subnet-ids subnet-111111111 subnet-222222222
+
+# Register multicast group members
+aws ec2 register-transit-gateway-multicast-group-members \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --group-ip-address 224.0.0.1 \
+    --network-interface-ids eni-0a1b2c3d4e5f6g7h8
+
+# Register multicast group sources
+aws ec2 register-transit-gateway-multicast-group-sources \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --group-ip-address 224.0.0.1 \
+    --network-interface-ids eni-9876543210fedcba0
+
+# Describe multicast domains
+aws ec2 describe-transit-gateway-multicast-domains
+
+# Get multicast group members
+aws ec2 search-transit-gateway-multicast-groups \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --filters "Name=group-ip-address,Values=224.0.0.1"
+
+# Deregister multicast group members
+aws ec2 deregister-transit-gateway-multicast-group-members \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --group-ip-address 224.0.0.1 \
+    --network-interface-ids eni-0a1b2c3d4e5f6g7h8
+
+# Deregister multicast group sources
+aws ec2 deregister-transit-gateway-multicast-group-sources \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --group-ip-address 224.0.0.1 \
+    --network-interface-ids eni-9876543210fedcba0
+
+# Disassociate VPC from multicast domain
+aws ec2 disassociate-transit-gateway-multicast-domain \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --subnet-ids subnet-111111111
+
+# Delete multicast domain
+aws ec2 delete-transit-gateway-multicast-domain \
+    --transit-gateway-multicast-domain-id tgw-mcast-domain-0a1b2c3d
+```
+
+### Network Manager
+
+```bash
+# Create global network
+aws networkmanager create-global-network \
+    --description "Global Corporate Network" \
+    --tags Key=Name,Value=GlobalNetwork
+
+# Register Transit Gateway to global network
+aws networkmanager register-transit-gateway \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-arn arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-1234567890abcdef0
+
+# Create site
+aws networkmanager create-site \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --location \
+        Latitude=40.7128,\
+        Longitude=-74.0060,\
+        Address="New York Office" \
+    --description "NY Headquarters" \
+    --tags Key=Name,Value=NYOffice
+
+# Create device
+aws networkmanager create-device \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --site-id site-0a1b2c3d4e5f6g7h8 \
+    --description "Core Router" \
+    --type "Router" \
+    --vendor "Cisco" \
+    --model "ASR1000" \
+    --tags Key=Name,Value=CoreRouter01
+
+# Create link
+aws networkmanager create-link \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --site-id site-0a1b2c3d4e5f6g7h8 \
+    --bandwidth UploadSpeed=1000,DownloadSpeed=1000 \
+    --provider "ISP-Name" \
+    --type "Broadband" \
+    --description "Primary Internet Connection"
+
+# Get Transit Gateway registrations
+aws networkmanager get-transit-gateway-registrations \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8
+
+# Describe global networks
+aws networkmanager describe-global-networks
+
+# Get network routes
+aws networkmanager get-route-analysis \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --source \
+        TransitGatewayAttachmentArn=arn:aws:ec2:us-east-1:123456789012:transit-gateway-attachment/tgw-attach-source \
+    --destination \
+        TransitGatewayAttachmentArn=arn:aws:ec2:us-west-2:123456789012:transit-gateway-attachment/tgw-attach-dest
+
+# Deregister Transit Gateway
+aws networkmanager deregister-transit-gateway \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8 \
+    --transit-gateway-arn arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-1234567890abcdef0
+
+# Delete global network
+aws networkmanager delete-global-network \
+    --global-network-id global-network-0a1b2c3d4e5f6g7h8
+```
+
+### Tags Management
+
+```bash
+# Tag Transit Gateway
+aws ec2 create-tags \
+    --resources tgw-1234567890abcdef0 \
+    --tags Key=Environment,Value=Production Key=CostCenter,Value=IT
+
+# Tag Transit Gateway attachment
+aws ec2 create-tags \
+    --resources tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --tags Key=Application,Value=WebApp Key=Backup,Value=Yes
+
+# Tag route table
+aws ec2 create-tags \
+    --resources tgw-rtb-0a1b2c3d4e5f6g7h8 \
+    --tags Key=Segment,Value=Production Key=Team,Value=Network
+
+# Describe tags
+aws ec2 describe-tags \
+    --filters "Name=resource-id,Values=tgw-1234567890abcdef0"
+
+# Delete tags
+aws ec2 delete-tags \
+    --resources tgw-1234567890abcdef0 \
+    --tags Key=Environment
+```
+
+### Monitoring and Troubleshooting
+
+```bash
+# Get Transit Gateway attachment state
+aws ec2 describe-transit-gateway-attachments \
+    --transit-gateway-attachment-ids tgw-attach-0a1b2c3d4e5f6g7h8 \
+    --query 'TransitGatewayAttachments[0].State'
+
+# List all attachments for a Transit Gateway
+aws ec2 describe-transit-gateway-attachments \
+    --filters "Name=transit-gateway-id,Values=tgw-1234567890abcdef0"
+
+# Check route table associations
+aws ec2 get-transit-gateway-attachment-propagations \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Get attachment propagations
+aws ec2 get-transit-gateway-attachment-propagations \
+    --transit-gateway-attachment-id tgw-attach-0a1b2c3d4e5f6g7h8
+
+# Describe prefix list references
+aws ec2 describe-transit-gateway-prefix-list-references \
+    --transit-gateway-route-table-id tgw-rtb-0a1b2c3d4e5f6g7h8
+
+# Get VPN tunnel status (for VPN attachments)
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].VgwTelemetry'
+```
+
+---
 
 ## Hands-on Labs
 

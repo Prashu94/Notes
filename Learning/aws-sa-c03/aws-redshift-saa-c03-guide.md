@@ -12,7 +12,8 @@
 8. [Integration with AWS Services](#integration-with-aws-services)
 9. [Best Practices](#best-practices)
 10. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
-11. [Common Scenarios](#common-scenarios)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [Common Scenarios](#common-scenarios)
 
 ---
 
@@ -2089,6 +2090,992 @@ Solution:
 - Configure SSL/TLS for encryption in transit  
 - Use IAM roles instead of access keys
 - Enable VPC for network isolation
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Prerequisites
+
+```bash
+# Install AWS CLI
+# Visit: https://aws.amazon.com/cli/
+
+# Configure AWS CLI
+aws configure
+
+# Verify configuration
+aws sts get-caller-identity
+```
+
+### Cluster Management
+
+#### Create Cluster
+
+```bash
+# Create a basic Redshift cluster
+aws redshift create-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --node-type dc2.large \
+    --master-username admin \
+    --master-user-password MySecurePass123! \
+    --cluster-type single-node \
+    --db-name salesdb \
+    --region us-east-1
+
+# Create multi-node cluster
+aws redshift create-cluster \
+    --cluster-identifier prod-redshift-cluster \
+    --node-type ra3.4xlarge \
+    --master-username admin \
+    --master-user-password MySecurePass123! \
+    --cluster-type multi-node \
+    --number-of-nodes 3 \
+    --db-name analytics \
+    --region us-east-1
+
+# Create cluster in VPC with encryption
+aws redshift create-cluster \
+    --cluster-identifier secure-cluster \
+    --node-type ra3.xlplus \
+    --master-username admin \
+    --master-user-password MySecurePass123! \
+    --cluster-type multi-node \
+    --number-of-nodes 2 \
+    --db-name datawarehouse \
+    --vpc-security-group-ids sg-12345678 \
+    --cluster-subnet-group-name my-subnet-group \
+    --encrypted \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789abc \
+    --publicly-accessible false \
+    --enhanced-vpc-routing \
+    --iam-roles arn:aws:iam::123456789012:role/RedshiftS3Role \
+    --region us-east-1
+
+# Create cluster with custom parameter group
+aws redshift create-cluster \
+    --cluster-identifier custom-cluster \
+    --node-type dc2.large \
+    --master-username admin \
+    --master-user-password MySecurePass123! \
+    --cluster-type single-node \
+    --db-name mydb \
+    --cluster-parameter-group-name my-custom-params \
+    --automated-snapshot-retention-period 7 \
+    --preferred-maintenance-window sun:03:00-sun:04:00 \
+    --region us-east-1
+
+# Create cluster with tags
+aws redshift create-cluster \
+    --cluster-identifier tagged-cluster \
+    --node-type dc2.large \
+    --master-username admin \
+    --master-user-password MySecurePass123! \
+    --cluster-type single-node \
+    --db-name mydb \
+    --tags Key=Environment,Value=Production Key=Application,Value=DataWarehouse Key=CostCenter,Value=Analytics \
+    --region us-east-1
+```
+
+#### Describe and List Clusters
+
+```bash
+# List all clusters
+aws redshift describe-clusters
+
+# Get specific cluster details
+aws redshift describe-clusters \
+    --cluster-identifier my-redshift-cluster
+
+# Get cluster endpoint
+aws redshift describe-clusters \
+    --cluster-identifier my-redshift-cluster \
+    --query 'Clusters[0].Endpoint.Address' \
+    --output text
+
+# Get cluster status
+aws redshift describe-clusters \
+    --cluster-identifier my-redshift-cluster \
+    --query 'Clusters[0].ClusterStatus' \
+    --output text
+
+# List clusters with specific tags
+aws redshift describe-clusters \
+    --query "Clusters[?Tags[?Key=='Environment' && Value=='Production']]"
+```
+
+#### Modify Cluster
+
+```bash
+# Modify master user password
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --master-user-password NewSecurePass456!
+
+# Change node type (resize)
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --node-type ra3.xlplus \
+    --apply-immediately
+
+# Change number of nodes
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --number-of-nodes 5 \
+    --apply-immediately
+
+# Modify VPC security groups
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --vpc-security-group-ids sg-12345678 sg-87654321
+
+# Enable encryption (requires snapshot restore)
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --encrypted \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789abc
+
+# Modify maintenance window
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --preferred-maintenance-window mon:03:00-mon:04:00
+
+# Modify snapshot retention period
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --automated-snapshot-retention-period 14
+
+# Enable enhanced VPC routing
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --enhanced-vpc-routing
+
+# Modify publicly accessible setting
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --no-publicly-accessible
+```
+
+#### Resize Cluster
+
+```bash
+# Classic resize (cluster is unavailable during resize)
+aws redshift modify-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --number-of-nodes 4 \
+    --apply-immediately
+
+# Elastic resize (faster, minimal downtime)
+aws redshift resize-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --number-of-nodes 4 \
+    --classic false
+
+# Get resize info
+aws redshift describe-resize \
+    --cluster-identifier my-redshift-cluster
+```
+
+#### Pause and Resume Cluster
+
+```bash
+# Pause cluster
+aws redshift pause-cluster \
+    --cluster-identifier my-redshift-cluster
+
+# Resume cluster
+aws redshift resume-cluster \
+    --cluster-identifier my-redshift-cluster
+```
+
+#### Reboot Cluster
+
+```bash
+# Reboot cluster
+aws redshift reboot-cluster \
+    --cluster-identifier my-redshift-cluster
+```
+
+#### Delete Cluster
+
+```bash
+# Delete cluster without final snapshot
+aws redshift delete-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --skip-final-cluster-snapshot
+
+# Delete cluster with final snapshot
+aws redshift delete-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --final-cluster-snapshot-identifier final-snapshot-2024-01-15
+
+# Delete cluster and skip final snapshot
+aws redshift delete-cluster \
+    --cluster-identifier my-redshift-cluster \
+    --skip-final-cluster-snapshot \
+    --final-cluster-snapshot-retention-period 0
+```
+
+### Snapshot Operations
+
+#### Create Manual Snapshot
+
+```bash
+# Create manual snapshot
+aws redshift create-cluster-snapshot \
+    --cluster-identifier my-redshift-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15
+
+# Create snapshot with tags
+aws redshift create-cluster-snapshot \
+    --cluster-identifier my-redshift-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --tags Key=BackupType,Value=Manual Key=CreatedBy,Value=Admin
+
+# Create snapshot with retention period
+aws redshift create-cluster-snapshot \
+    --cluster-identifier my-redshift-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --manual-snapshot-retention-period 30
+```
+
+#### List and Describe Snapshots
+
+```bash
+# List all snapshots
+aws redshift describe-cluster-snapshots
+
+# List snapshots for specific cluster
+aws redshift describe-cluster-snapshots \
+    --cluster-identifier my-redshift-cluster
+
+# Get specific snapshot details
+aws redshift describe-cluster-snapshots \
+    --snapshot-identifier manual-snapshot-2024-01-15
+
+# List manual snapshots only
+aws redshift describe-cluster-snapshots \
+    --snapshot-type manual
+
+# List automated snapshots only
+aws redshift describe-cluster-snapshots \
+    --snapshot-type automated
+
+# List snapshots within date range
+aws redshift describe-cluster-snapshots \
+    --start-time 2024-01-01T00:00:00Z \
+    --end-time 2024-01-31T23:59:59Z
+
+# List snapshots sorted by create time
+aws redshift describe-cluster-snapshots \
+    --cluster-identifier my-redshift-cluster \
+    --query 'Snapshots | sort_by(@, &SnapshotCreateTime) | reverse(@)'
+```
+
+#### Restore from Snapshot
+
+```bash
+# Restore cluster from snapshot
+aws redshift restore-from-cluster-snapshot \
+    --cluster-identifier restored-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15
+
+# Restore to different node type
+aws redshift restore-from-cluster-snapshot \
+    --cluster-identifier restored-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --node-type ra3.4xlarge \
+    --number-of-nodes 2
+
+# Restore with specific subnet group and security groups
+aws redshift restore-from-cluster-snapshot \
+    --cluster-identifier restored-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --cluster-subnet-group-name my-subnet-group \
+    --vpc-security-group-ids sg-12345678 \
+    --publicly-accessible false
+
+# Restore with IAM roles
+aws redshift restore-from-cluster-snapshot \
+    --cluster-identifier restored-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --iam-roles arn:aws:iam::123456789012:role/RedshiftS3Role arn:aws:iam::123456789012:role/RedshiftGlueRole
+
+# Restore specific tables from snapshot
+aws redshift restore-table-from-cluster-snapshot \
+    --cluster-identifier my-redshift-cluster \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --source-database-name salesdb \
+    --source-table-name orders \
+    --target-database-name salesdb \
+    --new-table-name orders_restored
+```
+
+#### Copy Snapshot
+
+```bash
+# Copy snapshot to another region
+aws redshift copy-cluster-snapshot \
+    --source-snapshot-identifier manual-snapshot-2024-01-15 \
+    --target-snapshot-identifier manual-snapshot-2024-01-15-copy \
+    --source-region us-east-1 \
+    --region us-west-2
+
+# Copy automated snapshot to manual snapshot
+aws redshift copy-cluster-snapshot \
+    --source-snapshot-identifier rs:my-cluster-2024-01-15-00-00-00 \
+    --target-snapshot-identifier manual-copy-2024-01-15 \
+    --manual-snapshot-retention-period 30
+```
+
+#### Modify Snapshot
+
+```bash
+# Modify snapshot retention period
+aws redshift modify-cluster-snapshot \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --manual-snapshot-retention-period 60
+
+# Make snapshot public (share with all AWS accounts)
+aws redshift modify-cluster-snapshot \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --manual-snapshot-public
+
+# Make snapshot private again
+aws redshift modify-cluster-snapshot \
+    --snapshot-identifier manual-snapshot-2024-01-15 \
+    --no-manual-snapshot-public
+```
+
+#### Delete Snapshot
+
+```bash
+# Delete manual snapshot
+aws redshift delete-cluster-snapshot \
+    --snapshot-identifier manual-snapshot-2024-01-15
+
+# Batch delete snapshots
+aws redshift batch-delete-cluster-snapshots \
+    --identifiers SnapshotIdentifier=snapshot1 SnapshotIdentifier=snapshot2 SnapshotIdentifier=snapshot3
+```
+
+#### Snapshot Schedule Operations
+
+```bash
+# Create snapshot schedule
+aws redshift create-snapshot-schedule \
+    --schedule-identifier daily-snapshots \
+    --schedule-definitions "rate(24 hours)"
+
+# Create custom snapshot schedule
+aws redshift create-snapshot-schedule \
+    --schedule-identifier business-hours-snapshots \
+    --schedule-definitions "cron(0 9,17 * * ? *)"  # 9 AM and 5 PM daily
+
+# Associate schedule with cluster
+aws redshift modify-cluster-snapshot-schedule \
+    --cluster-identifier my-redshift-cluster \
+    --schedule-identifier daily-snapshots
+
+# List snapshot schedules
+aws redshift describe-snapshot-schedules
+
+# Get snapshot schedule
+aws redshift describe-snapshot-schedules \
+    --schedule-identifier daily-snapshots
+
+# Modify snapshot schedule
+aws redshift modify-snapshot-schedule \
+    --schedule-identifier daily-snapshots \
+    --schedule-definitions "rate(12 hours)"
+
+# Delete snapshot schedule
+aws redshift delete-snapshot-schedule \
+    --schedule-identifier old-schedule
+```
+
+### Parameter Groups
+
+#### Create Parameter Group
+
+```bash
+# Create parameter group
+aws redshift create-cluster-parameter-group \
+    --parameter-group-name my-custom-params \
+    --parameter-group-family redshift-1.0 \
+    --description "Custom parameter group for production clusters"
+```
+
+#### List and Describe Parameter Groups
+
+```bash
+# List all parameter groups
+aws redshift describe-cluster-parameter-groups
+
+# Get specific parameter group
+aws redshift describe-cluster-parameter-groups \
+    --parameter-group-name my-custom-params
+
+# Get parameters in a parameter group
+aws redshift describe-cluster-parameters \
+    --parameter-group-name my-custom-params
+
+# Get default parameter groups
+aws redshift describe-default-cluster-parameters \
+    --parameter-group-family redshift-1.0
+```
+
+#### Modify Parameter Group
+
+```bash
+# Modify parameters
+aws redshift modify-cluster-parameter-group \
+    --parameter-group-name my-custom-params \
+    --parameters "ParameterName=enable_user_activity_logging,ParameterValue=true,ApplyType=static" \
+                 "ParameterName=max_cursor_result_set_size,ParameterValue=default,ApplyType=dynamic"
+
+# Set require_ssl parameter
+aws redshift modify-cluster-parameter-group \
+    --parameter-group-name my-custom-params \
+    --parameters "ParameterName=require_ssl,ParameterValue=true,ApplyType=static"
+
+# Set query timeout
+aws redshift modify-cluster-parameter-group \
+    --parameter-group-name my-custom-params \
+    --parameters "ParameterName=statement_timeout,ParameterValue=1800000,ApplyType=dynamic"
+```
+
+#### Reset Parameter Group
+
+```bash
+# Reset all parameters to default
+aws redshift reset-cluster-parameter-group \
+    --parameter-group-name my-custom-params
+
+# Reset specific parameters
+aws redshift reset-cluster-parameter-group \
+    --parameter-group-name my-custom-params \
+    --parameters ParameterName=enable_user_activity_logging ParameterName=statement_timeout
+```
+
+#### Delete Parameter Group
+
+```bash
+# Delete parameter group
+aws redshift delete-cluster-parameter-group \
+    --parameter-group-name old-params
+```
+
+### Subnet Groups
+
+#### Create Subnet Group
+
+```bash
+# Create subnet group
+aws redshift create-cluster-subnet-group \
+    --cluster-subnet-group-name my-subnet-group \
+    --description "Subnet group for Redshift clusters" \
+    --subnet-ids subnet-12345678 subnet-87654321 subnet-11111111
+
+# Create subnet group with tags
+aws redshift create-cluster-subnet-group \
+    --cluster-subnet-group-name prod-subnet-group \
+    --description "Production subnet group" \
+    --subnet-ids subnet-12345678 subnet-87654321 \
+    --tags Key=Environment,Value=Production Key=Application,Value=DataWarehouse
+```
+
+#### List and Describe Subnet Groups
+
+```bash
+# List all subnet groups
+aws redshift describe-cluster-subnet-groups
+
+# Get specific subnet group
+aws redshift describe-cluster-subnet-groups \
+    --cluster-subnet-group-name my-subnet-group
+```
+
+#### Modify Subnet Group
+
+```bash
+# Modify subnet group (add/remove subnets)
+aws redshift modify-cluster-subnet-group \
+    --cluster-subnet-group-name my-subnet-group \
+    --description "Updated subnet group" \
+    --subnet-ids subnet-12345678 subnet-87654321 subnet-22222222
+```
+
+#### Delete Subnet Group
+
+```bash
+# Delete subnet group
+aws redshift delete-cluster-subnet-group \
+    --cluster-subnet-group-name old-subnet-group
+```
+
+### IAM Role Management
+
+#### Associate IAM Roles
+
+```bash
+# Associate IAM role with cluster
+aws redshift modify-cluster-iam-roles \
+    --cluster-identifier my-redshift-cluster \
+    --add-iam-roles arn:aws:iam::123456789012:role/RedshiftS3Role
+
+# Associate multiple roles
+aws redshift modify-cluster-iam-roles \
+    --cluster-identifier my-redshift-cluster \
+    --add-iam-roles arn:aws:iam::123456789012:role/RedshiftS3Role arn:aws:iam::123456789012:role/RedshiftGlueRole
+
+# Remove IAM role
+aws redshift modify-cluster-iam-roles \
+    --cluster-identifier my-redshift-cluster \
+    --remove-iam-roles arn:aws:iam::123456789012:role/OldRole
+
+# Set default IAM role
+aws redshift modify-cluster-iam-roles \
+    --cluster-identifier my-redshift-cluster \
+    --default-iam-role-arn arn:aws:iam::123456789012:role/RedshiftS3Role
+```
+
+### Scheduled Actions
+
+#### Create Scheduled Action
+
+```bash
+# Schedule cluster pause
+aws redshift create-scheduled-action \
+    --scheduled-action-name pause-cluster-nightly \
+    --target-action '{"PauseCluster":{"ClusterIdentifier":"my-redshift-cluster"}}' \
+    --schedule "cron(0 22 * * ? *)" \
+    --iam-role arn:aws:iam::123456789012:role/RedshiftSchedulerRole \
+    --enable
+
+# Schedule cluster resume
+aws redshift create-scheduled-action \
+    --scheduled-action-name resume-cluster-morning \
+    --target-action '{"ResumeCluster":{"ClusterIdentifier":"my-redshift-cluster"}}' \
+    --schedule "cron(0 6 ? * MON-FRI *)" \
+    --iam-role arn:aws:iam::123456789012:role/RedshiftSchedulerRole \
+    --enable
+
+# Schedule cluster resize
+aws redshift create-scheduled-action \
+    --scheduled-action-name resize-cluster-monthly \
+    --target-action '{"ResizeCluster":{"ClusterIdentifier":"my-redshift-cluster","NumberOfNodes":5,"Classic":false}}' \
+    --schedule "cron(0 2 1 * ? *)" \
+    --iam-role arn:aws:iam::123456789012:role/RedshiftSchedulerRole \
+    --enable
+```
+
+#### List and Describe Scheduled Actions
+
+```bash
+# List all scheduled actions
+aws redshift describe-scheduled-actions
+
+# Get specific scheduled action
+aws redshift describe-scheduled-actions \
+    --scheduled-action-name pause-cluster-nightly
+
+# List scheduled actions for specific cluster
+aws redshift describe-scheduled-actions \
+    --filters Name=cluster-identifier,Values=my-redshift-cluster
+```
+
+#### Modify Scheduled Action
+
+```bash
+# Modify scheduled action
+aws redshift modify-scheduled-action \
+    --scheduled-action-name pause-cluster-nightly \
+    --schedule "cron(0 23 * * ? *)"  # Change to 11 PM
+
+# Disable scheduled action
+aws redshift modify-scheduled-action \
+    --scheduled-action-name pause-cluster-nightly \
+    --no-enable
+
+# Re-enable scheduled action
+aws redshift modify-scheduled-action \
+    --scheduled-action-name pause-cluster-nightly \
+    --enable
+```
+
+#### Delete Scheduled Action
+
+```bash
+# Delete scheduled action
+aws redshift delete-scheduled-action \
+    --scheduled-action-name old-scheduled-action
+```
+
+### Event Subscriptions
+
+#### Create Event Subscription
+
+```bash
+# Create event subscription for all cluster events
+aws redshift create-event-subscription \
+    --subscription-name cluster-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:redshift-events \
+    --source-type cluster \
+    --enabled
+
+# Create subscription for specific cluster
+aws redshift create-event-subscription \
+    --subscription-name my-cluster-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:redshift-events \
+    --source-type cluster \
+    --source-ids my-redshift-cluster \
+    --enabled
+
+# Create subscription for specific event categories
+aws redshift create-event-subscription \
+    --subscription-name critical-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:redshift-critical \
+    --source-type cluster \
+    --event-categories configuration management security \
+    --enabled
+
+# Create subscription for snapshot events
+aws redshift create-event-subscription \
+    --subscription-name snapshot-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:redshift-snapshots \
+    --source-type cluster-snapshot \
+    --enabled
+```
+
+#### List and Describe Event Subscriptions
+
+```bash
+# List all event subscriptions
+aws redshift describe-event-subscriptions
+
+# Get specific event subscription
+aws redshift describe-event-subscriptions \
+    --subscription-name cluster-events
+```
+
+#### Modify Event Subscription
+
+```bash
+# Modify event subscription
+aws redshift modify-event-subscription \
+    --subscription-name cluster-events \
+    --event-categories configuration management
+
+# Disable event subscription
+aws redshift modify-event-subscription \
+    --subscription-name cluster-events \
+    --no-enabled
+
+# Change SNS topic
+aws redshift modify-event-subscription \
+    --subscription-name cluster-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:new-redshift-events
+```
+
+#### Delete Event Subscription
+
+```bash
+# Delete event subscription
+aws redshift delete-event-subscription \
+    --subscription-name old-subscription
+```
+
+#### View Events
+
+```bash
+# List recent events
+aws redshift describe-events
+
+# List events for specific cluster
+aws redshift describe-events \
+    --source-identifier my-redshift-cluster \
+    --source-type cluster
+
+# List events within date range
+aws redshift describe-events \
+    --start-time 2024-01-01T00:00:00Z \
+    --end-time 2024-01-31T23:59:59Z
+
+# List events with specific category
+aws redshift describe-events \
+    --source-type cluster \
+    --source-identifier my-redshift-cluster \
+    --max-records 100
+```
+
+### Data Sharing (Redshift Serverless)
+
+#### Create Data Share
+
+```bash
+# Create data share
+aws redshift create-data-share \
+    --data-share-name sales_data_share \
+    --database-name salesdb \
+    --cluster-identifier my-redshift-cluster
+
+# Create data share with public accessibility
+aws redshift create-data-share \
+    --data-share-name public_data_share \
+    --database-name publicdb \
+    --cluster-identifier my-redshift-cluster \
+    --publicly-accessible
+```
+
+#### Authorize Data Share
+
+```bash
+# Authorize data share to specific account
+aws redshift authorize-data-share \
+    --data-share-arn arn:aws:redshift:us-east-1:123456789012:datashare:abc123/sales_data_share \
+    --consumer-identifier 987654321098
+
+# Authorize data share to all accounts
+aws redshift authorize-data-share \
+    --data-share-arn arn:aws:redshift:us-east-1:123456789012:datashare:abc123/public_data_share \
+    --allow-publicly-accessible-consumers
+```
+
+#### Deauthorize Data Share
+
+```bash
+# Deauthorize data share from specific account
+aws redshift deauthorize-data-share \
+    --data-share-arn arn:aws:redshift:us-east-1:123456789012:datashare:abc123/sales_data_share \
+    --consumer-identifier 987654321098
+```
+
+#### Associate and Disassociate Data Share
+
+```bash
+# Associate data share consumer
+aws redshift associate-data-share-consumer \
+    --data-share-arn arn:aws:redshift:us-east-1:987654321098:datashare:abc123/sales_data_share \
+    --associate-entire-account
+
+# Disassociate data share consumer
+aws redshift disassociate-data-share-consumer \
+    --data-share-arn arn:aws:redshift:us-east-1:987654321098:datashare:abc123/sales_data_share \
+    --disassociate-entire-account
+```
+
+#### List and Describe Data Shares
+
+```bash
+# List data shares (producer)
+aws redshift describe-data-shares
+
+# List data shares for specific cluster
+aws redshift describe-data-shares \
+    --cluster-identifier my-redshift-cluster
+
+# List data shares by ARN
+aws redshift describe-data-shares \
+    --data-share-arn arn:aws:redshift:us-east-1:123456789012:datashare:abc123/sales_data_share
+
+# List data shares to consume
+aws redshift describe-data-shares-for-consumer
+
+# List data shares from producer
+aws redshift describe-data-shares-for-producer \
+    --producer-arn arn:aws:redshift:us-east-1:123456789012:cluster:my-redshift-cluster
+```
+
+#### Delete Data Share
+
+```bash
+# Delete data share
+aws redshift delete-data-share \
+    --data-share-arn arn:aws:redshift:us-east-1:123456789012:datashare:abc123/sales_data_share
+```
+
+### Usage Limits
+
+```bash
+# Create usage limit (concurrency scaling)
+aws redshift create-usage-limit \
+    --cluster-identifier my-redshift-cluster \
+    --feature-type concurrency-scaling \
+    --limit-type time \
+    --amount 60 \
+    --period daily
+
+# Create usage limit (Spectrum)
+aws redshift create-usage-limit \
+    --cluster-identifier my-redshift-cluster \
+    --feature-type spectrum \
+    --limit-type data-scanned \
+    --amount 10 \
+    --period monthly \
+    --breach-action log
+
+# List usage limits
+aws redshift describe-usage-limits \
+    --cluster-identifier my-redshift-cluster
+
+# Modify usage limit
+aws redshift modify-usage-limit \
+    --usage-limit-id usagelimit-abc123 \
+    --amount 120
+
+# Delete usage limit
+aws redshift delete-usage-limit \
+    --usage-limit-id usagelimit-abc123
+```
+
+### Monitoring and Logging
+
+```bash
+# Enable audit logging
+aws redshift enable-logging \
+    --cluster-identifier my-redshift-cluster \
+    --bucket-name my-redshift-logs \
+    --s3-key-prefix logs/
+
+# Disable logging
+aws redshift disable-logging \
+    --cluster-identifier my-redshift-cluster
+
+# Describe logging status
+aws redshift describe-logging-status \
+    --cluster-identifier my-redshift-cluster
+
+# Get cluster credentials (temporary)
+aws redshift get-cluster-credentials \
+    --cluster-identifier my-redshift-cluster \
+    --db-user temp_user \
+    --db-name salesdb \
+    --duration-seconds 3600
+```
+
+### Tagging Operations
+
+```bash
+# Tag cluster
+aws redshift create-tags \
+    --resource-name arn:aws:redshift:us-east-1:123456789012:cluster:my-redshift-cluster \
+    --tags Key=Environment,Value=Production Key=Application,Value=DataWarehouse Key=Owner,Value=DataTeam
+
+# Tag snapshot
+aws redshift create-tags \
+    --resource-name arn:aws:redshift:us-east-1:123456789012:snapshot:my-redshift-cluster/snapshot-2024-01-15 \
+    --tags Key=BackupType,Value=Manual
+
+# List tags
+aws redshift describe-tags \
+    --resource-name arn:aws:redshift:us-east-1:123456789012:cluster:my-redshift-cluster
+
+# List all resources with specific tag
+aws redshift describe-tags \
+    --tag-keys Environment \
+    --tag-values Production
+
+# Remove tags
+aws redshift delete-tags \
+    --resource-name arn:aws:redshift:us-east-1:123456789012:cluster:my-redshift-cluster \
+    --tag-keys OldTag TempTag
+```
+
+### Advanced Operations
+
+#### Batch Operations Script
+
+```bash
+#!/bin/bash
+# Comprehensive Redshift management script
+
+CLUSTER_ID="my-redshift-cluster"
+REGION="us-east-1"
+
+# Function to wait for cluster to be available
+wait_for_cluster() {
+    echo "Waiting for cluster to be available..."
+    while true; do
+        STATUS=$(aws redshift describe-clusters \
+            --cluster-identifier "$CLUSTER_ID" \
+            --region "$REGION" \
+            --query 'Clusters[0].ClusterStatus' \
+            --output text)
+        
+        if [ "$STATUS" = "available" ]; then
+            echo "Cluster is available"
+            break
+        fi
+        echo "Current status: $STATUS"
+        sleep 30
+    done
+}
+
+# Create snapshot
+echo "Creating snapshot..."
+SNAPSHOT_ID="snapshot-$(date +%Y%m%d-%H%M%S)"
+aws redshift create-cluster-snapshot \
+    --cluster-identifier "$CLUSTER_ID" \
+    --snapshot-identifier "$SNAPSHOT_ID" \
+    --region "$REGION"
+
+# Wait for snapshot to complete
+echo "Waiting for snapshot..."
+aws redshift wait snapshot-available \
+    --snapshot-identifier "$SNAPSHOT_ID" \
+    --region "$REGION"
+
+echo "Snapshot created: $SNAPSHOT_ID"
+
+# Copy snapshot to another region
+BACKUP_REGION="us-west-2"
+echo "Copying snapshot to $BACKUP_REGION..."
+aws redshift copy-cluster-snapshot \
+    --source-snapshot-identifier "$SNAPSHOT_ID" \
+    --target-snapshot-identifier "$SNAPSHOT_ID" \
+    --source-region "$REGION" \
+    --region "$BACKUP_REGION"
+
+echo "Backup completed successfully"
+```
+
+#### Query Performance Monitoring
+
+```bash
+# Get cluster performance metrics from CloudWatch
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/Redshift \
+    --metric-name CPUUtilization \
+    --dimensions Name=ClusterIdentifier,Value=my-redshift-cluster \
+    --start-time 2024-01-15T00:00:00Z \
+    --end-time 2024-01-15T23:59:59Z \
+    --period 3600 \
+    --statistics Average Maximum \
+    --region us-east-1
+
+# Get database connections
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/Redshift \
+    --metric-name DatabaseConnections \
+    --dimensions Name=ClusterIdentifier,Value=my-redshift-cluster \
+    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 300 \
+    --statistics Average Sum \
+    --region us-east-1
+
+# Monitor query throughput
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/Redshift \
+    --metric-name QueryDuration \
+    --dimensions Name=ClusterIdentifier,Value=my-redshift-cluster \
+    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 300 \
+    --statistics Average Maximum \
+    --region us-east-1
 ```
 
 ---

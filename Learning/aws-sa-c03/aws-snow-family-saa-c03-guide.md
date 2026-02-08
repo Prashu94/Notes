@@ -13,7 +13,8 @@
 10. [Pricing and Cost Optimization](#pricing-and-cost-optimization)
 11. [Best Practices](#best-practices)
 12. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-13. [Practice Questions](#practice-questions)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [Practice Questions](#practice-questions)
 
 ---
 
@@ -845,7 +846,485 @@ AWS OpsHub is a graphical user interface for managing Snow Family devices, avail
 | Snowmobile | 100 PB | Custom |
 
 ---
+## AWS CLI Commands Reference
 
+### Snowball Job Management
+
+#### Create Snowball Job
+```bash
+# Create import job with Snowball Edge Storage Optimized
+aws snowball create-job \
+    --job-type IMPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::my-import-bucket"}]}' \
+    --description "Import 50TB of archive data" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T80 \
+    --shipping-option SECOND_DAY
+
+# Create export job from S3 to Snowball
+aws snowball create-job \
+    --job-type EXPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::my-export-bucket", "KeyRange": {"BeginMarker": "data/", "EndMarker": "data/~"}}]}' \
+    --description "Export data for offline processing" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T80 \
+    --shipping-option NEXT_DAY
+
+# Create local compute and storage job
+aws snowball create-job \
+    --job-type LOCAL_USE \
+    --description "Edge computing for video processing" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T42 \
+    --device-configuration '{"SnowconeDeviceConfiguration": {"WirelessConnection": {"IsWifiEnabled": true}}}' \
+    --shipping-option SECOND_DAY
+
+# Create Snowball Edge Compute Optimized job with GPU
+aws snowball create-job \
+    --job-type IMPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::ml-training-data"}]}' \
+    --description "ML training data import with GPU processing" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T42 \
+    --snowball-type EDGE_C \
+    --shipping-option SECOND_DAY
+```
+
+#### Create Snowcone Job
+```bash
+# Create Snowcone HDD job for import
+aws snowball create-job \
+    --job-type IMPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::remote-site-data"}]}' \
+    --description "Snowcone data collection from remote site" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T8 \
+    --snowball-type SNC1_HDD \
+    --shipping-option SECOND_DAY
+
+# Create Snowcone SSD job with DataSync
+aws snowball create-job \
+    --job-type IMPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::iot-data-bucket"}]}' \
+    --description "IoT edge data collection with Snowcone SSD" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-capacity-preference T14 \
+    --snowball-type SNC1_SSD \
+    --device-configuration '{"SnowconeDeviceConfiguration": {"WirelessConnection": {"IsWifiEnabled": true}}}' \
+    --long-term-pricing-id LTP1234567890abc
+```
+
+#### Describe and List Jobs
+```bash
+# List all Snowball jobs
+aws snowball list-jobs
+
+# List jobs with specific output format
+aws snowball list-jobs \
+    --query 'JobListEntries[*].[JobId,JobType,JobState,CreationDate]' \
+    --output table
+
+# Describe specific job details
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000
+
+# Get job status
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.JobState' \
+    --output text
+
+# List only import jobs
+aws snowball list-jobs \
+    --query 'JobListEntries[?JobType==`IMPORT`]' \
+    --output table
+
+# List jobs in specific state
+aws snowball list-jobs \
+    --query 'JobListEntries[?JobState==`InProgress`]' \
+    --output table
+```
+
+#### Cancel and Update Jobs
+```bash
+# Cancel a job
+aws snowball cancel-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000
+
+# Update job notification settings
+aws snowball update-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --notification '{"SnsTopicARN": "arn:aws:sns:us-east-1:123456789012:snowball-notifications", "JobStatesToNotify": ["InProgress", "Complete"]}'
+
+# Update job shipping option
+aws snowball update-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --shipping-option NEXT_DAY
+
+# Update job description
+aws snowball update-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --description "Updated: Emergency data transfer for disaster recovery"
+```
+
+### Cluster Management
+
+#### Create and Manage Clusters
+```bash
+# Create Snowball Edge cluster for large-scale operations
+aws snowball create-cluster \
+    --job-type LOCAL_USE \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::cluster-storage"}]}' \
+    --description "5-node cluster for data processing" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowballRole \
+    --snowball-type EDGE \
+    --shipping-option SECOND_DAY \
+    --cluster-size 5
+
+# List clusters
+aws snowball list-clusters
+
+# Describe cluster
+aws snowball describe-cluster \
+    --cluster-id CID123e4567-e89b-12d3-a456-426655440000
+
+# List jobs in cluster
+aws snowball list-cluster-jobs \
+    --cluster-id CID123e4567-e89b-12d3-a456-426655440000
+
+# Cancel cluster
+aws snowball cancel-cluster \
+    --cluster-id CID123e4567-e89b-12d3-a456-426655440000
+
+# Update cluster
+aws snowball update-cluster \
+    --cluster-id CID123e4567-e89b-12d3-a456-426655440000 \
+    --description "Updated cluster configuration" \
+    --notification '{"SnsTopicARN": "arn:aws:sns:us-east-1:123456789012:cluster-events"}'
+```
+
+### Address Management
+
+#### Create and Manage Shipping Addresses
+```bash
+# Create shipping address
+aws snowball create-address \
+    --address '{"Name": "John Doe", "Company": "Example Corp", "Street1": "123 Main Street", "Street2": "Suite 100", "City": "Seattle", "StateOrProvince": "WA", "PostalCode": "98101", "Country": "US", "PhoneNumber": "206-555-0100"}'
+
+# Create address for remote location
+aws snowball create-address \
+    --address '{"Name": "Remote Site Manager", "Company": "Field Operations", "Street1": "Remote Site Alpha", "City": "Anchorage", "StateOrProvince": "AK", "PostalCode": "99501", "Country": "US", "PhoneNumber": "907-555-0100", "PrefectureOrDistrict": "North"}'
+
+# List all addresses
+aws snowball list-addresses
+
+# Describe specific address
+aws snowball describe-address \
+    --address-id ADID1234567890abc
+
+# Update address (create new address as addresses are immutable)
+aws snowball create-address \
+    --address '{"Name": "John Doe", "Company": "Example Corp", "Street1": "456 New Street", "City": "Seattle", "StateOrProvince": "WA", "PostalCode": "98102", "Country": "US", "PhoneNumber": "206-555-0200"}'
+```
+
+### Job Credentials and Access
+
+#### Get Job Manifest and Unlock Code
+```bash
+# Get job manifest (required for Snowball Client)
+aws snowball get-job-manifest \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000
+
+# Get job unlock code
+aws snowball get-job-unlock-code \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000
+
+# Save manifest to file
+aws snowball get-job-manifest \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --output text > job-manifest.json
+
+# Display unlock code only
+aws snowball get-job-unlock-code \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'UnlockCode' \
+    --output text
+```
+
+### Device Pickup and Return
+
+#### Manage Device Logistics
+```bash
+# Get shipping label
+aws snowball get-job-manifest \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.ShippingDetails'
+
+# Check device status and tracking
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.{State:JobState,ShipDate:ShippingDetails.ShippingOption,Tracking:ShippingDetails.TrackingNumber}' \
+    --output table
+
+# List jobs ready for pickup
+aws snowball list-jobs \
+    --query 'JobListEntries[?JobState==`Pending`].[JobId,JobType,CreationDate]' \
+    --output table
+```
+
+### Snowmobile Operations
+
+#### Create and Manage Snowmobile Job
+```bash
+# Note: Snowmobile jobs require direct AWS contact and special arrangements
+# These are representative commands - actual Snowmobile operations are coordinated with AWS
+
+# Create Snowmobile job (contact AWS first)
+aws snowball create-job \
+    --job-type IMPORT \
+    --resources '{"S3Resources": [{"BucketArn": "arn:aws:s3:::exabyte-migration"}]}' \
+    --description "Exabyte-scale data center migration" \
+    --address-id ADID1234567890abc \
+    --kms-key-arn arn:aws:kms:us-east-1:123456789012:key/abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --role-arn arn:aws:iam::123456789012:role/SnowmobileRole \
+    --snowball-type SNOWMOBILE \
+    --notification '{"SnsTopicARN": "arn:aws:sns:us-east-1:123456789012:snowmobile-alerts"}'
+
+# Check Snowmobile job status
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.{Type:SnowballType,State:JobState,Description:Description,Resources:Resources}'
+```
+
+### Long-Term Pricing
+
+#### Configure Long-Term Pricing
+```bash
+# Create long-term pricing (1 or 3 years commitment)
+aws snowball create-long-term-pricing \
+    --long-term-pricing-type OneYear \
+    --snowball-type SNC1_SSD \
+    --is-long-term-pricing-auto-renew
+
+# List long-term pricing options
+aws snowball list-long-term-pricing
+
+# Update long-term pricing
+aws snowball update-long-term-pricing \
+    --long-term-pricing-id LTP1234567890abc \
+    --is-long-term-pricing-auto-renew false
+```
+
+### Compatible Storage and Services
+
+#### Work with S3 Compatible Storage
+```bash
+# List S3 buckets on Snowball Edge (use dedicated endpoint)
+export AWS_ENDPOINT=http://192.168.1.100:8080
+aws s3 ls --endpoint-url $AWS_ENDPOINT
+
+# Copy data to Snowball Edge S3
+aws s3 cp /local/data/ s3://snowball-bucket/data/ \
+    --recursive \
+    --endpoint-url http://192.168.1.100:8080
+
+# Sync data to Snowball Edge
+aws s3 sync /local/data/ s3://snowball-bucket/ \
+    --endpoint-url http://192.168.1.100:8080
+
+# List objects on Snowball Edge
+aws s3 ls s3://snowball-bucket/ \
+    --recursive \
+    --endpoint-url http://192.168.1.100:8080
+```
+
+### DataSync with Snow Family
+
+#### Configure DataSync for Snowcone
+```bash
+# Create DataSync agent on Snowcone
+aws datasync create-agent \
+    --agent-name snowcone-datasync-agent \
+    --activation-key ACTIVATION-KEY-FROM-SNOWCONE
+
+# Create NFS location on Snowcone
+aws datasync create-location-nfs \
+    --server-hostname 192.168.1.50 \
+    --subdirectory /export/data \
+    --on-prem-config '{"AgentArns": ["arn:aws:datasync:us-east-1:123456789012:agent/agent-0123456789abcdef0"]}'
+
+# Create S3 location for destination
+aws datasync create-location-s3 \
+    --s3-bucket-arn arn:aws:s3:::my-destination-bucket \
+    --s3-config '{"BucketAccessRoleArn": "arn:aws:iam::123456789012:role/DataSyncS3Role"}'
+
+# Create DataSync task
+aws datasync create-task \
+    --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-source123 \
+    --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-dest456 \
+    --name snowcone-to-s3-transfer
+
+# Start DataSync task
+aws datasync start-task-execution \
+    --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+```
+
+### Common Monitoring and Troubleshooting
+
+#### Monitor Job Progress
+```bash
+# Check all jobs status
+aws snowball list-jobs \
+    --query 'JobListEntries[*].[JobId,JobState,IsMaster,CreationDate]' \
+    --output table
+
+# Monitor specific job with watch (Linux/Mac)
+watch -n 30 'aws snowball describe-job --job-id JID123e4567-e89b-12d3-a456-426655440000 --query "JobMetadata.JobState" --output text'
+
+# Get detailed job metadata
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.{State:JobState,Progress:JobLogUri,Resources:Resources,KMS:KmsKeyARN}' \
+    --output json
+
+# Check for failed jobs
+aws snowball list-jobs \
+    --query 'JobListEntries[?JobState==`Failed`]' \
+    --output table
+
+# Get job logs location
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.JobLogUri' \
+    --output text
+```
+
+#### Bulk Operations
+```bash
+# Cancel multiple jobs
+for job_id in JID123-001 JID123-002 JID123-003; do
+  echo "Cancelling job: $job_id"
+  aws snowball cancel-job --job-id $job_id
+done
+
+# Check status of multiple jobs
+for job_id in $(aws snowball list-jobs --query 'JobListEntries[*].JobId' --output text); do
+  status=$(aws snowball describe-job --job-id $job_id --query 'JobMetadata.JobState' --output text)
+  echo "Job: $job_id - Status: $status"
+done
+
+# Export job details to CSV
+aws snowball list-jobs \
+    --query 'JobListEntries[*].[JobId,JobType,JobState,CreationDate]' \
+    --output text | \
+    awk 'BEGIN {print "JobId,Type,State,CreationDate"} {print $1","$2","$3","$4}' > jobs.csv
+```
+
+### IAM Policy for Snow Family
+
+#### Example IAM Policies
+```bash
+# Create IAM role for Snowball
+cat > snowball-trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "importexport.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+awsiam create-role \
+    --role-name SnowballImportExportRole \
+    --assume-role-policy-document file://snowball-trust-policy.json
+
+# Attach S3 permissions policy
+cat > snowball-s3-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-snowball-bucket",
+        "arn:aws:s3:::my-snowball-bucket/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:Encrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "arn:aws:kms:us-east-1:123456789012:key/*"
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+    --role-name SnowballImportExportRole \
+    --policy-name SnowballS3Access \
+    --policy-document file://snowball-s3-policy.json
+```
+
+### Troubleshooting Commands
+
+#### Common Issues and Solutions
+```bash
+# Verify KMS key permissions
+aws kms describe-key \
+    --key-id abcd1234-a123-456a-a12b-a123b4cd56ef \
+    --query 'KeyMetadata.{KeyId:KeyId,State:KeyState,Used:KeyUsage}'
+
+# Check IAM role permissions
+aws iam get-role-policy \
+    --role-name SnowballRole \
+    --policy-name SnowballPolicy
+
+# Verify S3 bucket exists and is accessible
+aws s3 ls s3://my-import-bucket/
+
+# Check if address is valid
+aws snowball describe-address \
+    --address-id ADID1234567890abc
+
+# Validate job configuration before creation
+aws snowball describe-job \
+    --job-id JID123e4567-e89b-12d3-a456-426655440000 \
+    --query 'JobMetadata.{Resources:Resources,Role:RoleARN,KMS:KmsKeyARN,Address:ShippingDetails.ShippingAddress}' \
+    --output json
+```
+
+---
 ## Practice Questions
 
 ### Question 1

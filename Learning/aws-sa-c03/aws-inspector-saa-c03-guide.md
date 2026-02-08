@@ -11,7 +11,8 @@
 8. [Best Practices](#best-practices)
 9. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
 10. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-11. [Hands-on Labs](#hands-on-labs)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [Hands-on Labs](#hands-on-labs)
 
 ## Overview
 
@@ -997,6 +998,565 @@ Solution:
    - Inspector works with Security Hub
    - EventBridge enables automation
    - Config provides compliance tracking
+
+## AWS CLI Commands Reference
+
+### 1. Enable Inspector
+
+#### Enable Inspector V2
+```bash
+# Enable Inspector V2 for the account
+aws inspector2 enable \
+  --resource-types EC2 ECR LAMBDA
+
+# Enable Inspector V2 for specific resource types
+aws inspector2 enable \
+  --resource-types EC2 ECR
+
+# Enable Inspector V2 with account IDs (for delegated administrator)
+aws inspector2 enable \
+  --resource-types EC2 ECR LAMBDA \
+  --account-ids "111122223333" "444455556666"
+
+# Check enablement status
+aws inspector2 batch-get-account-status \
+  --account-ids "$(aws sts get-caller-identity --query Account --output text)"
+```
+
+#### Disable Inspector V2
+```bash
+# Disable Inspector V2 for specific resource types
+aws inspector2 disable \
+  --resource-types ECR
+
+# Disable all resource types
+aws inspector2 disable \
+  --resource-types EC2 ECR LAMBDA
+
+# Disable for specific accounts (delegated administrator)
+aws inspector2 disable \
+  --resource-types EC2 ECR LAMBDA \
+  --account-ids "111122223333" "444455556666"
+```
+
+### 2. Create Assessment Targets (Inspector Classic)
+
+#### Create Assessment Target
+```bash
+# Create assessment target with all instances in VPC
+aws inspector create-assessment-target \
+  --assessment-target-name "Production-WebServers" \
+  --resource-group-arn arn:aws:inspector:us-east-1:123456789012:resourcegroup/0-AbCdEfGh
+
+# Create resource group first
+aws inspector create-resource-group \
+  --resource-group-tags key=Environment,value=Production key=Role,value=WebServer
+
+# Then create assessment target with the resource group
+RESGROUP_ARN=$(aws inspector create-resource-group \
+  --resource-group-tags key=Environment,value=Production \
+  --query 'resourceGroupArn' \
+  --output text)
+
+aws inspector create-assessment-target \
+  --assessment-target-name "Production-Servers" \
+  --resource-group-arn $RESGROUP_ARN
+```
+
+#### List and Describe Assessment Targets
+```bash
+# List all assessment targets
+aws inspector list-assessment-targets
+
+# Describe specific assessment target
+aws inspector describe-assessment-targets \
+  --assessment-target-arns arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh
+
+# List assessment targets with filtering
+aws inspector list-assessment-targets \
+  --filter '{"assessmentTargetNamePattern": "Production*"}'
+```
+
+### 3. Create Assessment Templates (Inspector Classic)
+
+#### Create Assessment Template
+```bash
+# Get rules package ARNs for your region
+REGION="us-east-1"
+
+# Common Vulnerabilities and Exposures
+CVE_RULES="arn:aws:inspector:$REGION:316112463485:rulespackage/0-gEjTy7T7"
+
+# Security Best Practices
+SBP_RULES="arn:aws:inspector:$REGION:316112463485:rulespackage/0-R01qwB5Q"
+
+# Network Reachability
+NETWORK_RULES="arn:aws:inspector:$REGION:316112463485:rulespackage/0-PmNV0Tcd"
+
+# CIS Operating System Security Configuration Benchmarks
+CIS_RULES="arn:aws:inspector:$REGION:316112463485:rulespackage/0-rExsr2X8"
+
+# Create assessment template
+aws inspector create-assessment-template \
+  --assessment-target-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --assessment-template-name "Weekly-Security-Assessment" \
+  --duration-in-seconds 3600 \
+  --rules-package-arns $CVE_RULES $SBP_RULES $NETWORK_RULES $CIS_RULES
+
+# Create template with user attributes for tagging
+aws inspector create-assessment-template \
+  --assessment-target-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --assessment-template-name "Production-Assessment" \
+  --duration-in-seconds 3600 \
+  --rules-package-arns $CVE_RULES $SBP_RULES \
+  --user-attributes-for-findings key=Environment,value=Production key=Team,value=Security
+```
+
+#### List and Describe Assessment Templates
+```bash
+# List all assessment templates
+aws inspector list-assessment-templates
+
+# List templates for specific target
+aws inspector list-assessment-templates \
+  --assessment-target-arns arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh
+
+# Describe assessment template
+aws inspector describe-assessment-templates \
+  --assessment-template-arns arn:aws:inspector:us-east-1:123456789012:template/0-XyZ123Ab
+```
+
+### 4. Start Assessment Runs
+
+#### Start Assessment Run (Inspector Classic)
+```bash
+# Start assessment run from template
+aws inspector start-assessment-run \
+  --assessment-template-arn arn:aws:inspector:us-east-1:123456789012:template/0-XyZ123Ab \
+  --assessment-run-name "Manual-Run-$(date +%Y%m%d-%H%M%S)"
+
+# Start assessment run with custom name
+RUN_ARN=$(aws inspector start-assessment-run \
+  --assessment-template-arn arn:aws:inspector:us-east-1:123456789012:template/0-XyZ123Ab \
+  --assessment-run-name "Weekly-Security-Scan-Week-$(date +%V)" \
+  --query 'assessmentRunArn' \
+  --output text)
+
+echo "Started assessment run: $RUN_ARN"
+```
+
+#### Monitor Assessment Run Status
+```bash
+# Describe assessment run
+aws inspector describe-assessment-runs \
+  --assessment-run-arns $RUN_ARN
+
+# Get assessment run state
+STATE=$(aws inspector describe-assessment-runs \
+  --assessment-run-arns $RUN_ARN \
+  --query 'assessmentRuns[0].state' \
+  --output text)
+
+echo "Assessment run state: $STATE"
+
+# Wait for assessment run to complete
+while [ "$STATE" != "COMPLETED" ] && [ "$STATE" != "FAILED" ]; do
+  sleep 30
+  STATE=$(aws inspector describe-assessment-runs \
+    --assessment-run-arns $RUN_ARN \
+    --query 'assessmentRuns[0].state' \
+    --output text)
+  echo "Current state: $STATE"
+done
+```
+
+#### Stop Assessment Run
+```bash
+# Stop a running assessment
+aws inspector stop-assessment-run \
+  --assessment-run-arn $RUN_ARN
+```
+
+### 5. List Findings (Inspector V2)
+
+#### List All Findings
+```bash
+# List findings with basic filters
+aws inspector2 list-findings \
+  --max-results 100
+
+# List findings sorted by severity
+aws inspector2 list-findings \
+  --max-results 50 \
+  --sort-criteria '{"field": "SEVERITY", "sortOrder": "DESC"}'
+
+# List findings with pagination
+aws inspector2 list-findings \
+  --max-results 100 \
+  --next-token <token-from-previous-call>
+```
+
+#### Filter Findings by Criteria
+```bash
+# List critical and high severity findings
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "severity": [{"comparison": "EQUALS", "value": "CRITICAL"}],
+    "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]
+  }'
+
+# List findings for specific EC2 instances
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "resourceType": [{"comparison": "EQUALS", "value": "AWS_EC2_INSTANCE"}],
+    "ec2InstanceImageId": [{"comparison": "EQUALS", "value": "ami-0abcdef1234567890"}]
+  }'
+
+# List findings for ECR images
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "resourceType": [{"comparison": "EQUALS", "value": "AWS_ECR_CONTAINER_IMAGE"}],
+    "ecrRepositoryName": [{"comparison": "EQUALS", "value": "my-app-repo"}]
+  }'
+
+# List findings with available fixes
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "fixAvailable": [{"comparison": "EQUALS", "value": "YES"}],
+    "severity": [{"comparison": "EQUALS", "value": "HIGH"}]
+  }'
+
+# List Lambda findings
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "resourceType": [{"comparison": "EQUALS", "value": "AWS_LAMBDA_FUNCTION"}],
+    "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]
+  }'
+```
+
+#### Filter by Finding Type and CVE
+```bash
+# List findings by vulnerability ID
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "vulnerabilityId": [{"comparison": "EQUALS", "value": "CVE-2021-44228"}]
+  }'
+
+# List package vulnerability findings
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "findingType": [{"comparison": "EQUALS", "value": "PACKAGE_VULNERABILITY"}]
+  }'
+
+# List findings by EPSS score (exploit prediction)
+aws inspector2 list-findings \
+  --filter-criteria '{
+    "epssScore": [{"lowerInclusive": 0.8, "upperInclusive": 1.0}]
+  }'
+```
+
+### 6. Describe Findings
+
+#### Get Detailed Finding Information (Inspector V2)
+```bash
+# Describe specific findings
+aws inspector2 batch-get-findings \
+  --finding-arns \
+    "arn:aws:inspector2:us-east-1:123456789012:finding/abcd1234-ef56-7890-ghij-klmn12345678" \
+    "arn:aws:inspector2:us-east-1:123456789012:finding/wxyz5678-ab90-1234-cdef-ghij56789012"
+
+# Get finding details with JQ for parsing
+aws inspector2 batch-get-findings \
+  --finding-arns "arn:aws:inspector2:us-east-1:123456789012:finding/abcd1234-ef56-7890-ghij-klmn12345678" \
+  | jq '.findings[] | {title: .title, severity: .severity, status: .status, description: .description}'
+```
+
+#### Describe Findings (Inspector Classic)
+```bash
+# List findings for assessment run
+aws inspector list-findings \
+  --assessment-run-arns $RUN_ARN
+
+# Describe specific findings
+FINDING_ARN="arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh/template/0-XyZ123Ab/run/0-PqRs456Tu/finding/0-VwXyZ789"
+
+aws inspector describe-findings \
+  --finding-arns $FINDING_ARN
+
+# Describe findings with locale
+aws inspector describe-findings \
+  --finding-arns $FINDING_ARN \
+  --locale EN_US
+
+# List findings filtered by severity
+aws inspector list-findings \
+  --assessment-run-arns $RUN_ARN \
+  --filter '{"severities": ["High", "Medium"]}'
+
+# List findings filtered by attributes
+aws inspector list-findings \
+  --assessment-run-arns $RUN_ARN \
+  --filter '{
+    "attributes": [
+      {"key": "SEVERITY", "value": "High"},
+      {"key": "RULES_PACKAGE_ARN", "value": "'$CVE_RULES'"}
+    ]
+  }'
+```
+
+### 7. Get Assessment Reports
+
+#### Generate Assessment Report (Inspector Classic)
+```bash
+# Generate HTML report
+aws inspector get-assessment-report \
+  --assessment-run-arn $RUN_ARN \
+  --report-file-format HTML \
+  --report-type FULL
+
+# Generate PDF report
+aws inspector get-assessment-report \
+  --assessment-run-arn $RUN_ARN \
+  --report-file-format PDF \
+  --report-type FINDING
+
+# Check report generation status
+REPORT_ARN=$(aws inspector get-assessment-report \
+  --assessment-run-arn $RUN_ARN \
+  --report-file-format HTML \
+  --report-type FULL \
+  --query 'url' \
+  --output text)
+
+echo "Report URL: $REPORT_ARN"
+
+# Download report
+wget -O assessment-report.html "$REPORT_ARN"
+```
+
+#### Export Findings (Inspector V2)
+```bash
+# Create finding report (exports to S3)
+aws inspector2 create-findings-report \
+  --report-format JSON \
+  --s3-destination '{"bucketName": "my-inspector-reports", "keyPrefix": "reports/"}' \
+  --filter-criteria '{
+    "severity": [{"comparison": "EQUALS", "value": "CRITICAL"}],
+    "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]
+  }'
+
+# Create CSV report
+aws inspector2 create-findings-report \
+  --report-format CSV \
+  --s3-destination '{"bucketName": "my-inspector-reports", "keyPrefix": "reports/", "kmsKeyArn": "arn:aws:kms:us-east-1:123456789012:key/abc-123"}'
+
+# Get report status
+aws inspector2 get-findings-report-status \
+  --report-id <report-id>
+```
+
+### 8. Rules Packages (Inspector Classic)
+
+#### List Available Rules Packages
+```bash
+# List all rules packages available in region
+aws inspector list-rules-packages
+
+# Describe rules package
+aws inspector describe-rules-packages \
+  --rules-package-arns $CVE_RULES
+
+# List all rules packages with descriptions
+for arn in $(aws inspector list-rules-packages --query 'rulesPackageArns[]' --output text); do
+  echo "Rules Package: $arn"
+  aws inspector describe-rules-packages --rules-package-arns $arn
+  echo "---"
+done
+```
+
+#### Common Rules Package ARNs by Region
+```bash
+# US East (N. Virginia) - us-east-1
+CVE_US_EAST_1="arn:aws:inspector:us-east-1:316112463485:rulespackage/0-gEjTy7T7"
+CIS_US_EAST_1="arn:aws:inspector:us-east-1:316112463485:rulespackage/0-rExsr2X8"
+SECURITY_US_EAST_1="arn:aws:inspector:us-east-1:316112463485:rulespackage/0-R01qwB5Q"
+RUNTIME_US_EAST_1="arn:aws:inspector:us-east-1:316112463485:rulespackage/0-gBONHN9h"
+
+# US West (Oregon) - us-west-2
+CVE_US_WEST_2="arn:aws:inspector:us-west-2:758058086616:rulespackage/0-9hgA516p"
+CIS_US_WEST_2="arn:aws:inspector:us-west-2:758058086616:rulespackage/0-H5hpSawc"
+SECURITY_US_WEST_2="arn:aws:inspector:us-west-2:758058086616:rulespackage/0-JJOtZiqQ"
+RUNTIME_US_WEST_2="arn:aws:inspector:us-west-2:758058086616:rulespackage/0-vg5GGHSD"
+
+# EU (Ireland) - eu-west-1
+CVE_EU_WEST_1="arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-ubA5XvBh"
+CIS_EU_WEST_1="arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-sJBhCr0F"
+SECURITY_EU_WEST_1="arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-SnojL3Z6"
+RUNTIME_EU_WEST_1="arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-lLmwe1zd"
+```
+
+### 9. Tags Management
+
+#### Tag Resources (Inspector V2)
+```bash
+# Tag specific findings
+aws inspector2 tag-resource \
+  --resource-arn "arn:aws:inspector2:us-east-1:123456789012:finding/abcd1234-ef56-7890-ghij-klmn12345678" \
+  --tags Team=Security,Priority=High,Environment=Production
+
+# List tags for resource
+aws inspector2 list-tags-for-resource \
+  --resource-arn "arn:aws:inspector2:us-east-1:123456789012:finding/abcd1234-ef56-7890-ghij-klmn12345678"
+
+# Untag resource
+aws inspector2 untag-resource \
+  --resource-arn "arn:aws:inspector2:us-east-1:123456789012:finding/abcd1234-ef56-7890-ghij-klmn12345678" \
+  --tag-keys Priority Environment
+```
+
+#### Set Tags for Assessment Resources (Inspector Classic)
+```bash
+# Set tags for assessment template
+aws inspector set-tags-for-resource \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:template/0-XyZ123Ab \
+  --tags key=Environment,value=Production key=Schedule,value=Weekly
+
+# Set tags for assessment target
+aws inspector set-tags-for-resource \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --tags key=Department,value=IT key=CostCenter,value=CC001
+
+# Set tags for assessment run
+aws inspector set-tags-for-resource \
+  --resource-arn $RUN_ARN \
+  --tags key=RunType,value=Manual key=Requester,value=SecurityTeam
+```
+
+#### List Tags (Inspector Classic)
+```bash
+# List tags for assessment template
+aws inspector list-tags-for-resource \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:template/0-XyZ123Ab
+
+# List tags for assessment target
+aws inspector list-tags-for-resource \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh
+
+# List tags for assessment run
+aws inspector list-tags-for-resource \
+  --resource-arn $RUN_ARN
+```
+
+### 10. Additional Commands
+
+#### Subscription to Findings (Inspector Classic)
+```bash
+# Subscribe to SNS topic for findings
+aws inspector subscribe-to-event \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --event ASSESSMENT_RUN_COMPLETED \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:inspector-notifications
+
+# Subscribe to other events
+aws inspector subscribe-to-event \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --event FINDING_REPORTED \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:inspector-findings
+
+# List event subscriptions
+aws inspector list-event-subscriptions \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh
+
+# Unsubscribe from event
+aws inspector unsubscribe-from-event \
+  --resource-arn arn:aws:inspector:us-east-1:123456789012:target/0-AbCdEfGh \
+  --event ASSESSMENT_RUN_COMPLETED \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:inspector-notifications
+```
+
+#### Coverage Statistics (Inspector V2)
+```bash
+# Get coverage statistics
+aws inspector2 list-coverage \
+  --max-results 100
+
+# Get coverage for specific resource type
+aws inspector2 list-coverage \
+  --filter-criteria '{
+    "resourceType": [{"comparison": "EQUALS", "value": "AWS_EC2_INSTANCE"}]
+  }'
+
+# Get coverage statistics summary
+aws inspector2 list-coverage-statistics \
+  --group-by RESOURCE_TYPE
+
+# Get account coverage details
+aws inspector2 batch-get-account-status \
+  --account-ids "$(aws sts get-caller-identity --query Account --output text)"
+```
+
+#### Suppression Rules (Inspector V2)
+```bash
+# Create suppression rule
+aws inspector2 create-filter \
+  --name "Suppress-Test-Environment" \
+  --description "Suppress findings from test environment" \
+  --action SUPPRESS \
+  --filter-criteria '{
+    "resourceTags": [{"comparison": "EQUALS", "key": "Environment", "value": "test"}]
+  }'
+
+# List filters/suppression rules
+aws inspector2 list-filters
+
+# Update filter
+aws inspector2 update-filter \
+  --filter-arn "arn:aws:inspector2:us-east-1:123456789012:owner/123456789012/filter/abcdef123456" \
+  --action SUPPRESS \
+  --filter-criteria '{
+    "severity": [{"comparison": "EQUALS", "value": "LOW"}]
+  }'
+
+# Delete filter
+aws inspector2 delete-filter \
+  --filter-arn "arn:aws:inspector2:us-east-1:123456789012:owner/123456789012/filter/abcdef123456"
+```
+
+#### Member Account Management (Inspector V2)
+```bash
+# Enable delegated administrator
+aws inspector2 enable-delegated-admin-account \
+  --delegated-admin-account-id "123456789012"
+
+# Disable delegated administrator
+aws inspector2 disable-delegated-admin-account \
+  --delegated-admin-account-id "123456789012"
+
+# Associate member accounts
+aws inspector2 associate-member \
+  --account-id "111122223333"
+
+# Disassociate member accounts
+aws inspector2 disassociate-member \
+  --account-id "111122223333"
+
+# List members
+aws inspector2 list-members
+
+# Get member details
+aws inspector2 get-member \
+  --account-id "111122223333"
+```
+
+#### Update Organization Configuration (Inspector V2)
+```bash
+# Update organization configuration to auto-enable
+aws inspector2 update-organization-configuration \
+  --auto-enable '{"ec2": true, "ecr": true, "lambda": true}'
+
+# Describe organization configuration
+aws inspector2 describe-organization-configuration
+```
 
 ## Hands-on Labs
 

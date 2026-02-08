@@ -209,6 +209,751 @@ Integrations:
 
 ---
 
+### 13. AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing Amazon EBS volumes, snapshots, and related resources.
+
+#### Prerequisites
+
+```bash
+# Ensure AWS CLI is installed and configured
+aws --version
+aws configure
+
+# Set default region (optional)
+export AWS_DEFAULT_REGION=us-east-1
+```
+
+#### Create EBS Volumes
+
+```bash
+# Create a gp3 volume (default, most cost-effective)
+aws ec2 create-volume \
+  --volume-type gp3 \
+  --size 100 \
+  --iops 3000 \
+  --throughput 125 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=MyGP3Volume},{Key=Environment,Value=Production}]'
+
+# Create a gp3 volume with custom IOPS and throughput
+aws ec2 create-volume \
+  --volume-type gp3 \
+  --size 200 \
+  --iops 10000 \
+  --throughput 500 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=HighPerfGP3}]'
+
+# Create a gp2 volume (legacy, for comparison)
+aws ec2 create-volume \
+  --volume-type gp2 \
+  --size 100 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=MyGP2Volume}]'
+
+# Create an io2 volume (high durability, provisioned IOPS)
+aws ec2 create-volume \
+  --volume-type io2 \
+  --size 500 \
+  --iops 32000 \
+  --availability-zone us-east-1a \
+  --multi-attach-enabled \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=EnterpriseDB-IO2},{Key=Application,Value=Database}]'
+
+# Create an io1 volume (legacy provisioned IOPS)
+aws ec2 create-volume \
+  --volume-type io1 \
+  --size 400 \
+  --iops 20000 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=MyIO1Volume}]'
+
+# Create an st1 volume (throughput-optimized HDD)
+aws ec2 create-volume \
+  --volume-type st1 \
+  --size 500 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=BigDataST1},{Key=Purpose,Value=Analytics}]'
+
+# Create an sc1 volume (cold HDD, lowest cost)
+aws ec2 create-volume \
+  --volume-type sc1 \
+  --size 500 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=ArchiveSC1},{Key=Purpose,Value=ColdStorage}]'
+
+# Create an encrypted volume with default KMS key
+aws ec2 create-volume \
+  --volume-type gp3 \
+  --size 100 \
+  --availability-zone us-east-1a \
+  --encrypted \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=EncryptedVolume}]'
+
+# Create an encrypted volume with custom KMS key
+aws ec2 create-volume \
+  --volume-type gp3 \
+  --size 100 \
+  --availability-zone us-east-1a \
+  --encrypted \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=CustomKMSVolume}]'
+
+# Create volume from snapshot
+aws ec2 create-volume \
+  --snapshot-id snap-0123456789abcdef0 \
+  --volume-type gp3 \
+  --availability-zone us-east-1a \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=RestoredVolume}]'
+```
+
+#### List and Describe Volumes
+
+```bash
+# List all volumes
+aws ec2 describe-volumes
+
+# Describe a specific volume
+aws ec2 describe-volumes \
+  --volume-ids vol-0123456789abcdef0
+
+# List volumes by tag
+aws ec2 describe-volumes \
+  --filters "Name=tag:Environment,Values=Production"
+
+# List volumes in a specific availability zone
+aws ec2 describe-volumes \
+  --filters "Name=availability-zone,Values=us-east-1a"
+
+# List available (unattached) volumes
+aws ec2 describe-volumes \
+  --filters "Name=status,Values=available"
+
+# Get volume details in table format
+aws ec2 describe-volumes \
+  --query 'Volumes[*].{ID:VolumeId,Type:VolumeType,Size:Size,State:State,AZ:AvailabilityZone}' \
+  --output table
+
+# List volumes attached to a specific instance
+aws ec2 describe-volumes \
+  --filters "Name=attachment.instance-id,Values=i-0123456789abcdef0"
+
+# Check volume encryption status
+aws ec2 describe-volumes \
+  --volume-ids vol-0123456789abcdef0 \
+  --query 'Volumes[0].{Encrypted:Encrypted,KmsKeyId:KmsKeyId}' \
+  --output table
+```
+
+#### Attach and Detach Volumes
+
+```bash
+# Attach a volume to an EC2 instance
+aws ec2 attach-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --instance-id i-0123456789abcdef0 \
+  --device /dev/sdf
+
+# Attach with specific device name (NVMe instances)
+aws ec2 attach-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --instance-id i-0123456789abcdef0 \
+  --device /dev/nvme1n1
+
+# Detach a volume
+aws ec2 detach-volume \
+  --volume-id vol-0123456789abcdef0
+
+# Force detach (use with caution)
+aws ec2 detach-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --force
+
+# Check attachment state
+aws ec2 describe-volumes \
+  --volume-ids vol-0123456789abcdef0 \
+  --query 'Volumes[0].Attachments[0].{State:State,Instance:InstanceId,Device:Device}' \
+  --output table
+```
+
+#### Create Snapshots
+
+```bash
+# Create a snapshot of a volume
+aws ec2 create-snapshot \
+  --volume-id vol-0123456789abcdef0 \
+  --description "Daily backup $(date +%Y-%m-%d)" \
+  --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=DailyBackup},{Key=Date,Value='$(date +%Y-%m-%d)'}]'
+
+# Create snapshot with custom tags
+aws ec2 create-snapshot \
+  --volume-id vol-0123456789abcdef0 \
+  --description "Production database backup" \
+  --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=ProdDBSnapshot},{Key=Type,Value=Database},{Key=Retention,Value=30days}]'
+
+# Create snapshots of multiple volumes (crash-consistent set)
+VOLUME_IDS=("vol-0123456789abcdef0" "vol-0123456789abcdef1" "vol-0123456789abcdef2")
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+for vol_id in "${VOLUME_IDS[@]}"; do
+  aws ec2 create-snapshot \
+    --volume-id $vol_id \
+    --description "Multi-volume backup $TIMESTAMP" \
+    --tag-specifications 'ResourceType=snapshot,Tags=[{Key=SnapshotGroup,Value='$TIMESTAMP'}]'
+done
+
+# List snapshots
+aws ec2 describe-snapshots \
+  --owner-ids self
+
+# Describe a specific snapshot
+aws ec2 describe-snapshots \
+  --snapshot-ids snap-0123456789abcdef0
+
+# Check snapshot progress
+aws ec2 describe-snapshots \
+  --snapshot-ids snap-0123456789abcdef0 \
+  --query 'Snapshots[0].{State:State,Progress:Progress}' \
+  --output table
+
+# List snapshots by tag
+aws ec2 describe-snapshots \
+  --owner-ids self \
+  --filters "Name=tag:Type,Values=Database"
+```
+
+#### Copy Snapshots
+
+```bash
+# Copy snapshot to another region
+aws ec2 copy-snapshot \
+  --region us-west-2 \
+  --source-region us-east-1 \
+  --source-snapshot-id snap-0123456789abcdef0 \
+  --description "DR copy from us-east-1" \
+  --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=DRSnapshot},{Key=SourceRegion,Value=us-east-1}]'
+
+# Copy snapshot with encryption
+aws ec2 copy-snapshot \
+  --region us-west-2 \
+  --source-region us-east-1 \
+  --source-snapshot-id snap-0123456789abcdef0 \
+  --encrypted \
+  --kms-key-id arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --description "Encrypted DR copy"
+
+# Copy snapshot to different account (requires sharing first)
+# First, modify snapshot permissions in source account
+aws ec2 modify-snapshot-attribute \
+  --snapshot-id snap-0123456789abcdef0 \
+  --attribute createVolumePermission \
+  --operation-type add \
+  --user-ids 123456789012
+
+# Then, in target account, copy the snapshot
+aws ec2 copy-snapshot \
+  --source-region us-east-1 \
+  --source-snapshot-id snap-0123456789abcdef0 \
+  --description "Cross-account copy"
+```
+
+#### Create AMI from Snapshot
+
+```bash
+# Create AMI from EBS snapshot
+aws ec2 register-image \
+  --name "MyCustomAMI-$(date +%Y%m%d)" \
+  --description "Custom AMI created from snapshot" \
+  --architecture x86_64 \
+  --root-device-name /dev/xvda \
+  --block-device-mappings \
+    DeviceName=/dev/xvda,Ebs={SnapshotId=snap-0123456789abcdef0,VolumeType=gp3,DeleteOnTermination=true} \
+    DeviceName=/dev/sdf,Ebs={SnapshotId=snap-0123456789abcdef1,VolumeType=gp3,VolumeSize=100} \
+  --virtualization-type hvm \
+  --ena-support \
+  --sriov-net-support simple
+
+# Create AMI with multiple volumes
+aws ec2 register-image \
+  --name "MultiVolumeAMI" \
+  --architecture x86_64 \
+  --root-device-name /dev/xvda \
+  --block-device-mappings \
+    '[{"DeviceName":"/dev/xvda","Ebs":{"SnapshotId":"snap-root123","VolumeType":"gp3"}},{"DeviceName":"/dev/sdf","Ebs":{"SnapshotId":"snap-data123","VolumeType":"io2","Iops":10000}}]'
+
+# List AMIs
+aws ec2 describe-images \
+  --owners self
+
+# Deregister AMI
+aws ec2 deregister-image \
+  --image-id ami-0123456789abcdef0
+```
+
+#### Fast Snapshot Restore (FSR)
+
+```bash
+# Enable Fast Snapshot Restore for a snapshot
+aws ec2 enable-fast-snapshot-restores \
+  --availability-zones us-east-1a us-east-1b \
+  --source-snapshot-ids snap-0123456789abcdef0
+
+# Enable FSR in multiple AZs
+aws ec2 enable-fast-snapshot-restores \
+  --availability-zones us-east-1a us-east-1b us-east-1c \
+  --source-snapshot-ids snap-0123456789abcdef0 snap-0123456789abcdef1
+
+# Describe FSR status
+aws ec2 describe-fast-snapshot-restores \
+  --filters "Name=snapshot-id,Values=snap-0123456789abcdef0"
+
+# Disable Fast Snapshot Restore
+aws ec2 disable-fast-snapshot-restores \
+  --availability-zones us-east-1a us-east-1b \
+  --source-snapshot-ids snap-0123456789abcdef0
+
+# Check FSR costs and status
+aws ec2 describe-fast-snapshot-restores \
+  --query 'FastSnapshotRestores[*].{Snapshot:SnapshotId,AZ:AvailabilityZone,State:State}' \
+  --output table
+```
+
+#### EBS Encryption
+
+```bash
+# Enable EBS encryption by default for the account
+aws ec2 enable-ebs-encryption-by-default
+
+# Check if encryption by default is enabled
+aws ec2 get-ebs-encryption-by-default
+
+# Set default KMS key for EBS encryption
+aws ec2 modify-ebs-default-kms-key-id \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Get default KMS key
+aws ec2 get-ebs-default-kms-key-id
+
+# Disable EBS encryption by default
+aws ec2 disable-ebs-encryption-by-default
+
+# Create encrypted snapshot from unencrypted volume
+# Step 1: Create snapshot of unencrypted volume
+UNENCRYPTED_SNAP=$(aws ec2 create-snapshot \
+  --volume-id vol-unencrypted123 \
+  --description "Temp snapshot for encryption" \
+  --query 'SnapshotId' \
+  --output text)
+
+# Step 2: Wait for snapshot completion
+aws ec2 wait snapshot-completed \
+  --snapshot-ids $UNENCRYPTED_SNAP
+
+# Step 3: Copy snapshot with encryption
+ENCRYPTED_SNAP=$(aws ec2 copy-snapshot \
+  --source-region us-east-1 \
+  --source-snapshot-id $UNENCRYPTED_SNAP \
+  --encrypted \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --description "Encrypted copy" \
+  --query 'SnapshotId' \
+  --output text)
+
+# Step 4: Create encrypted volume from encrypted snapshot
+aws ec2 create-volume \
+  --snapshot-id $ENCRYPTED_SNAP \
+  --availability-zone us-east-1a \
+  --volume-type gp3 \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=EncryptedVolume}]'
+```
+
+#### Volume Modifications (Elastic Volumes)
+
+```bash
+# Modify volume size
+aws ec2 modify-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --size 200
+
+# Modify volume type from gp2 to gp3
+aws ec2 modify-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --volume-type gp3
+
+# Modify gp3 IOPS and throughput
+aws ec2 modify-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --iops 10000 \
+  --throughput 500
+
+# Modify io2 volume IOPS
+aws ec2 modify-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --iops 50000
+
+# Comprehensive modification (size, type, IOPS, throughput)
+aws ec2 modify-volume \
+  --volume-id vol-0123456789abcdef0 \
+  --size 500 \
+  --volume-type io2 \
+  --iops 40000
+
+# Check modification state
+aws ec2 describe-volumes-modifications \
+  --volume-ids vol-0123456789abcdef0
+
+# Monitor all ongoing modifications
+aws ec2 describe-volumes-modifications \
+  --filters "Name=modification-state,Values=modifying,optimizing" \
+  --query 'VolumesModifications[*].{Volume:VolumeId,State:ModificationState,Progress:Progress}' \
+  --output table
+
+# Wait for modification to complete (if using in scripts)
+while true; do
+  STATUS=$(aws ec2 describe-volumes-modifications \
+    --volume-ids vol-0123456789abcdef0 \
+    --query 'VolumesModifications[0].ModificationState' \
+    --output text)
+  if [ "$STATUS" == "completed" ]; then
+    echo "Volume modification completed"
+    break
+  fi
+  echo "Current state: $STATUS, waiting..."
+  sleep 30
+done
+```
+
+#### Snapshot Lifecycle Policies (Data Lifecycle Manager)
+
+```bash
+# Create a lifecycle policy for daily snapshots
+cat > dlm-policy.json <<EOF
+{
+  "ExecutionRoleArn": "arn:aws:iam::123456789012:role/AWSDataLifecycleManagerDefaultRole",
+  "Description": "Daily snapshot policy with 7-day retention",
+  "State": "ENABLED",
+  "PolicyDetails": {
+    "PolicyType": "EBS_SNAPSHOT_MANAGEMENT",
+    "ResourceTypes": ["VOLUME"],
+    "TargetTags": [
+      {
+        "Key": "Backup",
+        "Value": "Daily"
+      }
+    ],
+    "Schedules": [
+      {
+        "Name": "DailySnapshot",
+        "CopyTags": true,
+        "TagsToAdd": [
+          {
+            "Key": "SnapshotType",
+            "Value": "DLMAutomatic"
+          }
+        ],
+        "CreateRule": {
+          "Interval": 24,
+          "IntervalUnit": "HOURS",
+          "Times": ["03:00"]
+        },
+        "RetainRule": {
+          "Count": 7
+        }
+      }
+    ]
+  }
+}
+EOF
+
+aws dlm create-lifecycle-policy \
+  --cli-input-json file://dlm-policy.json
+
+# Create weekly snapshot policy with cross-region copy
+cat > dlm-weekly-policy.json <<EOF
+{
+  "ExecutionRoleArn": "arn:aws:iam::123456789012:role/AWSDataLifecycleManagerDefaultRole",
+  "Description": "Weekly snapshots with DR copy",
+  "State": "ENABLED",
+  "PolicyDetails": {
+    "PolicyType": "EBS_SNAPSHOT_MANAGEMENT",
+    "ResourceTypes": ["VOLUME"],
+    "TargetTags": [
+      {
+        "Key": "Backup",
+        "Value": "Weekly"
+      }
+    ],
+    "Schedules": [
+      {
+        "Name": "WeeklySnapshot",
+        "CopyTags": true,
+        "CreateRule": {
+          "Interval": 7,
+          "IntervalUnit": "DAYS",
+          "Times": ["02:00"]
+        },
+        "RetainRule": {
+          "Count": 4
+        },
+        "CrossRegionCopyRules": [
+          {
+            "TargetRegion": "us-west-2",
+            "Encrypted": true,
+            "RetainRule": {
+              "Interval": 30,
+              "IntervalUnit": "DAYS"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+
+aws dlm create-lifecycle-policy \
+  --cli-input-json file://dlm-weekly-policy.json
+
+# List all lifecycle policies
+aws dlm get-lifecycle-policies
+
+# Describe a specific policy
+aws dlm get-lifecycle-policy \
+  --policy-id policy-0123456789abcdef0
+
+# Update a lifecycle policy
+aws dlm update-lifecycle-policy \
+  --policy-id policy-0123456789abcdef0 \
+  --state DISABLED
+
+# Delete a lifecycle policy
+aws dlm delete-lifecycle-policy \
+  --policy-id policy-0123456789abcdef0
+```
+
+#### Tags Management
+
+```bash
+# Add tags to a volume
+aws ec2 create-tags \
+  --resources vol-0123456789abcdef0 \
+  --tags Key=Environment,Value=Production Key=Application,Value=Database Key=Owner,Value=TeamA
+
+# Add tags to multiple volumes
+aws ec2 create-tags \
+  --resources vol-0123456789abcdef0 vol-0123456789abcdef1 vol-0123456789abcdef2 \
+  --tags Key=Project,Value=WebApp Key=CostCenter,Value=Engineering
+
+# Add tags to snapshots
+aws ec2 create-tags \
+  --resources snap-0123456789abcdef0 \
+  --tags Key=Retention,Value=30days Key=Type,Value=Backup
+
+# List tags for a volume
+aws ec2 describe-tags \
+  --filters "Name=resource-id,Values=vol-0123456789abcdef0"
+
+# Remove tags from a volume
+aws ec2 delete-tags \
+  --resources vol-0123456789abcdef0 \
+  --tags Key=OldTag
+
+# Find all volumes with specific tag
+aws ec2 describe-volumes \
+  --filters "Name=tag:Environment,Values=Production" \
+  --query 'Volumes[*].{ID:VolumeId,Type:VolumeType,Size:Size}' \
+  --output table
+```
+
+#### Delete Volumes and Snapshots
+
+```bash
+# Delete a volume (must be detached first)
+aws ec2 delete-volume \
+  --volume-id vol-0123456789abcdef0
+
+# Delete a snapshot
+aws ec2 delete-snapshot \
+  --snapshot-id snap-0123456789abcdef0
+
+# Cleanup script: Delete all available (unattached) volumes in a region
+for vol_id in $(aws ec2 describe-volumes \
+  --filters "Name=status,Values=available" \
+  --query "Volumes[*].VolumeId" \
+  --output text); do
+  echo "Deleting volume: $vol_id"
+  aws ec2 delete-volume --volume-id $vol_id
+done
+
+# Cleanup script: Delete old snapshots (older than 90 days)
+CUTOFF_DATE=$(date -u -d '90 days ago' +%Y-%m-%d)
+
+for snap_id in $(aws ec2 describe-snapshots \
+  --owner-ids self \
+  --query "Snapshots[?StartTime<'$CUTOFF_DATE'].SnapshotId" \
+  --output text); do
+  echo "Deleting old snapshot: $snap_id"
+  aws ec2 delete-snapshot --snapshot-id $snap_id
+done
+```
+
+#### Monitoring and CloudWatch Metrics
+
+```bash
+# Get volume IOPS metrics
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/EBS \
+  --metric-name VolumeReadOps \
+  --dimensions Name=VolumeId,Value=vol-0123456789abcdef0 \
+  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum \
+  --output table
+
+# Get burst balance for gp2/st1/sc1 volumes
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/EBS \
+  --metric-name BurstBalance \
+  --dimensions Name=VolumeId,Value=vol-0123456789abcdef0 \
+  --start-time $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 3600 \
+  --statistics Average \
+  --output table
+
+# Create CloudWatch alarm for low burst balance
+aws cloudwatch put-metric-alarm \
+  --alarm-name "EBS-LowBurstBalance-vol-0123456789abcdef0" \
+  --alarm-description "Alert when burst balance drops below 20%" \
+  --metric-name BurstBalance \
+  --namespace AWS/EBS \
+  --statistic Average \
+  --period 300 \
+  --threshold 20 \
+  --comparison-operator LessThanThreshold \
+  --evaluation-periods 2 \
+  --dimensions Name=VolumeId,Value=vol-0123456789abcdef0
+
+# Create alarm for high volume queue length
+aws cloudwatch put-metric-alarm \
+  --alarm-name "EBS-HighQueueLength-vol-0123456789abcdef0" \
+  --metric-name VolumeQueueLength \
+  --namespace AWS/EBS \
+  --statistic Average \
+  --period 300 \
+  --threshold 10 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 3 \
+  --dimensions Name=VolumeId,Value=vol-0123456789abcdef0
+```
+
+#### Automation Scripts
+
+```bash
+#!/bin/bash
+# Comprehensive EBS backup script with error handling
+
+VOLUME_ID="vol-0123456789abcdef0"
+RETENTION_DAYS=7
+REGION="us-east-1"
+
+echo "Starting backup for volume: $VOLUME_ID"
+
+# Create snapshot
+SNAPSHOT_ID=$(aws ec2 create-snapshot \
+  --region $REGION \
+  --volume-id $VOLUME_ID \
+  --description "Automated backup $(date +%Y-%m-%d-%H-%M)" \
+  --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Type,Value=AutomatedBackup},{Key=Date,Value='$(date +%Y-%m-%d)'}]' \
+  --query 'SnapshotId' \
+  --output text)
+
+if [ $? -eq 0 ]; then
+  echo "Snapshot created: $SNAPSHOT_ID"
+else
+  echo "Failed to create snapshot"
+  exit 1
+fi
+
+# Wait for snapshot to complete
+echo "Waiting for snapshot to complete..."
+aws ec2 wait snapshot-completed \
+  --region $REGION \
+  --snapshot-ids $SNAPSHOT_ID
+
+echo "Snapshot completed successfully"
+
+# Delete old snapshots
+CUTOFF_DATE=$(date -u -d "$RETENTION_DAYS days ago" +%Y-%m-%d)
+echo "Deleting snapshots older than $CUTOFF_DATE"
+
+OLD_SNAPSHOTS=$(aws ec2 describe-snapshots \
+  --region $REGION \
+  --owner-ids self \
+  --filters \
+    "Name=volume-id,Values=$VOLUME_ID" \
+    "Name=tag:Type,Values=AutomatedBackup" \
+  --query "Snapshots[?StartTime<'$CUTOFF_DATE'].SnapshotId" \
+  --output text)
+
+for snap in $OLD_SNAPSHOTS; do
+  echo "Deleting snapshot: $snap"
+  aws ec2 delete-snapshot --region $REGION --snapshot-id $snap
+done
+
+echo "Backup process completed"
+```
+
+```bash
+#!/bin/bash
+# Script to migrate from gp2 to gp3 and optimize costs
+
+REGION="us-east-1"
+
+echo "Finding all gp2 volumes..."
+GP2_VOLUMES=$(aws ec2 describe-volumes \
+  --region $REGION \
+  --filters "Name=volume-type,Values=gp2" \
+  --query "Volumes[*].VolumeId" \
+  --output text)
+
+for vol_id in $GP2_VOLUMES; do
+  echo "Processing volume: $vol_id"
+  
+  # Get current size
+  SIZE=$(aws ec2 describe-volumes \
+    --region $REGION \
+    --volume-ids $vol_id \
+    --query "Volumes[0].Size" \
+    --output text)
+  
+  # Calculate current gp2 baseline IOPS (3 IOPS per GB, min 100, max 16000)
+  BASELINE_IOPS=$((SIZE * 3))
+  if [ $BASELINE_IOPS -lt 100 ]; then
+    BASELINE_IOPS=100
+  elif [ $BASELINE_IOPS -gt 16000 ]; then
+    BASELINE_IOPS=16000
+  fi
+  
+  # Migrate to gp3 with baseline 3000 IOPS (free)
+  echo "Migrating $vol_id from gp2 to gp3 (Size: ${SIZE}GB, Old IOPS: ${BASELINE_IOPS})"  
+  
+  aws ec2 modify-volume \
+    --region $REGION \
+    --volume-id $vol_id \
+    --volume-type gp3
+  
+  echo "Migration initiated for $vol_id"
+  echo "---"
+done
+
+echo "Migration script completed"
+```
+
+---
+
 ### 14. Architecture & Design Scenario Patterns
 Scenario 1: “Need low-latency, highly durable storage for mission-critical OLTP database.” → io2 (or io2 Block Express if extreme scale). Add Multi-AZ DB replication at application/DB layer (EBS itself is AZ-scoped).
 

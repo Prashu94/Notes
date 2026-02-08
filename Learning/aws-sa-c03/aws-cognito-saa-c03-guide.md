@@ -12,7 +12,8 @@
 9. [Best Practices](#best-practices)
 10. [Common Exam Scenarios](#common-exam-scenarios)
 11. [Troubleshooting](#troubleshooting)
-12. [Hands-on Labs](#hands-on-labs)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Hands-on Labs](#hands-on-labs)
 
 ---
 
@@ -675,6 +676,779 @@ Secure API Gateway endpoints using Cognito User Pool authorization.
      --authorization-type COGNITO_USER_POOLS \
      --authorizer-id <authorizer-id>
    ```
+
+---
+
+## AWS CLI Commands Reference
+
+### User Pool Management
+
+#### Create User Pool
+
+```bash
+# Create basic user pool
+aws cognito-idp create-user-pool \
+  --pool-name MyUserPool \
+  --policies "PasswordPolicy={MinimumLength=8,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=true}" \
+  --auto-verified-attributes email \
+  --username-attributes email \
+  --region us-east-1
+
+# Create user pool with advanced configuration
+aws cognito-idp create-user-pool \
+  --pool-name ProductionUserPool \
+  --policies file://password-policy.json \
+  --mfa-configuration OPTIONAL \
+  --email-configuration SourceArn=arn:aws:ses:us-east-1:123456789012:identity/noreply@example.com,ReplyToEmailAddress=support@example.com \
+  --sms-configuration SnsCallerArn=arn:aws:iam::123456789012:role/SNSRole \
+  --user-attribute-update-settings AttributesRequireVerificationBeforeUpdate=email \
+  --account-recovery-setting file://recovery-config.json \
+  --tags Environment=Production,Application=MyApp \
+  --region us-east-1
+
+# Example password-policy.json
+cat > password-policy.json <<'EOF'
+{
+  "PasswordPolicy": {
+    "MinimumLength": 12,
+    "RequireUppercase": true,
+    "RequireLowercase": true,
+    "RequireNumbers": true,
+    "RequireSymbols": true,
+    "TemporaryPasswordValidityDays": 7
+  }
+}
+EOF
+
+# Example recovery-config.json
+cat > recovery-config.json <<'EOF'
+{
+  "RecoveryMechanisms": [
+    {
+      "Priority": 1,
+      "Name": "verified_email"
+    },
+    {
+      "Priority": 2,
+      "Name": "verified_phone_number"
+    }
+  ]
+}
+EOF
+```
+
+#### Describe User Pool
+
+```bash
+# Get user pool details
+aws cognito-idp describe-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+
+# Get user pool details with specific fields
+aws cognito-idp describe-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --query 'UserPool.[Name,Status,EstimatedNumberOfUsers,MfaConfiguration]' \
+  --output table \
+  --region us-east-1
+```
+
+#### Update User Pool
+
+```bash
+# Enable MFA
+aws cognito-idp set-user-pool-mfa-config \
+  --user-pool-id us-east-1_ABC123DEF \
+  --mfa-configuration ON \
+  --software-token-mfa-configuration Enabled=true \
+  --region us-east-1
+
+# Update user pool configuration
+aws cognito-idp update-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --policies "PasswordPolicy={MinimumLength=10,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=false}" \
+  --auto-verified-attributes email phone_number \
+  --region us-east-1
+
+# Enable advanced security features
+aws cognito-idp update-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --user-pool-add-ons AdvancedSecurityMode=ENFORCED \
+  --region us-east-1
+```
+
+#### List User Pools
+
+```bash
+# List all user pools
+aws cognito-idp list-user-pools \
+  --max-results 60 \
+  --region us-east-1
+
+# List user pools with formatted output
+aws cognito-idp list-user-pools \
+  --max-results 60 \
+  --query 'UserPools[*].[Name,Id,Status,CreationDate]' \
+  --output table \
+  --region us-east-1
+```
+
+#### Delete User Pool
+
+```bash
+# Delete user pool
+aws cognito-idp delete-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+### User Pool Client Management
+
+#### Create User Pool Client
+
+```bash
+# Create app client for web application
+aws cognito-idp create-user-pool-client \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-name WebAppClient \
+  --generate-secret \
+  --allowed-o-auth-flows code implicit \
+  --allowed-o-auth-scopes openid email profile \
+  --allowed-o-auth-flows-user-pool-client \
+  --callback-urls https://example.com/callback \
+  --logout-urls https://example.com/logout \
+  --supported-identity-providers COGNITO Google Facebook \
+  --region us-east-1
+
+# Create app client for mobile application
+aws cognito-idp create-user-pool-client \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-name MobileAppClient \
+  --no-generate-secret \
+  --refresh-token-validity 30 \
+  --access-token-validity 60 \
+  --id-token-validity 60 \
+  --token-validity-units AccessToken=minutes,IdToken=minutes,RefreshToken=days \
+  --read-attributes email name phone_number \
+  --write-attributes email name \
+  --region us-east-1
+
+# Create app client with custom authentication flow
+aws cognito-idp create-user-pool-client \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-name CustomAuthClient \
+  --explicit-auth-flows ALLOW_CUSTOM_AUTH ALLOW_REFRESH_TOKEN_AUTH ALLOW_USER_SRP_AUTH \
+  --prevent-user-existence-errors ENABLED \
+  --region us-east-1
+```
+
+#### Describe User Pool Client
+
+```bash
+# Get app client details
+aws cognito-idp describe-user-pool-client \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-id 1234567890abcdef \
+  --region us-east-1
+```
+
+#### Update User Pool Client
+
+```bash
+# Update app client configuration
+aws cognito-idp update-user-pool-client \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-id 1234567890abcdef \
+  --client-name UpdatedWebAppClient \
+  --refresh-token-validity 60 \
+  --region us-east-1
+```
+
+#### List User Pool Clients
+
+```bash
+# List all app clients
+aws cognito-idp list-user-pool-clients \
+  --user-pool-id us-east-1_ABC123DEF \
+  --max-results 60 \
+  --region us-east-1
+```
+
+### User Management
+
+#### Create User
+
+```bash
+# Create user (admin)
+aws cognito-idp admin-create-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --user-attributes Name=email,Value=john.doe@example.com Name=name,Value="John Doe" Name=phone_number,Value="+1234567890" \
+  --temporary-password TempPass123! \
+  --message-action SUPPRESS \
+  --region us-east-1
+
+# Create user with auto-verification
+aws cognito-idp admin-create-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username jane.smith@example.com \
+  --user-attributes Name=email,Value=jane.smith@example.com Name=email_verified,Value=true \
+  --desired-delivery-mediums EMAIL \
+  --region us-east-1
+```
+
+#### Confirm User Signup
+
+```bash
+# Admin confirm user
+aws cognito-idp admin-confirm-sign-up \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+```
+
+#### Set User Password
+
+```bash
+# Set permanent password (admin)
+aws cognito-idp admin-set-user-password \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --password NewPassword123! \
+  --permanent \
+  --region us-east-1
+```
+
+#### Get User Details
+
+```bash
+# Get user (admin)
+aws cognito-idp admin-get-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+
+# List users
+aws cognito-idp list-users \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+
+# List users with filter
+aws cognito-idp list-users \
+  --user-pool-id us-east-1_ABC123DEF \
+  --filter "email ^= \"john\"" \
+  --region us-east-1
+
+# List users with attributes
+aws cognito-idp list-users \
+  --user-pool-id us-east-1_ABC123DEF \
+  --attributes-to-get email name phone_number \
+  --region us-east-1
+```
+
+#### Update User Attributes
+
+```bash
+# Update user attributes (admin)
+aws cognito-idp admin-update-user-attributes \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --user-attributes Name=name,Value="John Updated" Name=phone_number,Value="+9876543210" \
+  --region us-east-1
+```
+
+#### Delete User
+
+```bash
+# Delete user (admin)
+aws cognito-idp admin-delete-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+```
+
+#### Enable/Disable User
+
+```bash
+# Disable user
+aws cognito-idp admin-disable-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+
+# Enable user
+aws cognito-idp admin-enable-user \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+```
+
+### Group Management
+
+#### Create Group
+
+```bash
+# Create user group
+aws cognito-idp create-group \
+  --group-name Administrators \
+  --user-pool-id us-east-1_ABC123DEF \
+  --description "Administrator users with full access" \
+  --role-arn arn:aws:iam::123456789012:role/CognitoAdminRole \
+  --precedence 1 \
+  --region us-east-1
+
+# Create group without IAM role
+aws cognito-idp create-group \
+  --group-name Users \
+  --user-pool-id us-east-1_ABC123DEF \
+  --description "Standard users" \
+  --precedence 10 \
+  --region us-east-1
+```
+
+#### List Groups
+
+```bash
+# List all groups
+aws cognito-idp list-groups \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+#### Add User to Group
+
+```bash
+# Add user to group
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --group-name Administrators \
+  --region us-east-1
+```
+
+#### Remove User from Group
+
+```bash
+# Remove user from group
+aws cognito-idp admin-remove-user-from-group \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --group-name Administrators \
+  --region us-east-1
+```
+
+#### List Users in Group
+
+```bash
+# List group members
+aws cognito-idp list-users-in-group \
+  --user-pool-id us-east-1_ABC123DEF \
+  --group-name Administrators \
+  --region us-east-1
+```
+
+#### Delete Group
+
+```bash
+# Delete group
+aws cognito-idp delete-group \
+  --group-name Users \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+### Identity Pool Management
+
+#### Create Identity Pool
+
+```bash
+# Create identity pool with Cognito User Pool
+aws cognito-identity create-identity-pool \
+  --identity-pool-name MyIdentityPool \
+  --allow-unauthenticated-identities \
+  --cognito-identity-providers ProviderName=cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123DEF,ClientId=1234567890abcdef,ServerSideTokenCheck=false \
+  --region us-east-1
+
+# Create identity pool with multiple providers
+aws cognito-identity create-identity-pool \
+  --identity-pool-name ProductionIdentityPool \
+  --no-allow-unauthenticated-identities \
+  --cognito-identity-providers file://cognito-providers.json \
+  --supported-login-providers "accounts.google.com"="YOUR_GOOGLE_CLIENT_ID" "graph.facebook.com"="YOUR_FACEBOOK_APP_ID" \
+  --region us-east-1
+
+# Example cognito-providers.json
+cat > cognito-providers.json <<'EOF'
+[
+  {
+    "ProviderName": "cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123DEF",
+    "ClientId": "1234567890abcdef",
+    "ServerSideTokenCheck": false
+  }
+]
+EOF
+```
+
+#### Describe Identity Pool
+
+```bash
+# Get identity pool details
+aws cognito-identity describe-identity-pool \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+#### Update Identity Pool
+
+```bash
+# Update identity pool
+aws cognito-identity update-identity-pool \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --identity-pool-name UpdatedIdentityPool \
+  --allow-unauthenticated-identities \
+  --region us-east-1
+```
+
+#### List Identity Pools
+
+```bash
+# List all identity pools
+aws cognito-identity list-identity-pools \
+  --max-results 60 \
+  --region us-east-1
+```
+
+#### Set Identity Pool Roles
+
+```bash
+# Set IAM roles for identity pool
+aws cognito-identity set-identity-pool-roles \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --roles authenticated=arn:aws:iam::123456789012:role/Cognito_AuthRole,unauthenticated=arn:aws:iam::123456789012:role/Cognito_UnauthRole \
+  --region us-east-1
+
+# Set roles with role mappings
+aws cognito-identity set-identity-pool-roles \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --roles authenticated=arn:aws:iam::123456789012:role/Cognito_AuthRole,unauthenticated=arn:aws:iam::123456789012:role/Cognito_UnauthRole \
+  --role-mappings file://role-mappings.json \
+  --region us-east-1
+
+# Example role-mappings.json
+cat > role-mappings.json <<'EOF'
+{
+  "cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123DEF:1234567890abcdef": {
+    "Type": "Token",
+    "AmbiguousRoleResolution": "AuthenticatedRole"
+  }
+}
+EOF
+```
+
+#### Get Identity Pool Roles
+
+```bash
+# Get IAM roles associated with identity pool
+aws cognito-identity get-identity-pool-roles \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+#### Delete Identity Pool
+
+```bash
+# Delete identity pool
+aws cognito-identity delete-identity-pool \
+  --identity-pool-id us-east-1:12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+### Identity Provider Configuration
+
+#### Create SAML Provider
+
+```bash
+# Create SAML identity provider
+aws cognito-idp create-identity-provider \
+  --user-pool-id us-east-1_ABC123DEF \
+  --provider-name MyCorpSAML \
+  --provider-type SAML \
+  --provider-details file://saml-provider-details.json \
+  --attribute-mapping email=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress,name=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name \
+  --region us-east-1
+
+# Example saml-provider-details.json
+cat > saml-provider-details.json <<'EOF'
+{
+  "MetadataURL": "https://idp.example.com/metadata"
+}
+EOF
+
+# Or with metadata file
+cat > saml-provider-details-file.json <<'EOF'
+{
+  "MetadataFile": "<?xml version=\"1.0\"?>..."
+}
+EOF
+```
+
+#### Create OIDC Provider
+
+```bash
+# Create OIDC identity provider
+aws cognito-idp create-identity-provider \
+  --user-pool-id us-east-1_ABC123DEF \
+  --provider-name MyOIDCProvider \
+  --provider-type OIDC \
+  --provider-details client_id=YOUR_CLIENT_ID,client_secret=YOUR_CLIENT_SECRET,authorize_scopes="openid email profile",oidc_issuer=https://accounts.example.com \
+  --attribute-mapping email=email,name=name,username=sub \
+  --region us-east-1
+```
+
+#### Create Social Identity Provider
+
+```bash
+# Create Google identity provider
+aws cognito-idp create-identity-provider \
+  --user-pool-id us-east-1_ABC123DEF \
+  --provider-name Google \
+  --provider-type Google \
+  --provider-details client_id=YOUR_GOOGLE_CLIENT_ID,client_secret=YOUR_GOOGLE_CLIENT_SECRET,authorize_scopes="openid email profile" \
+  --attribute-mapping email=email,name=name,username=sub \
+  --region us-east-1
+
+# Create Facebook identity provider
+aws cognito-idp create-identity-provider \
+  --user-pool-id us-east-1_ABC123DEF \
+  --provider-name Facebook \
+  --provider-type Facebook \
+  --provider-details client_id=YOUR_FACEBOOK_APP_ID,client_secret=YOUR_FACEBOOK_APP_SECRET,authorize_scopes="public_profile,email" \
+  --attribute-mapping email=email,name=name,username=id \
+  --region us-east-1
+```
+
+#### List Identity Providers
+
+```bash
+# List all identity providers
+aws cognito-idp list-identity-providers \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+#### Delete Identity Provider
+
+```bash
+# Delete identity provider
+aws cognito-idp delete-identity-provider \
+  --user-pool-id us-east-1_ABC123DEF \
+  --provider-name MyCorpSAML \
+  --region us-east-1
+```
+
+### Lambda Triggers
+
+#### Set User Pool Lambda Triggers
+
+```bash
+# Configure Lambda triggers
+aws cognito-idp update-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --lambda-config file://lambda-config.json \
+  --region us-east-1
+
+# Example lambda-config.json
+cat > lambda-config.json <<'EOF'
+{
+  "PreSignUp": "arn:aws:lambda:us-east-1:123456789012:function:PreSignUpTrigger",
+  "PostConfirmation": "arn:aws:lambda:us-east-1:123456789012:function:PostConfirmationTrigger",
+  "PreAuthentication": "arn:aws:lambda:us-east-1:123456789012:function:PreAuthenticationTrigger",
+  "PostAuthentication": "arn:aws:lambda:us-east-1:123456789012:function:PostAuthenticationTrigger",
+  "PreTokenGeneration": "arn:aws:lambda:us-east-1:123456789012:function:PreTokenGenerationTrigger",
+  "CustomMessage": "arn:aws:lambda:us-east-1:123456789012:function:CustomMessageTrigger",
+  "DefineAuthChallenge": "arn:aws:lambda:us-east-1:123456789012:function:DefineAuthChallengeTrigger",
+  "CreateAuthChallenge": "arn:aws:lambda:us-east-1:123456789012:function:CreateAuthChallengeTrigger",
+  "VerifyAuthChallengeResponse": "arn:aws:lambda:us-east-1:123456789012:function:VerifyAuthChallengeTrigger",
+  "UserMigration": "arn:aws:lambda:us-east-1:123456789012:function:UserMigrationTrigger"
+}
+EOF
+```
+
+### MFA Configuration
+
+#### Configure Software Token MFA
+
+```bash
+# Enable software token MFA
+aws cognito-idp set-user-pool-mfa-config \
+  --user-pool-id us-east-1_ABC123DEF \
+  --software-token-mfa-configuration Enabled=true \
+  --mfa-configuration OPTIONAL \
+  --region us-east-1
+
+# Enable SMS MFA
+aws cognito-idp set-user-pool-mfa-config \
+  --user-pool-id us-east-1_ABC123DEF \
+  --sms-mfa-configuration SmsConfiguration={SmsAuthenticationMessage="Your authentication code is {####}",SnsCallerArn=arn:aws:iam::123456789012:role/SNSRole} \
+  --mfa-configuration ON \
+  --region us-east-1
+
+# Enable both SMS and Software Token MFA
+aws cognito-idp set-user-pool-mfa-config \
+  --user-pool-id us-east-1_ABC123DEF \
+  --software-token-mfa-configuration Enabled=true \
+  --sms-mfa-configuration SmsConfiguration={SmsAuthenticationMessage="Your authentication code is {####}",SnsCallerArn=arn:aws:iam::123456789012:role/SNSRole} \
+  --mfa-configuration OPTIONAL \
+  --region us-east-1
+```
+
+#### Get MFA Configuration
+
+```bash
+# Get user pool MFA configuration
+aws cognito-idp get-user-pool-mfa-config \
+  --user-pool-id us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+#### Set User MFA Preference
+
+```bash
+# Set MFA preference for user (admin)
+aws cognito-idp admin-set-user-mfa-preference \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --software-token-mfa-settings Enabled=true,PreferredMfa=true \
+  --region us-east-1
+```
+
+### Password Policies
+
+#### Update Password Policy
+
+```bash
+# Update password policy
+aws cognito-idp update-user-pool \
+  --user-pool-id us-east-1_ABC123DEF \
+  --policies file://password-policy-update.json \
+  --region us-east-1
+
+# Example password-policy-update.json
+cat > password-policy-update.json <<'EOF'
+{
+  "PasswordPolicy": {
+    "MinimumLength": 14,
+    "RequireUppercase": true,
+    "RequireLowercase": true,
+    "RequireNumbers": true,
+    "RequireSymbols": true,
+    "TemporaryPasswordValidityDays": 3
+  }
+}
+EOF
+```
+
+### Authentication and Token Operations
+
+#### Initiate Authentication
+
+```bash
+# Initiate auth with USER_SRP_AUTH flow
+aws cognito-idp initiate-auth \
+  --auth-flow USER_SRP_AUTH \
+  --client-id 1234567890abcdef \
+  --auth-parameters USERNAME=john.doe@example.com,SRP_A=<SRP_A_VALUE> \
+  --region us-east-1
+
+# Admin initiate auth
+aws cognito-idp admin-initiate-auth \
+  --user-pool-id us-east-1_ABC123DEF \
+  --client-id 1234567890abcdef \
+  --auth-flow ADMIN_NO_SRP_AUTH \
+  --auth-parameters USERNAME=john.doe@example.com,PASSWORD=Password123! \
+  --region us-east-1
+```
+
+#### Sign Out User
+
+```bash
+# Global sign out (admin)
+aws cognito-idp admin-user-global-sign-out \
+  --user-pool-id us-east-1_ABC123DEF \
+  --username john.doe@example.com \
+  --region us-east-1
+```
+
+### Domain Configuration
+
+#### Create User Pool Domain
+
+```bash
+# Create Cognito domain
+aws cognito-idp create-user-pool-domain \
+  --user-pool-id us-east-1_ABC123DEF \
+  --domain my-app-auth \
+  --region us-east-1
+
+# Create custom domain
+aws cognito-idp create-user-pool-domain \
+  --user-pool-id us-east-1_ABC123DEF \
+  --domain auth.example.com \
+  --custom-domain-config CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+#### Describe User Pool Domain
+
+```bash
+# Get domain details
+aws cognito-idp describe-user-pool-domain \
+  --domain my-app-auth \
+  --region us-east-1
+```
+
+#### Delete User Pool Domain
+
+```bash
+# Delete domain
+aws cognito-idp delete-user-pool-domain \
+  --user-pool-id us-east-1_ABC123DEF \
+  --domain my-app-auth \
+  --region us-east-1
+```
+
+### Resource Tags
+
+#### Tag User Pool
+
+```bash
+# Add tags to user pool
+aws cognito-idp tag-resource \
+  --resource-arn arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_ABC123DEF \
+  --tags Environment=Production,CostCenter=Engineering,Application=MyApp \
+  --region us-east-1
+```
+
+#### List Tags
+
+```bash
+# List tags for user pool
+aws cognito-idp list-tags-for-resource \
+  --resource-arn arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_ABC123DEF \
+  --region us-east-1
+```
+
+#### Untag Resource
+
+```bash
+# Remove tags
+aws cognito-idp untag-resource \
+  --resource-arn arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_ABC123DEF \
+  --tag-keys Environment CostCenter \
+  --region us-east-1
+```
+
+---
 
 ### Lab 4: Lambda Triggers
 

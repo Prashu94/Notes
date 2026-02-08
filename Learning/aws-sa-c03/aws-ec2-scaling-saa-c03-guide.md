@@ -14,7 +14,8 @@
 10. [Troubleshooting Common Issues](#troubleshooting-common-issues)
 11. [SAA-C03 Exam Scenarios](#saa-c03-exam-scenarios)
 12. [Best Practices and Recommendations](#best-practices-and-recommendations)
-13. [Practice Questions](#practice-questions)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1913,6 +1914,882 @@ Capacity Planning Process:
     - Load testing scenarios
     - Failover testing
     - Scaling policy validation
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Launch Templates
+
+#### Create a Launch Template
+```bash
+# Create a basic launch template
+aws ec2 create-launch-template \
+    --launch-template-name my-web-app-template \
+    --version-description "Web app version 1" \
+    --launch-template-data file://launch-template-data.json
+
+# Launch template data JSON structure
+cat > launch-template-data.json << 'EOF'
+{
+  "ImageId": "ami-0c55b159cbfafe1f0",
+  "InstanceType": "t3.micro",
+  "KeyName": "my-key-pair",
+  "SecurityGroupIds": ["sg-0123456789abcdef0"],
+  "UserData": "IyEvYmluL2Jhc2gKeXVtIHVwZGF0ZSAteQp5dW0gaW5zdGFsbCAteSBodHRwZApzeXN0ZW1jdGwgc3RhcnQgaHR0cGQ=",
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {"Key": "Name", "Value": "WebServer"},
+        {"Key": "Environment", "Value": "Production"}
+      ]
+    }
+  ],
+  "Monitoring": {
+    "Enabled": true
+  },
+  "IamInstanceProfile": {
+    "Name": "EC2-S3-ReadOnly-Role"
+  },
+  "MetadataOptions": {
+    "HttpTokens": "required",
+    "HttpPutResponseHopLimit": 1
+  }
+}
+EOF
+```
+
+#### Create Launch Template with Mixed Instance Types
+```bash
+# Create launch template with multiple instance types for cost optimization
+aws ec2 create-launch-template \
+    --launch-template-name multi-instance-template \
+    --launch-template-data '{
+      "ImageId": "ami-0c55b159cbfafe1f0",
+      "KeyName": "my-key-pair",
+      "SecurityGroupIds": ["sg-0123456789abcdef0"],
+      "TagSpecifications": [{
+        "ResourceType": "instance",
+        "Tags": [{"Key": "Name", "Value": "FlexibleInstance"}]
+      }]
+    }'
+```
+
+#### Describe Launch Templates
+```bash
+# List all launch templates
+aws ec2 describe-launch-templates
+
+# Get specific launch template details
+aws ec2 describe-launch-templates \
+    --launch-template-names my-web-app-template
+
+# Get launch template versions
+aws ec2 describe-launch-template-versions \
+    --launch-template-name my-web-app-template
+
+# Get specific version
+aws ec2 describe-launch-template-versions \
+    --launch-template-name my-web-app-template \
+    --versions 2
+```
+
+#### Update Launch Template
+```bash
+# Create a new version of launch template
+aws ec2 create-launch-template-version \
+    --launch-template-name my-web-app-template \
+    --version-description "Updated instance type" \
+    --source-version 1 \
+    --launch-template-data '{"InstanceType": "t3.small"}'
+
+# Set default version
+aws ec2 modify-launch-template \
+    --launch-template-name my-web-app-template \
+    --default-version 2
+```
+
+#### Delete Launch Template
+```bash
+# Delete specific version
+aws ec2 delete-launch-template-versions \
+    --launch-template-name my-web-app-template \
+    --versions 1
+
+# Delete entire launch template
+aws ec2 delete-launch-template \
+    --launch-template-name my-web-app-template
+```
+
+---
+
+### Launch Configurations (Legacy)
+
+#### Create Launch Configuration
+```bash
+# Create a basic launch configuration
+aws autoscaling create-launch-configuration \
+    --launch-configuration-name my-launch-config \
+    --image-id ami-0c55b159cbfafe1f0 \
+    --instance-type t3.micro \
+    --key-name my-key-pair \
+    --security-groups sg-0123456789abcdef0 \
+    --user-data file://user-data.sh \
+    --iam-instance-profile EC2-S3-ReadOnly-Role \
+    --instance-monitoring Enabled=true \
+    --ebs-optimized \
+    --associate-public-ip-address
+
+# Create with spot instances
+aws autoscaling create-launch-configuration \
+    --launch-configuration-name spot-launch-config \
+    --image-id ami-0c55b159cbfafe1f0 \
+    --instance-type t3.micro \
+    --spot-price "0.05"
+```
+
+#### Describe Launch Configurations
+```bash
+# List all launch configurations
+aws autoscaling describe-launch-configurations
+
+# Get specific launch configuration
+aws autoscaling describe-launch-configurations \
+    --launch-configuration-names my-launch-config
+```
+
+#### Delete Launch Configuration
+```bash
+# Delete launch configuration
+aws autoscaling delete-launch-configuration \
+    --launch-configuration-name my-launch-config
+```
+
+---
+
+### Auto Scaling Groups
+
+#### Create Auto Scaling Group
+```bash
+# Create ASG with launch template
+aws autoscaling create-auto-scaling-group \
+    --auto-scaling-group-name my-asg \
+    --launch-template LaunchTemplateName=my-web-app-template,Version='$Latest' \
+    --min-size 1 \
+    --max-size 10 \
+    --desired-capacity 3 \
+    --vpc-zone-identifier "subnet-12345678,subnet-87654321,subnet-13579246" \
+    --health-check-type ELB \
+    --health-check-grace-period 300 \
+    --default-cooldown 300 \
+    --target-group-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/abc123 \
+    --tags Key=Name,Value=WebServer,PropagateAtLaunch=true Key=Environment,Value=Production,PropagateAtLaunch=true
+
+# Create ASG with mixed instances policy (on-demand + spot)
+aws autoscaling create-auto-scaling-group \
+    --auto-scaling-group-name mixed-asg \
+    --min-size 2 \
+    --max-size 10 \
+    --desired-capacity 4 \
+    --vpc-zone-identifier "subnet-12345678,subnet-87654321" \
+    --mixed-instances-policy file://mixed-policy.json
+
+# Mixed instances policy JSON
+cat > mixed-policy.json << 'EOF'
+{
+  "LaunchTemplate": {
+    "LaunchTemplateSpecification": {
+      "LaunchTemplateName": "my-web-app-template",
+      "Version": "$Latest"
+    },
+    "Overrides": [
+      {"InstanceType": "t3.micro"},
+      {"InstanceType": "t3.small"},
+      {"InstanceType": "t3a.micro"},
+      {"InstanceType": "t3a.small"}
+    ]
+  },
+  "InstancesDistribution": {
+    "OnDemandBaseCapacity": 1,
+    "OnDemandPercentageAboveBaseCapacity": 30,
+    "SpotAllocationStrategy": "capacity-optimized",
+    "SpotInstancePools": 4,
+    "SpotMaxPrice": ""
+  }
+}
+EOF
+```
+
+#### Describe Auto Scaling Groups
+```bash
+# List all ASGs
+aws autoscaling describe-auto-scaling-groups
+
+# Get specific ASG details
+aws autoscaling describe-auto-scaling-groups \
+    --auto-scaling-group-names my-asg
+
+# Get ASG with filters
+aws autoscaling describe-auto-scaling-groups \
+    --query "AutoScalingGroups[?contains(AutoScalingGroupName, 'web')]"
+
+# Get ASG instances
+aws autoscaling describe-auto-scaling-instances
+
+# Get instances of specific ASG
+aws autoscaling describe-auto-scaling-instances \
+    --query "AutoScalingInstances[?AutoScalingGroupName=='my-asg']"
+```
+
+#### Update Auto Scaling Group
+```bash
+# Update capacity
+aws autoscaling update-auto-scaling-group \
+    --auto-scaling-group-name my-asg \
+    --min-size 2 \
+    --max-size 15 \
+    --desired-capacity 5
+
+# Update launch template version
+aws autoscaling update-auto-scaling-group \
+    --auto-scaling-group-name my-asg \
+    --launch-template LaunchTemplateName=my-web-app-template,Version='$Latest'
+
+# Update health check configuration
+aws autoscaling update-auto-scaling-group \
+    --auto-scaling-group-name my-asg \
+    --health-check-type ELB \
+    --health-check-grace-period 600
+
+# Attach load balancer target group
+aws autoscaling attach-load-balancer-target-groups \
+    --auto-scaling-group-name my-asg \
+    --target-group-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/abc123
+```
+
+#### Delete Auto Scaling Group
+```bash
+# Delete ASG (terminate instances)
+aws autoscaling delete-auto-scaling-group \
+    --auto-scaling-group-name my-asg \
+    --force-delete
+
+# Delete ASG without terminating instances
+aws autoscaling delete-auto-scaling-group \
+    --auto-scaling-group-name my-asg
+```
+
+---
+
+### Scaling Policies
+
+#### Target Tracking Scaling Policy
+```bash
+# Create target tracking policy - CPU utilization
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name target-tracking-cpu \
+    --policy-type TargetTrackingScaling \
+    --target-tracking-configuration file://cpu-tracking.json
+
+cat > cpu-tracking.json << 'EOF'
+{
+  "PredefinedMetricSpecification": {
+    "PredefinedMetricType": "ASGAverageCPUUtilization"
+  },
+  "TargetValue": 70.0
+}
+EOF
+
+# Create target tracking policy - Request count per target
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name target-tracking-requests \
+    --policy-type TargetTrackingScaling \
+    --target-tracking-configuration file://request-tracking.json
+
+cat > request-tracking.json << 'EOF'
+{
+  "PredefinedMetricSpecification": {
+    "PredefinedMetricType": "ALBRequestCountPerTarget",
+    "ResourceLabel": "app/my-load-balancer/50dc6c495c0c9188/targetgroup/my-targets/73e2d6bc24d8a067"
+  },
+  "TargetValue": 1000.0
+}
+EOF
+
+# Create target tracking policy - Custom metric
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name target-tracking-custom \
+    --policy-type TargetTrackingScaling \
+    --target-tracking-configuration file://custom-tracking.json
+
+cat > custom-tracking.json << 'EOF'
+{
+  "CustomizedMetricSpecification": {
+    "MetricName": "ActiveUsers",
+    "Namespace": "MyApp",
+    "Statistic": "Average"
+  },
+  "TargetValue": 500.0
+}
+EOF
+```
+
+#### Step Scaling Policy
+```bash
+# Create step scaling policy (scale out)
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name step-scale-out \
+    --policy-type StepScaling \
+    --adjustment-type PercentChangeInCapacity \
+    --metric-aggregation-type Average \
+    --step-adjustments file://step-out.json
+
+cat > step-out.json << 'EOF'
+[
+  {
+    "MetricIntervalLowerBound": 0,
+    "MetricIntervalUpperBound": 10,
+    "ScalingAdjustment": 10
+  },
+  {
+    "MetricIntervalLowerBound": 10,
+    "MetricIntervalUpperBound": 20,
+    "ScalingAdjustment": 20
+  },
+  {
+    "MetricIntervalLowerBound": 20,
+    "ScalingAdjustment": 30
+  }
+]
+EOF
+
+# Create CloudWatch alarm for step scaling
+aws cloudwatch put-metric-alarm \
+    --alarm-name high-cpu-alarm \
+    --alarm-description "Trigger when CPU exceeds 70%" \
+    --metric-name CPUUtilization \
+    --namespace AWS/EC2 \
+    --statistic Average \
+    --period 300 \
+    --evaluation-periods 2 \
+    --threshold 70 \
+    --comparison-operator GreaterThanThreshold \
+    --dimensions Name=AutoScalingGroupName,Value=my-asg \
+    --alarm-actions arn:aws:autoscaling:us-east-1:123456789012:scalingPolicy:policy-id:autoScalingGroupName/my-asg:policyName/step-scale-out
+
+# Create step scaling policy (scale in)
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name step-scale-in \
+    --policy-type StepScaling \
+    --adjustment-type ChangeInCapacity \
+    --step-adjustments '[{"MetricIntervalUpperBound":0,"ScalingAdjustment":-1}]'
+```
+
+#### Simple Scaling Policy
+```bash
+# Create simple scaling policy (scale out)
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name simple-scale-out \
+    --scaling-adjustment 2 \
+    --adjustment-type ChangeInCapacity \
+    --cooldown 300
+
+# Create simple scaling policy (scale in)
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name simple-scale-in \
+    --scaling-adjustment -1 \
+    --adjustment-type ChangeInCapacity \
+    --cooldown 300
+
+# Create with percentage adjustment
+aws autoscaling put-scaling-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name simple-scale-percent \
+    --scaling-adjustment 25 \
+    --adjustment-type PercentChangeInCapacity \
+    --cooldown 300 \
+    --min-adjustment-magnitude 2
+```
+
+#### Describe and Delete Scaling Policies
+```bash
+# List all scaling policies
+aws autoscaling describe-policies
+
+# Get policies for specific ASG
+aws autoscaling describe-policies \
+    --auto-scaling-group-name my-asg
+
+# Get specific policy
+aws autoscaling describe-policies \
+    --auto-scaling-group-name my-asg \
+    --policy-names target-tracking-cpu
+
+# Delete scaling policy
+aws autoscaling delete-policy \
+    --auto-scaling-group-name my-asg \
+    --policy-name target-tracking-cpu
+```
+
+---
+
+### Scheduled Actions
+
+#### Create Scheduled Actions
+```bash
+# Create one-time scheduled action
+aws autoscaling put-scheduled-update-group-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name scale-up-morning \
+    --start-time "2026-02-15T08:00:00Z" \
+    --desired-capacity 10 \
+    --min-size 5 \
+    --max-size 15
+
+# Create recurring scheduled action (daily)
+aws autoscaling put-scheduled-update-group-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name daily-scale-up \
+    --recurrence "0 8 * * *" \
+    --desired-capacity 10 \
+    --min-size 5 \
+    --max-size 15
+
+# Create recurring scheduled action (business hours)
+aws autoscaling put-scheduled-update-group-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name business-hours-start \
+    --recurrence "0 9 * * MON-FRI" \
+    --desired-capacity 8 \
+    --min-size 4 \
+    --max-size 12
+
+# Scale down after business hours
+aws autoscaling put-scheduled-update-group-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name business-hours-end \
+    --recurrence "0 18 * * MON-FRI" \
+    --desired-capacity 2 \
+    --min-size 2 \
+    --max-size 4
+
+# Weekend scaling
+aws autoscaling put-scheduled-update-group-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name weekend-scale-down \
+    --recurrence "0 0 * * SAT" \
+    --desired-capacity 1 \
+    --min-size 1 \
+    --max-size 2
+```
+
+#### Describe and Delete Scheduled Actions
+```bash
+# List all scheduled actions
+aws autoscaling describe-scheduled-actions
+
+# Get scheduled actions for specific ASG
+aws autoscaling describe-scheduled-actions \
+    --auto-scaling-group-name my-asg
+
+# Get specific scheduled action
+aws autoscaling describe-scheduled-actions \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-names daily-scale-up
+
+# Delete scheduled action
+aws autoscaling delete-scheduled-action \
+    --auto-scaling-group-name my-asg \
+    --scheduled-action-name daily-scale-up
+```
+
+---
+
+### Lifecycle Hooks
+
+#### Create Lifecycle Hooks
+```bash
+# Create lifecycle hook for instance launch
+aws autoscaling put-lifecycle-hook \
+    --lifecycle-hook-name launch-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-transition autoscaling:EC2_INSTANCE_LAUNCHING \
+    --default-result CONTINUE \
+    --heartbeat-timeout 3600 \
+    --notification-target-arn arn:aws:sns:us-east-1:123456789012:asg-notifications \
+    --role-arn arn:aws:iam::123456789012:role/AutoScaling-NotificationRole
+
+# Create lifecycle hook for instance termination
+aws autoscaling put-lifecycle-hook \
+    --lifecycle-hook-name terminate-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-transition autoscaling:EC2_INSTANCE_TERMINATING \
+    --default-result CONTINUE \
+    --heartbeat-timeout 1800 \
+    --notification-target-arn arn:aws:sqs:us-east-1:123456789012:asg-queue
+
+# Create lifecycle hook with Lambda notification
+aws autoscaling put-lifecycle-hook \
+    --lifecycle-hook-name lambda-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-transition autoscaling:EC2_INSTANCE_LAUNCHING \
+    --notification-metadata '{"environment":"production","app":"web"}' \
+    --default-result ABANDON \
+    --heartbeat-timeout 300
+```
+
+#### Manage Lifecycle Actions
+```bash
+# Complete lifecycle action (continue)
+aws autoscaling complete-lifecycle-action \
+    --lifecycle-hook-name launch-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-action-token $TOKEN \
+    --lifecycle-action-result CONTINUE
+
+# Complete lifecycle action (abandon)
+aws autoscaling complete-lifecycle-action \
+    --lifecycle-hook-name launch-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-action-token $TOKEN \
+    --lifecycle-action-result ABANDON
+
+# Record lifecycle action heartbeat
+aws autoscaling record-lifecycle-action-heartbeat \
+    --lifecycle-hook-name launch-hook \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-action-token $TOKEN
+```
+
+#### Describe and Delete Lifecycle Hooks
+```bash
+# Describe lifecycle hooks
+aws autoscaling describe-lifecycle-hooks \
+    --auto-scaling-group-name my-asg
+
+# Describe specific hook
+aws autoscaling describe-lifecycle-hooks \
+    --auto-scaling-group-name my-asg \
+    --lifecycle-hook-names launch-hook
+
+# Delete lifecycle hook
+aws autoscaling delete-lifecycle-hook \
+    --lifecycle-hook-name launch-hook \
+    --auto-scaling-group-name my-asg
+```
+
+---
+
+### Suspend and Resume Processes
+
+#### Suspend Processes
+```bash
+# Suspend all scaling processes
+aws autoscaling suspend-processes \
+    --auto-scaling-group-name my-asg
+
+# Suspend specific processes
+aws autoscaling suspend-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes Launch Terminate
+
+# Suspend only Launch process (prevent scale out)
+aws autoscaling suspend-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes Launch
+
+# Suspend health check replacement
+aws autoscaling suspend-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes ReplaceUnhealthy
+
+# Suspend scheduled actions
+aws autoscaling suspend-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes ScheduledActions
+```
+
+#### Resume Processes
+```bash
+# Resume all processes
+aws autoscaling resume-processes \
+    --auto-scaling-group-name my-asg
+
+# Resume specific processes
+aws autoscaling resume-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes Launch Terminate
+
+# Resume Launch process
+aws autoscaling resume-processes \
+    --auto-scaling-group-name my-asg \
+    --scaling-processes Launch
+```
+
+---
+
+### Warm Pools
+
+#### Create and Configure Warm Pools
+```bash
+# Create warm pool with default settings
+aws autoscaling put-warm-pool \
+    --auto-scaling-group-name my-asg
+
+# Create warm pool with specific configuration
+aws autoscaling put-warm-pool \
+    --auto-scaling-group-name my-asg \
+    --max-group-prepared-capacity 5 \
+    --min-size 2 \
+    --pool-state Stopped
+
+# Create warm pool with Running state
+aws autoscaling put-warm-pool \
+    --auto-scaling-group-name my-asg \
+    --max-group-prepared-capacity 10 \
+    --min-size 3 \
+    --pool-state Running \
+    --instance-reuse-policy '{"ReuseOnScaleIn": true}'
+
+# Create warm pool with Hibernated state
+aws autoscaling put-warm-pool \
+    --auto-scaling-group-name my-asg \
+    --pool-state Hibernated \
+    --min-size 2
+```
+
+#### Describe and Delete Warm Pools
+```bash
+# Describe warm pool
+aws autoscaling describe-warm-pool \
+    --auto-scaling-group-name my-asg
+
+# Delete warm pool
+aws autoscaling delete-warm-pool \
+    --auto-scaling-group-name my-asg
+
+# Force delete warm pool (terminate instances immediately)
+aws autoscaling delete-warm-pool \
+    --auto-scaling-group-name my-asg \
+    --force-delete
+```
+
+---
+
+### Update Instances
+
+#### Instance Refresh
+```bash
+# Start instance refresh
+aws autoscaling start-instance-refresh \
+    --auto-scaling-group-name my-asg \
+    --preferences file://refresh-preferences.json
+
+cat > refresh-preferences.json << 'EOF'
+{
+  "MinHealthyPercentage": 90,
+  "InstanceWarmup": 300,
+  "CheckpointPercentages": [50],
+  "CheckpointDelay": 3600
+}
+EOF
+
+# Start instance refresh with scale-in protection
+aws autoscaling start-instance-refresh \
+    --auto-scaling-group-name my-asg \
+    --preferences MinHealthyPercentage=80,InstanceWarmup=180,ScaleInProtectedInstances=Ignore
+
+# Cancel instance refresh
+aws autoscaling cancel-instance-refresh \
+    --auto-scaling-group-name my-asg
+
+# Describe instance refresh
+aws autoscaling describe-instance-refreshes \
+    --auto-scaling-group-name my-asg
+```
+
+#### Terminate Instances
+```bash
+# Terminate instance and decrement capacity
+aws autoscaling terminate-instance-in-auto-scaling-group \
+    --instance-id i-1234567890abcdef0 \
+    --should-decrement-desired-capacity
+
+# Terminate instance without decrementing capacity
+aws autoscaling terminate-instance-in-auto-scaling-group \
+    --instance-id i-1234567890abcdef0 \
+    --no-should-decrement-desired-capacity
+```
+
+#### Set Instance Health
+```bash
+# Mark instance as unhealthy
+aws autoscaling set-instance-health \
+    --instance-id i-1234567890abcdef0 \
+    --health-status Unhealthy
+
+# Mark instance as healthy
+aws autoscaling set-instance-health \
+    --instance-id i-1234567890abcdef0 \
+    --health-status Healthy \
+    --should-respect-grace-period
+```
+
+#### Instance Protection
+```bash
+# Enable scale-in protection
+aws autoscaling set-instance-protection \
+    --instance-ids i-1234567890abcdef0 i-0987654321fedcba0 \
+    --auto-scaling-group-name my-asg \
+    --protected-from-scale-in
+
+# Disable scale-in protection
+aws autoscaling set-instance-protection \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg \
+    --no-protected-from-scale-in
+```
+
+---
+
+### Desired Capacity Changes
+
+#### Set Desired Capacity
+```bash
+# Set desired capacity
+aws autoscaling set-desired-capacity \
+    --auto-scaling-group-name my-asg \
+    --desired-capacity 5
+
+# Set desired capacity and honor cooldown
+aws autoscaling set-desired-capacity \
+    --auto-scaling-group-name my-asg \
+    --desired-capacity 8 \
+    --honor-cooldown
+
+# Set desired capacity without honoring cooldown
+aws autoscaling set-desired-capacity \
+    --auto-scaling-group-name my-asg \
+    --desired-capacity 3 \
+    --no-honor-cooldown
+```
+
+#### Attach and Detach Instances
+```bash
+# Attach existing EC2 instance to ASG
+aws autoscaling attach-instances \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg
+
+# Detach instance from ASG (keep running)
+aws autoscaling detach-instances \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg \
+    --should-decrement-desired-capacity
+
+# Detach instance and terminate it
+aws autoscaling detach-instances \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg \
+    --no-should-decrement-desired-capacity
+
+aws ec2 terminate-instances --instance-ids i-1234567890abcdef0
+```
+
+#### Enter and Exit Standby
+```bash
+# Move instances to standby
+aws autoscaling enter-standby \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg \
+    --should-decrement-desired-capacity
+
+# Exit standby mode
+aws autoscaling exit-standby \
+    --instance-ids i-1234567890abcdef0 \
+    --auto-scaling-group-name my-asg
+```
+
+---
+
+### Monitoring and Metrics
+
+#### Enable/Disable Metrics Collection
+```bash
+# Enable detailed metrics
+aws autoscaling enable-metrics-collection \
+    --auto-scaling-group-name my-asg \
+    --granularity "1Minute"
+
+# Enable specific metrics
+aws autoscaling enable-metrics-collection \
+    --auto-scaling-group-name my-asg \
+    --metrics GroupMinSize GroupMaxSize GroupDesiredCapacity GroupInServiceInstances \
+    --granularity "1Minute"
+
+# Disable metrics collection
+aws autoscaling disable-metrics-collection \
+    --auto-scaling-group-name my-asg
+
+# Disable specific metrics
+aws autoscaling disable-metrics-collection \
+    --auto-scaling-group-name my-asg \
+    --metrics GroupDesiredCapacity
+```
+
+#### Get Scaling Activities
+```bash
+# Get all scaling activities
+aws autoscaling describe-scaling-activities \
+    --auto-scaling-group-name my-asg
+
+# Get recent scaling activities (last 10)
+aws autoscaling describe-scaling-activities \
+    --auto-scaling-group-name my-asg \
+    --max-records 10
+
+# Get scaling activities with specific status
+aws autoscaling describe-scaling-activities \
+    --auto-scaling-group-name my-asg \
+    --query "Activities[?StatusCode=='Failed']"
+```
+
+---
+
+### Tags Management
+
+#### Add Tags to ASG
+```bash
+# Add or update tags
+aws autoscaling create-or-update-tags \
+    --tags \
+        "ResourceId=my-asg,ResourceType=auto-scaling-group,Key=Environment,Value=Production,PropagateAtLaunch=true" \
+        "ResourceId=my-asg,ResourceType=auto-scaling-group,Key=CostCenter,Value=Engineering,PropagateAtLaunch=true" \
+        "ResourceId=my-asg,ResourceType=auto-scaling-group,Key=Owner,Value=TeamA,PropagateAtLaunch=false"
+```
+
+#### Describe and Delete Tags
+```bash
+# Describe all tags
+aws autoscaling describe-tags
+
+# Describe tags for specific ASG
+aws autoscaling describe-tags \
+    --filters Name=auto-scaling-group,Values=my-asg
+
+# Delete specific tags
+aws autoscaling delete-tags \
+    --tags \
+        "ResourceId=my-asg,ResourceType=auto-scaling-group,Key=Owner"
 ```
 
 ---

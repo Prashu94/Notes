@@ -14,7 +14,8 @@
 11. [Monitoring and Alerting](#monitoring-and-alerting)
 12. [Troubleshooting](#troubleshooting)
 13. [Best Practices](#best-practices)
-14. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+14. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+15. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 
 ---
 
@@ -1083,6 +1084,515 @@ fields @timestamp, eventName, userIdentity.type, sourceIPAddress
 - Enable log file validation
 - Regular validation checks
 - Implement tamper detection
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing CloudTrail resources.
+
+### Trail Management
+
+#### Create a Trail
+
+```bash
+# Create a basic single-region trail
+aws cloudtrail create-trail \
+  --name my-trail \
+  --s3-bucket-name my-cloudtrail-bucket
+
+# Create a multi-region trail with CloudWatch Logs integration
+aws cloudtrail create-trail \
+  --name my-multi-region-trail \
+  --s3-bucket-name my-cloudtrail-bucket \
+  --is-multi-region-trail \
+  --include-global-service-events \
+  --cloud-watch-logs-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:CloudTrail/logs \
+  --cloud-watch-logs-role-arn arn:aws:iam::123456789012:role/CloudTrailRoleForCloudWatchLogs
+
+# Create a trail with SNS notification
+aws cloudtrail create-trail \
+  --name my-trail-with-sns \
+  --s3-bucket-name my-cloudtrail-bucket \
+  --sns-topic-name my-cloudtrail-topic \
+  --is-multi-region-trail
+
+# Create a trail with KMS encryption
+aws cloudtrail create-trail \
+  --name my-encrypted-trail \
+  --s3-bucket-name my-cloudtrail-bucket \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+```
+
+#### Start and Stop Logging
+
+```bash
+# Start logging for a trail
+aws cloudtrail start-logging \
+  --name my-trail
+
+# Stop logging for a trail
+aws cloudtrail stop-logging \
+  --name my-trail
+
+# Check logging status
+aws cloudtrail get-trail-status \
+  --name my-trail
+```
+
+#### Update Trail Configuration
+
+```bash
+# Update trail to include global service events
+aws cloudtrail update-trail \
+  --name my-trail \
+  --include-global-service-events
+
+# Update trail to enable log file validation
+aws cloudtrail update-trail \
+  --name my-trail \
+  --enable-log-file-validation
+
+# Update S3 bucket for a trail
+aws cloudtrail update-trail \
+  --name my-trail \
+  --s3-bucket-name new-cloudtrail-bucket
+
+# Convert single-region trail to multi-region
+aws cloudtrail update-trail \
+  --name my-trail \
+  --is-multi-region-trail
+
+# Add CloudWatch Logs integration
+aws cloudtrail update-trail \
+  --name my-trail \
+  --cloud-watch-logs-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:CloudTrail/logs \
+  --cloud-watch-logs-role-arn arn:aws:iam::123456789012:role/CloudTrailRoleForCloudWatchLogs
+```
+
+#### Delete a Trail
+
+```bash
+# Delete a trail (does not delete S3 logs)
+aws cloudtrail delete-trail \
+  --name my-trail
+```
+
+### CloudTrail Insights
+
+#### Enable CloudTrail Insights
+
+```bash
+# Enable Insights for API call rate
+aws cloudtrail put-insight-selectors \
+  --trail-name my-trail \
+  --insight-selectors '[{"InsightType": "ApiCallRateInsight"}]'
+
+# Enable Insights for API error rate
+aws cloudtrail put-insight-selectors \
+  --trail-name my-trail \
+  --insight-selectors '[{"InsightType": "ApiErrorRateInsight"}]'
+
+# Enable both types of Insights
+aws cloudtrail put-insight-selectors \
+  --trail-name my-trail \
+  --insight-selectors '[{"InsightType": "ApiCallRateInsight"},{"InsightType": "ApiErrorRateInsight"}]'
+```
+
+#### Get Insight Selectors
+
+```bash
+# Get current Insight configuration
+aws cloudtrail get-insight-selectors \
+  --trail-name my-trail
+```
+
+### Event Selectors
+
+#### Configure Management and Data Events
+
+```bash
+# Configure management events only (read and write)
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": []
+  }]'
+
+# Configure management events (write-only)
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "WriteOnly",
+    "IncludeManagementEvents": true,
+    "DataResources": []
+  }]'
+
+# Configure S3 data events for specific bucket
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [{
+      "Type": "AWS::S3::Object",
+      "Values": ["arn:aws:s3:::my-bucket/*"]
+    }]
+  }]'
+
+# Configure S3 data events for all buckets
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [{
+      "Type": "AWS::S3::Object",
+      "Values": ["arn:aws:s3:::*/*"]
+    }]
+  }]'
+
+# Configure Lambda data events for specific function
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [{
+      "Type": "AWS::Lambda::Function",
+      "Values": ["arn:aws:lambda:us-east-1:123456789012:function:my-function"]
+    }]
+  }]'
+
+# Configure Lambda data events for all functions
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [{
+      "Type": "AWS::Lambda::Function",
+      "Values": ["arn:aws:lambda:*:*:function/*"]
+    }]
+  }]'
+
+# Configure multiple data event types
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [
+      {
+        "Type": "AWS::S3::Object",
+        "Values": ["arn:aws:s3:::my-bucket/*"]
+      },
+      {
+        "Type": "AWS::Lambda::Function",
+        "Values": ["arn:aws:lambda:us-east-1:123456789012:function:*"]
+      }
+    ]
+  }]'
+```
+
+#### Get Event Selectors
+
+```bash
+# Get current event selector configuration
+aws cloudtrail get-event-selectors \
+  --trail-name my-trail
+```
+
+### Advanced Event Selectors (Recommended)
+
+```bash
+# Configure advanced event selectors for S3 data events
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --advanced-event-selectors '[
+    {
+      "Name": "Log S3 data events for specific bucket",
+      "FieldSelectors": [
+        {"Field": "eventCategory", "Equals": ["Data"]},
+        {"Field": "resources.type", "Equals": ["AWS::S3::Object"]},
+        {"Field": "resources.ARN", "StartsWith": ["arn:aws:s3:::my-bucket/"]}
+      ]
+    }
+  ]'
+
+# Configure advanced event selectors with exclusions
+aws cloudtrail put-event-selectors \
+  --trail-name my-trail \
+  --advanced-event-selectors '[
+    {
+      "Name": "Log S3 events except GetObject",
+      "FieldSelectors": [
+        {"Field": "eventCategory", "Equals": ["Data"]},
+        {"Field": "resources.type", "Equals": ["AWS::S3::Object"]},
+        {"Field": "eventName", "NotEquals": ["GetObject"]}
+      ]
+    }
+  ]'
+```
+
+### Multi-Region Trails
+
+```bash
+# Create a multi-region trail
+aws cloudtrail create-trail \
+  --name my-multi-region-trail \
+  --s3-bucket-name my-cloudtrail-bucket \
+  --is-multi-region-trail \
+  --include-global-service-events
+
+# Convert existing trail to multi-region
+aws cloudtrail update-trail \
+  --name my-trail \
+  --is-multi-region-trail
+
+# Verify multi-region configuration
+aws cloudtrail describe-trails \
+  --trail-name-list my-multi-region-trail
+```
+
+### Organization Trails
+
+```bash
+# Create an organization trail (must run in management account)
+aws cloudtrail create-trail \
+  --name my-organization-trail \
+  --s3-bucket-name my-org-cloudtrail-bucket \
+  --is-multi-region-trail \
+  --is-organization-trail
+
+# Update existing trail to organization trail
+aws cloudtrail update-trail \
+  --name my-trail \
+  --is-organization-trail
+
+# List organization trails
+aws cloudtrail describe-trails \
+  --include-shadow-trails
+```
+
+### Query and Lookup Events
+
+#### Lookup Recent Events
+
+```bash
+# Lookup events from the last 90 days
+aws cloudtrail lookup-events
+
+# Lookup events by username
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue=alice
+
+# Lookup events by event name
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=CreateBucket
+
+# Lookup events by resource type
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::S3::Bucket
+
+# Lookup events by resource name
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=my-bucket
+
+# Lookup events within a time range
+aws cloudtrail lookup-events \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-31T23:59:59Z
+
+# Lookup events with pagination
+aws cloudtrail lookup-events \
+  --max-results 50 \
+  --next-token <token-from-previous-response>
+
+# Output events in table format
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteBucket \
+  --output table
+```
+
+### Trail Information and Status
+
+```bash
+# Describe all trails in current region
+aws cloudtrail describe-trails
+
+# Describe specific trail
+aws cloudtrail describe-trails \
+  --trail-name-list my-trail
+
+# Get trail status
+aws cloudtrail get-trail-status \
+  --name my-trail
+
+# List all trails in all regions
+aws cloudtrail describe-trails \
+  --region us-east-1 \
+  --include-shadow-trails
+```
+
+### Tags Management
+
+```bash
+# Add tags to a trail
+aws cloudtrail add-tags \
+  --resource-id arn:aws:cloudtrail:us-east-1:123456789012:trail/my-trail \
+  --tags-list Key=Environment,Value=Production Key=Owner,Value=SecurityTeam
+
+# List tags for a trail
+aws cloudtrail list-tags \
+  --resource-id-list arn:aws:cloudtrail:us-east-1:123456789012:trail/my-trail
+
+# Remove tags from a trail
+aws cloudtrail remove-tags \
+  --resource-id arn:aws:cloudtrail:us-east-1:123456789012:trail/my-trail \
+  --tags-list Key=Owner
+```
+
+### Log File Validation
+
+```bash
+# Enable log file validation
+aws cloudtrail update-trail \
+  --name my-trail \
+  --enable-log-file-validation
+
+# Verify log file integrity
+aws cloudtrail validate-logs \
+  --trail-arn arn:aws:cloudtrail:us-east-1:123456789012:trail/my-trail \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-31T23:59:59Z
+```
+
+### Public Access Configuration
+
+```bash
+# Get public access block configuration
+aws cloudtrail get-trail \
+  --name my-trail
+
+# Note: CloudTrail does not have direct public access controls.
+# Configure S3 bucket policies and access separately.
+```
+
+### Export Events
+
+```bash
+# Export events to JSON file
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=RunInstances \
+  --output json > cloudtrail-events.json
+
+# Export events and format with jq
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue=admin | \
+  jq '.Events[] | {time: .EventTime, name: .EventName, user: .Username}'
+
+# Count events by event name
+aws cloudtrail lookup-events \
+  --start-time 2024-01-01T00:00:00Z | \
+  jq -r '.Events[].EventName' | sort | uniq -c | sort -rn
+```
+
+### List Public Trails
+
+```bash
+# List trails in all regions (including organization trails)
+aws cloudtrail list-trails
+
+# List trails with details
+aws cloudtrail list-trails \
+  --output json | \
+  jq '.Trails[] | {name: .Name, homeRegion: .HomeRegion}'
+```
+
+### CloudTrail Lake (Event Data Store)
+
+```bash
+# Create an event data store
+aws cloudtrail create-event-data-store \
+  --name my-event-data-store \
+  --retention-period 90
+
+# List event data stores
+aws cloudtrail list-event-data-stores
+
+# Query event data store using SQL
+aws cloudtrail start-query \
+  --query-statement "SELECT eventTime, eventName, userIdentity.principalId FROM my-event-data-store WHERE eventTime > '2024-01-01 00:00:00' LIMIT 10"
+
+# Get query results
+aws cloudtrail get-query-results \
+  --query-id <query-id-from-start-query>
+```
+
+### Automation Scripts
+
+```bash
+# Create trail with complete configuration
+#!/bin/bash
+TRAIL_NAME="my-production-trail"
+BUCKET_NAME="my-cloudtrail-logs"
+KMS_KEY_ID="arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+LOG_GROUP="CloudTrail/ProductionLogs"
+ROLE_ARN="arn:aws:iam::123456789012:role/CloudTrailRoleForCloudWatchLogs"
+
+# Create trail
+aws cloudtrail create-trail \
+  --name "$TRAIL_NAME" \
+  --s3-bucket-name "$BUCKET_NAME" \
+  --is-multi-region-trail \
+  --include-global-service-events \
+  --enable-log-file-validation \
+  --kms-key-id "$KMS_KEY_ID" \
+  --cloud-watch-logs-log-group-arn "arn:aws:logs:us-east-1:123456789012:log-group:$LOG_GROUP" \
+  --cloud-watch-logs-role-arn "$ROLE_ARN"
+
+# Configure event selectors
+aws cloudtrail put-event-selectors \
+  --trail-name "$TRAIL_NAME" \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [
+      {
+        "Type": "AWS::S3::Object",
+        "Values": ["arn:aws:s3:::sensitive-bucket/*"]
+      }
+    ]
+  }]'
+
+# Enable Insights
+aws cloudtrail put-insight-selectors \
+  --trail-name "$TRAIL_NAME" \
+  --insight-selectors '[{"InsightType": "ApiCallRateInsight"},{"InsightType": "ApiErrorRateInsight"}]'
+
+# Add tags
+aws cloudtrail add-tags \
+  --resource-id "arn:aws:cloudtrail:us-east-1:123456789012:trail/$TRAIL_NAME" \
+  --tags-list Key=Environment,Value=Production Key=ManagedBy,Value=Terraform
+
+# Start logging
+aws cloudtrail start-logging --name "$TRAIL_NAME"
+
+echo "Trail $TRAIL_NAME created and started successfully"
+```
+
+```bash
+# Bulk audit script - Check trail configurations across regions
+#!/bin/bash
+for region in us-east-1 us-west-2 eu-west-1; do
+  echo "Checking trails in $region"
+  aws cloudtrail describe-trails --region "$region" | \
+    jq -r '.trailList[] | "Trail: \(.Name), MultiRegion: \(.IsMultiRegionTrail), LogValidation: \(.LogFileValidationEnabled)"'
+done
+```
 
 ---
 

@@ -11,7 +11,8 @@
 8. [Best Practices](#best-practices)
 9. [Pricing](#pricing)
 10. [Common Exam Scenarios](#common-exam-scenarios)
-11. [Hands-on Labs](#hands-on-labs)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [Hands-on Labs](#hands-on-labs)
 
 ---
 
@@ -454,6 +455,560 @@ Enable logging for message delivery status:
 3. **Throughput Requirements**: Standard (unlimited) vs FIFO (limited)
 4. **Protocol Requirements**: Email, SMS, HTTP, SQS, Lambda, Mobile
 5. **Security Requirements**: Encryption, VPC endpoints, cross-account access
+
+---
+
+## AWS CLI Commands Reference
+
+### Create and Manage Topics
+
+#### Create Standard Topic
+```bash
+# Create a standard SNS topic
+aws sns create-topic --name MyStandardTopic
+
+# Create topic with display name
+aws sns create-topic \
+  --name MyTopic \
+  --attributes DisplayName="My Production Topic"
+
+# Create topic with tags
+aws sns create-topic \
+  --name MyTaggedTopic \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+```
+
+#### Create FIFO Topic
+```bash
+# Create FIFO topic with content-based deduplication
+aws sns create-topic \
+  --name MyFIFOTopic.fifo \
+  --attributes FifoTopic=true,ContentBasedDeduplication=true
+
+# Create FIFO topic without content-based deduplication
+aws sns create-topic \
+  --name MyFIFOTopic.fifo \
+  --attributes FifoTopic=true,ContentBasedDeduplication=false
+```
+
+#### List and Get Topics
+```bash
+# List all topics
+aws sns list-topics
+
+# List topics with pagination
+aws sns list-topics --max-items 10
+
+# Get topic attributes
+aws sns get-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic
+```
+
+#### Configure Topic Attributes
+```bash
+# Set topic display name
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name DisplayName \
+  --attribute-value "Production Alerts"
+
+# Enable server-side encryption with AWS managed key
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name KmsMasterKeyId \
+  --attribute-value alias/aws/sns
+
+# Enable server-side encryption with customer managed key
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name KmsMasterKeyId \
+  --attribute-value arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Set delivery status logging for Lambda
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name LambdaSuccessFeedbackRoleArn \
+  --attribute-value arn:aws:iam::123456789012:role/SNSSuccessFeedback
+
+# Set delivery policy for retries
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name DeliveryPolicy \
+  --attribute-value '{"http":{"defaultHealthyRetryPolicy":{"minDelayTarget":20,"maxDelayTarget":20,"numRetries":3}}}'
+```
+
+#### Delete Topic
+```bash
+# Delete SNS topic (also deletes all subscriptions)
+aws sns delete-topic \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic
+```
+
+### Manage Subscriptions
+
+#### Email Subscriptions
+```bash
+# Subscribe email address to topic
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol email \
+  --notification-endpoint user@example.com
+
+# Subscribe with return subscription ARN
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol email \
+  --notification-endpoint user@example.com \
+  --return-subscription-arn
+
+# Subscribe email-json (receives full JSON message)
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol email-json \
+  --notification-endpoint admin@example.com
+```
+
+#### SMS Subscriptions
+```bash
+# Subscribe phone number to topic
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol sms \
+  --notification-endpoint +1234567890
+
+# Set SMS attributes for account
+aws sns set-sms-attributes \
+  --attributes DefaultSMSType=Transactional
+
+# Get SMS attributes
+aws sns get-sms-attributes
+```
+
+#### HTTP/HTTPS Subscriptions
+```bash
+# Subscribe HTTP endpoint
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol http \
+  --notification-endpoint http://example.com/sns-endpoint
+
+# Subscribe HTTPS endpoint
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol https \
+  --notification-endpoint https://example.com/sns-endpoint
+```
+
+#### Lambda Subscriptions
+```bash
+# Subscribe Lambda function to topic
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol lambda \
+  --notification-endpoint arn:aws:lambda:us-east-1:123456789012:function:MyFunction
+
+# Add Lambda permission for SNS to invoke
+aws lambda add-permission \
+  --function-name MyFunction \
+  --statement-id sns-invoke \
+  --action lambda:InvokeFunction \
+  --principal sns.amazonaws.com \
+  --source-arn arn:aws:sns:us-east-1:123456789012:MyTopic
+```
+
+#### SQS Subscriptions
+```bash
+# Subscribe SQS queue to topic
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --protocol sqs \
+  --notification-endpoint arn:aws:sqs:us-east-1:123456789012:MyQueue
+
+# Subscribe SQS FIFO queue to SNS FIFO topic
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyFIFOTopic.fifo \
+  --protocol sqs \
+  --notification-endpoint arn:aws:sqs:us-east-1:123456789012:MyQueue.fifo
+```
+
+#### List and Manage Subscriptions
+```bash
+# List all subscriptions
+aws sns list-subscriptions
+
+# List subscriptions for a specific topic
+aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic
+
+# Get subscription attributes
+aws sns get-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012
+
+# Confirm pending subscription (for HTTP/HTTPS/Email)
+aws sns confirm-subscription \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --token <token-from-confirmation-message>
+
+# Unsubscribe from topic
+aws sns unsubscribe \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012
+```
+
+### Publish Messages
+
+#### Publish to Standard Topic
+```bash
+# Publish simple message
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Hello from SNS!"
+
+# Publish message with subject
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Important notification" \
+  --subject "Alert: System Status"
+
+# Publish message from file
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message file://message.txt
+
+# Publish JSON message
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message '{"status":"active","count":42}'
+```
+
+#### Publish to FIFO Topic
+```bash
+# Publish to FIFO topic with message group ID
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyFIFOTopic.fifo \
+  --message "Ordered message 1" \
+  --message-group-id "order-group-1" \
+  --message-deduplication-id "unique-id-1"
+
+# Publish to FIFO topic with content-based deduplication
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyFIFOTopic.fifo \
+  --message "This message will be deduplicated based on content" \
+  --message-group-id "order-group-1"
+```
+
+#### Publish to Phone Number (Direct SMS)
+```bash
+# Send SMS directly to phone number (no topic needed)
+aws sns publish \
+  --phone-number +1234567890 \
+  --message "Your verification code is 123456"
+
+# Send SMS with sender ID
+aws sns publish \
+  --phone-number +1234567890 \
+  --message "Your order has shipped!" \
+  --message-attributes '{"AWS.SNS.SMS.SenderID":{"DataType":"String","StringValue":"MyCompany"}}'
+```
+
+### Message Attributes
+
+#### Publish with Message Attributes
+```bash
+# Publish message with string attributes
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Order placed" \
+  --message-attributes '{
+    "store": {"DataType":"String", "StringValue":"example_store"},
+    "customer_type": {"DataType":"String", "StringValue":"premium"}
+  }'
+
+# Publish message with numeric attributes
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Price alert" \
+  --message-attributes '{
+    "price": {"DataType":"Number", "StringValue":"99.99"},
+    "quantity": {"DataType":"Number", "StringValue":"5"}
+  }'
+
+# Publish message with binary attributes
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Binary data notification" \
+  --message-attributes '{
+    "data": {"DataType":"Binary", "BinaryValue":"base64-encoded-data"}
+  }'
+
+# Publish message with string array
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --message "Multi-region deployment" \
+  --message-attributes '{
+    "regions": {"DataType":"String.Array", "StringValue":"[\"us-east-1\",\"us-west-2\",\"eu-west-1\"]"}
+  }'
+```
+
+### Message Filtering
+
+#### Set Filter Policy on Subscription
+```bash
+# Set filter policy for exact string match
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"store":["example_store"]}'
+
+# Set filter policy for multiple values (OR condition)
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"customer_type":["premium","gold"]}'
+
+# Set filter policy with numeric range
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"price":[{"numeric":[">",100]}]}'
+
+# Set complex filter policy (AND conditions)
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{
+    "store": ["example_store"],
+    "event_type": ["order"],
+    "price": [{"numeric":[">=",100]}]
+  }'
+
+# Set filter policy with exists check
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{"urgent":[{"exists":true}]}'
+
+# Remove filter policy
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicy \
+  --attribute-value '{}'
+```
+
+#### Set Filter Policy Scope
+```bash
+# Set filter policy scope to MessageAttributes (default)
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicyScope \
+  --attribute-value MessageAttributes
+
+# Set filter policy scope to MessageBody
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name FilterPolicyScope \
+  --attribute-value MessageBody
+```
+
+### Advanced Subscription Configuration
+
+#### Configure Raw Message Delivery
+```bash
+# Enable raw message delivery (for SQS/HTTP/S)
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name RawMessageDelivery \
+  --attribute-value true
+
+# Disable raw message delivery
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name RawMessageDelivery \
+  --attribute-value false
+```
+
+#### Configure Dead Letter Queue
+```bash
+# Set DLQ for subscription
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name RedrivePolicy \
+  --attribute-value '{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:MyDLQ"}'
+
+# Remove DLQ configuration
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name RedrivePolicy \
+  --attribute-value ''
+```
+
+#### Configure Delivery Status
+```bash
+# Enable delivery status logging for HTTP
+aws sns set-subscription-attributes \
+  --subscription-arn arn:aws:sns:us-east-1:123456789012:MyTopic:12345678-1234-1234-1234-123456789012 \
+  --attribute-name DeliveryPolicy \
+  --attribute-value '{"healthyRetryPolicy":{"numRetries":3,"minDelayTarget":10,"maxDelayTarget":30}}'
+```
+
+### Topic Policies
+
+#### Set Topic Policy
+```bash
+# Allow all AWS accounts to subscribe
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name Policy \
+  --attribute-value '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"AWS": "*"},
+      "Action": "SNS:Subscribe",
+      "Resource": "arn:aws:sns:us-east-1:123456789012:MyTopic"
+    }]
+  }'
+
+# Allow specific AWS service to publish
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name Policy \
+  --attribute-value '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "cloudwatch.amazonaws.com"},
+      "Action": "SNS:Publish",
+      "Resource": "arn:aws:sns:us-east-1:123456789012:MyTopic"
+    }]
+  }'
+
+# Cross-account topic access
+aws sns set-topic-attributes \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --attribute-name Policy \
+  --attribute-value '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
+      "Action": ["SNS:Subscribe", "SNS:Receive"],
+      "Resource": "arn:aws:sns:us-east-1:123456789012:MyTopic"
+    }]
+  }'
+```
+
+### Tags Management
+
+```bash
+# Add tags to topic
+aws sns tag-resource \
+  --resource-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --tags Key=Environment,Value=Production Key=CostCenter,Value=Engineering
+
+# List tags for topic
+aws sns list-tags-for-resource \
+  --resource-arn arn:aws:sns:us-east-1:123456789012:MyTopic
+
+# Remove tags from topic
+aws sns untag-resource \
+  --resource-arn arn:aws:sns:us-east-1:123456789012:MyTopic \
+  --tag-keys Environment CostCenter
+```
+
+### Platform Applications (Mobile Push)
+
+#### Create Platform Application
+```bash
+# Create platform application for iOS (APNS)
+aws sns create-platform-application \
+  --name MyiOSApp \
+  --platform APNS \
+  --attributes PlatformCredential=<certificate>,PlatformPrincipal=<private-key>
+
+# Create platform application for Android (FCM)
+aws sns create-platform-application \
+  --name MyAndroidApp \
+  --platform GCM \
+  --attributes PlatformCredential=<api-key>
+
+# List platform applications
+aws sns list-platform-applications
+
+# Get platform application attributes
+aws sns get-platform-application-attributes \
+  --platform-application-arn arn:aws:sns:us-east-1:123456789012:app/APNS/MyiOSApp
+```
+
+#### Manage Platform Endpoints
+```bash
+# Create platform endpoint (register device)
+aws sns create-platform-endpoint \
+  --platform-application-arn arn:aws:sns:us-east-1:123456789012:app/APNS/MyiOSApp \
+  --token <device-token>
+
+# List endpoints for platform application
+aws sns list-endpoints-by-platform-application \
+  --platform-application-arn arn:aws:sns:us-east-1:123456789012:app/APNS/MyiOSApp
+
+# Publish to mobile device
+aws sns publish \
+  --target-arn arn:aws:sns:us-east-1:123456789012:endpoint/APNS/MyiOSApp/12345678-1234-1234-1234-123456789012 \
+  --message '{"APNS":"{\\"aps\\":{\\"alert\\":\\"Hello from SNS!\\"}}"}'   --message-structure json
+
+# Delete platform endpoint
+aws sns delete-endpoint \
+  --endpoint-arn arn:aws:sns:us-east-1:123456789012:endpoint/APNS/MyiOSApp/12345678-1234-1234-1234-123456789012
+
+# Delete platform application
+aws sns delete-platform-application \
+  --platform-application-arn arn:aws:sns:us-east-1:123456789012:app/APNS/MyiOSApp
+```
+
+### Monitoring and Troubleshooting
+
+```bash
+# Check if phone number is opted out
+aws sns check-if-phone-number-is-opted-out \
+  --phone-number +1234567890
+
+# List opted out phone numbers
+aws sns list-phone-numbers-opted-out
+
+# Opt in phone number
+aws sns opt-in-phone-number \
+  --phone-number +1234567890
+
+# Get SMS sandbox account status
+aws sns get-sms-sandbox-account-status
+
+# List SMS sandbox phone numbers
+aws sns list-sms-sandbox-phone-numbers
+```
+
+### Batch Operations
+
+```bash
+# Publish batch messages to FIFO topic
+aws sns publish-batch \
+  --topic-arn arn:aws:sns:us-east-1:123456789012:MyFIFOTopic.fifo \
+  --publish-batch-request-entries file://batch-messages.json
+
+# Example batch-messages.json:
+# [
+#   {
+#     "Id": "1",
+#     "Message": "First message",
+#     "MessageGroupId": "group1",
+#     "MessageDeduplicationId": "dedup1"
+#   },
+#   {
+#     "Id": "2",
+#     "Message": "Second message", 
+#     "MessageGroupId": "group1",
+#     "MessageDeduplicationId": "dedup2"
+#   }
+# ]
+```
 
 ---
 

@@ -10,7 +10,8 @@
 7. [Best Practices](#best-practices)
 8. [Troubleshooting](#troubleshooting)
 9. [Cost Optimization](#cost-optimization)
-10. [Exam Tips and Key Takeaways](#exam-tips-and-key-takeaways)
+10. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+11. [Exam Tips and Key Takeaways](#exam-tips-and-key-takeaways)
 
 ---
 
@@ -1162,6 +1163,481 @@ aws cur put-report-definition \
         "S3Region": "us-east-1",
         "AdditionalArtifacts": ["REDSHIFT", "QUICKSIGHT"]
     }'
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Creating KMS Keys
+
+#### Create a Symmetric KMS Key
+```bash
+# Create a standard symmetric key for encryption/decryption
+aws kms create-key \
+  --description "My application encryption key" \
+  --key-usage ENCRYPT_DECRYPT \
+  --origin AWS_KMS
+
+# Create a symmetric key with tags
+aws kms create-key \
+  --description "Production database encryption key" \
+  --key-usage ENCRYPT_DECRYPT \
+  --tags TagKey=Environment,TagValue=Production TagKey=Application,TagValue=Database
+
+# Create a symmetric key with automatic rotation enabled
+KEY_ID=$(aws kms create-key \
+  --description "Auto-rotating encryption key" \
+  --key-usage ENCRYPT_DECRYPT \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+aws kms enable-key-rotation --key-id $KEY_ID
+```
+
+#### Create Asymmetric KMS Keys
+```bash
+# Create RSA key pair for encryption/decryption
+aws kms create-key \
+  --description "RSA key for asymmetric encryption" \
+  --key-usage ENCRYPT_DECRYPT \
+  --key-spec RSA_4096
+
+# Create RSA key pair for signing/verification
+aws kms create-key \
+  --description "RSA key for digital signatures" \
+  --key-usage SIGN_VERIFY \
+  --key-spec RSA_4096
+
+# Create ECC key pair for signing
+aws kms create-key \
+  --description "ECC key for digital signatures" \
+  --key-usage SIGN_VERIFY \
+  --key-spec ECC_NIST_P384
+```
+
+### Key Aliases
+
+#### Create and Manage Aliases
+```bash
+# Create an alias for a key
+aws kms create-alias \
+  --alias-name alias/my-application-key \
+  --target-key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Update an alias to point to a different key
+aws kms update-alias \
+  --alias-name alias/my-application-key \
+  --target-key-id abcd1234-ab12-cd34-ef56-abcdef123456
+
+# List all aliases
+aws kms list-aliases
+
+# List aliases for a specific key
+aws kms list-aliases \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Delete an alias
+aws kms delete-alias \
+  --alias-name alias/old-application-key
+```
+
+### Encrypting and Decrypting Data
+
+#### Symmetric Encryption Operations
+```bash
+# Encrypt plaintext data (max 4KB)
+aws kms encrypt \
+  --key-id alias/my-application-key \
+  --plaintext "Sensitive data to encrypt" \
+  --output text \
+  --query CiphertextBlob | base64 --decode > encrypted_data.bin
+
+# Encrypt with encryption context for additional security
+aws kms encrypt \
+  --key-id alias/my-application-key \
+  --plaintext fileb://plaintext.txt \
+  --encryption-context Department=Finance,Purpose=Audit \
+  --query CiphertextBlob \
+  --output text | base64 --decode > encrypted.bin
+
+# Decrypt encrypted data
+aws kms decrypt \
+  --ciphertext-blob fileb://encrypted_data.bin \
+  --query Plaintext \
+  --output text | base64 --decode
+
+# Decrypt with encryption context validation
+aws kms decrypt \
+  --ciphertext-blob fileb://encrypted.bin \
+  --encryption-context Department=Finance,Purpose=Audit \
+  --query Plaintext \
+  --output text | base64 --decode
+```
+
+#### Re-encryption Operations
+```bash
+# Re-encrypt data with a different key (for key rotation)
+aws kms re-encrypt \
+  --ciphertext-blob fileb://old_encrypted.bin \
+  --destination-key-id alias/new-application-key \
+  --query CiphertextBlob \
+  --output text | base64 --decode > new_encrypted.bin
+
+# Re-encrypt with new encryption context
+aws kms re-encrypt \
+  --ciphertext-blob fileb://encrypted.bin \
+  --source-encryption-context Department=Finance \
+  --destination-key-id alias/my-key \
+  --destination-encryption-context Department=Finance,Rotated=true \
+  --query CiphertextBlob \
+  --output text | base64 --decode > rotated.bin
+```
+
+### Data Key Generation
+
+#### Generate Data Keys for Envelope Encryption
+```bash
+# Generate a 256-bit data key
+aws kms generate-data-key \
+  --key-id alias/my-application-key \
+  --key-spec AES_256 \
+  --query '{Plaintext:Plaintext,CiphertextBlob:CiphertextBlob}'
+
+# Generate data key with encryption context
+aws kms generate-data-key \
+  --key-id alias/my-application-key \
+  --key-spec AES_256 \
+  --encryption-context Application=MyApp,Environment=Production
+
+# Generate data key without plaintext (for distributed systems)
+aws kms generate-data-key-without-plaintext \
+  --key-id alias/my-application-key \
+  --key-spec AES_256
+
+# Generate a random 32-byte data key
+aws kms generate-data-key \
+  --key-id alias/my-application-key \
+  --number-of-bytes 32
+
+# Generate random bytes for salts, IVs, etc.
+aws kms generate-random \
+  --number-of-bytes 32 \
+  --query Plaintext \
+  --output text | base64 --decode > random_bytes.bin
+```
+
+### Key Policies and Permissions
+
+#### View and Update Key Policies
+```bash
+# Get the key policy for a key
+aws kms get-key-policy \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --policy-name default
+
+# Create a key policy JSON file
+cat > key-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Enable IAM User Permissions",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow use of the key for encryption",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:role/MyAppRole"},
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow attachment of persistent resources",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:role/MyAppRole"},
+      "Action": [
+        "kms:CreateGrant",
+        "kms:ListGrants",
+        "kms:RevokeGrant"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "Bool": {"kms:GrantIsForAWSResource": "true"}
+      }
+    }
+  ]
+}
+EOF
+
+# Update the key policy
+aws kms put-key-policy \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --policy-name default \
+  --policy file://key-policy.json
+```
+
+### Grants Management
+
+#### Create and Manage Grants
+```bash
+# Create a grant for an IAM role to use a key
+aws kms create-grant \
+  --key-id alias/my-application-key \
+  --grantee-principal arn:aws:iam::123456789012:role/MyAppRole \
+  --operations Encrypt Decrypt GenerateDataKey DescribeKey
+
+# Create a grant with constraints
+aws kms create-grant \
+  --key-id alias/my-application-key \
+  --grantee-principal arn:aws:iam::123456789012:role/MyAppRole \
+  --operations Encrypt Decrypt \
+  --constraints EncryptionContextSubset={Department=Finance} \
+  --retiring-principal arn:aws:iam::123456789012:role/AdminRole
+
+# List grants for a key
+aws kms list-grants \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Retire a grant
+aws kms retire-grant \
+  --grant-token <grant-token-from-create-grant>
+
+# Revoke a grant
+aws kms revoke-grant \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --grant-id 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd
+```
+
+### Key Rotation
+
+#### Enable and Manage Automatic Rotation
+```bash
+# Enable automatic key rotation (yearly)
+aws kms enable-key-rotation \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Check if key rotation is enabled
+aws kms get-key-rotation-status \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Disable key rotation
+aws kms disable-key-rotation \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# List key rotations (shows rotation history)
+aws kms list-key-rotations \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Rotate key on-demand (for customer managed keys)
+aws kms rotate-key-on-demand \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+```
+
+### Key State Management
+
+#### Enable, Disable, and Delete Keys
+```bash
+# Describe a key to check its status
+aws kms describe-key \
+  --key-id alias/my-application-key
+
+# Disable a key (prevents its use but keeps it for decryption)
+aws kms disable-key \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Enable a previously disabled key
+aws kms enable-key \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Schedule key deletion (7-30 day waiting period)
+aws kms schedule-key-deletion \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --pending-window-in-days 30
+
+# Cancel key deletion
+aws kms cancel-key-deletion \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+```
+
+### Importing Key Material
+
+#### Import External Key Material
+```bash
+# Step 1: Create a key with no key material (EXTERNAL origin)
+KEY_ID=$(aws kms create-key \
+  --description "Key with imported material" \
+  --origin EXTERNAL \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+# Step 2: Download wrapping key and import token
+aws kms get-parameters-for-import \
+  --key-id $KEY_ID \
+  --wrapping-algorithm RSAES_OAEP_SHA_256 \
+  --wrapping-key-spec RSA_2048 \
+  --query '{PublicKey:PublicKey,ImportToken:ImportToken}' > import-params.json
+
+# Extract and save the public key
+jq -r '.PublicKey' import-params.json | base64 --decode > wrapping-key.bin
+
+# Extract and save the import token
+jq -r '.ImportToken' import-params.json | base64 --decode > import-token.bin
+
+# Step 3: Generate or obtain your key material (256-bit for AES-256)
+openssl rand -out key-material.bin 32
+
+# Step 4: Encrypt your key material with the wrapping key
+openssl pkeyutl \
+  -encrypt \
+  -in key-material.bin \
+  -out encrypted-key-material.bin \
+  -inkey wrapping-key.bin \
+  -keyform DER \
+  -pubin \
+  -pkeyopt rsa_padding_mode:oaep \
+  -pkeyopt rsa_oaep_md:sha256
+
+# Step 5: Import the encrypted key material
+aws kms import-key-material \
+  --key-id $KEY_ID \
+  --encrypted-key-material fileb://encrypted-key-material.bin \
+  --import-token fileb://import-token.bin \
+  --expiration-model KEY_MATERIAL_DOES_NOT_EXPIRE
+
+# Delete imported key material (keeps the key metadata)
+aws kms delete-imported-key-material \
+  --key-id $KEY_ID
+```
+
+### Listing and Describing Keys
+
+#### Query KMS Keys
+```bash
+# List all KMS keys in the account
+aws kms list-keys
+
+# List keys with pagination
+aws kms list-keys --max-results 10
+
+# Describe a specific key
+aws kms describe-key \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# List resource tags for a key
+aws kms list-resource-tags \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab
+
+# Tag a key
+aws kms tag-resource \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --tags TagKey=CostCenter,TagValue=Engineering TagKey=Owner,TagValue=SecurityTeam
+
+# Untag a key
+aws kms untag-resource \
+  --key-id 1234abcd-12ab-34cd-56ef-1234567890ab \
+  --tag-keys CostCenter Owner
+```
+
+### Multi-Region Keys
+
+#### Create and Manage Multi-Region Keys
+```bash
+# Create a multi-region primary key
+PRIMARY_KEY_ID=$(aws kms create-key \
+  --description "Multi-region primary key" \
+  --multi-region \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+# Replicate the key to another region
+aws kms replicate-key \
+  --key-id $PRIMARY_KEY_ID \
+  --replica-region eu-west-1 \
+  --description "EU replica of primary key"
+
+# List all replicas of a multi-region key
+aws kms describe-key \
+  --key-id $PRIMARY_KEY_ID \
+  --query 'KeyMetadata.MultiRegionConfiguration'
+
+# Update primary region (promote a replica)
+REPLICA_KEY_ID="mrk-1234567890abcdef"
+aws kms update-primary-region \
+  --key-id $PRIMARY_KEY_ID \
+  --primary-region eu-west-1
+```
+
+### Signing and Verification (Asymmetric Keys)
+
+#### Digital Signatures
+```bash
+# Create an asymmetric key for signing
+SIGN_KEY_ID=$(aws kms create-key \
+  --description "Digital signature key" \
+  --key-usage SIGN_VERIFY \
+  --key-spec RSA_4096 \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+# Sign a message
+aws kms sign \
+  --key-id $SIGN_KEY_ID \
+  --message fileb://message.txt \
+  --message-type RAW \
+  --signing-algorithm RSASSA_PKCS1_V1_5_SHA_256 \
+  --query Signature \
+  --output text | base64 --decode > signature.bin
+
+# Get the public key for verification
+aws kms get-public-key \
+  --key-id $SIGN_KEY_ID \
+  --query PublicKey \
+  --output text | base64 --decode > public-key.der
+
+# Verify a signature
+aws kms verify \
+  --key-id $SIGN_KEY_ID \
+  --message fileb://message.txt \
+  --message-type RAW \
+  --signature fileb://signature.bin \
+  --signing-algorithm RSASSA_PKCS1_V1_5_SHA_256
+```
+
+### CloudWatch Integration
+
+#### Monitor KMS Usage
+```bash
+# Get CloudWatch metrics for KMS usage
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/KMS \
+  --metric-name NumberOfCalls \
+  --dimensions Name=KeyId,Value=1234abcd-12ab-34cd-56ef-1234567890ab \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-31T23:59:59Z \
+  --period 86400 \
+  --statistics Sum
+
+# Set up CloudWatch alarm for KMS key usage
+aws cloudwatch put-metric-alarm \
+  --alarm-name kms-high-usage \
+  --alarm-description "Alert when KMS key usage is high" \
+  --metric-name NumberOfCalls \
+  --namespace AWS/KMS \
+  --statistic Sum \
+  --period 300 \
+  --threshold 1000 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 2
 ```
 
 ---

@@ -18,7 +18,8 @@
 15. [Monitoring and Alerting](#monitoring-and-alerting)
 16. [Troubleshooting](#troubleshooting)
 17. [Best Practices](#best-practices)
-18. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+18. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+19. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 
 ---
 
@@ -1552,6 +1553,692 @@ def config_change_handler(event, context):
 - Alert on configuration recorder failures
 - Track compliance trend changes
 - Monitor for unusual rule evaluation patterns
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing AWS Config resources.
+
+### Configuration Recorder Management
+
+#### Create Configuration Recorder
+
+```bash
+# Create a basic configuration recorder
+aws configservice put-configuration-recorder \
+  --configuration-recorder name=default,roleARN=arn:aws:iam::123456789012:role/aws-config-role \
+  --recording-group allSupported=true,includeGlobalResourceTypes=true
+
+# Create configuration recorder for specific resource types
+aws configservice put-configuration-recorder \
+  --configuration-recorder '{"name":"default","roleARN":"arn:aws:iam::123456789012:role/aws-config-role"}' \
+  --recording-group '{"allSupported":false,"includeGlobalResourceTypes":false,"resourceTypes":["AWS::EC2::Instance","AWS::EC2::SecurityGroup","AWS::S3::Bucket"]}'
+
+# Create configuration recorder with exclusion by resource types
+aws configservice put-configuration-recorder \
+  --configuration-recorder name=default,roleARN=arn:aws:iam::123456789012:role/aws-config-role \
+  --recording-group '{"allSupported":true,"includeGlobalResourceTypes":true,"exclusionByResourceTypes":{"resourceTypes":["AWS::EC2::NetworkInterface"]}}'
+
+# Create configuration recorder using JSON file
+aws configservice put-configuration-recorder \
+  --configuration-recorder file://config-recorder.json \
+  --recording-group file://recording-group.json
+```
+
+#### Start and Stop Configuration Recorder
+
+```bash
+# Start configuration recorder
+aws configservice start-configuration-recorder \
+  --configuration-recorder-name default
+
+# Stop configuration recorder
+aws configservice stop-configuration-recorder \
+  --configuration-recorder-name default
+```
+
+#### Describe Configuration Recorders
+
+```bash
+# Describe all configuration recorders
+aws configservice describe-configuration-recorders
+
+# Describe specific configuration recorder
+aws configservice describe-configuration-recorders \
+  --configuration-recorder-names default
+
+# Get configuration recorder status
+aws configservice describe-configuration-recorder-status
+
+# Get status of specific recorder
+aws configservice describe-configuration-recorder-status \
+  --configuration-recorder-names default
+```
+
+#### Delete Configuration Recorder
+
+```bash
+# Delete configuration recorder
+aws configservice delete-configuration-recorder \
+  --configuration-recorder-name default
+```
+
+### Delivery Channel Management
+
+#### Create Delivery Channel
+
+```bash
+# Create basic delivery channel
+aws configservice put-delivery-channel \
+  --delivery-channel name=default,s3BucketName=my-config-bucket
+
+# Create delivery channel with SNS topic
+aws configservice put-delivery-channel \
+  --delivery-channel '{"name":"default","s3BucketName":"my-config-bucket","snsTopicARN":"arn:aws:sns:us-east-1:123456789012:config-topic"}'
+
+# Create delivery channel with custom delivery frequency
+aws configservice put-delivery-channel \
+  --delivery-channel '{"name":"default","s3BucketName":"my-config-bucket","configSnapshotDeliveryProperties":{"deliveryFrequency":"Six_Hours"}}'
+
+# Create delivery channel with S3 key prefix
+aws configservice put-delivery-channel \
+  --delivery-channel '{"name":"default","s3BucketName":"my-config-bucket","s3KeyPrefix":"config-logs/production"}'
+```
+
+#### Describe Delivery Channels
+
+```bash
+# Describe all delivery channels
+aws configservice describe-delivery-channels
+
+# Describe specific delivery channel
+aws configservice describe-delivery-channels \
+  --delivery-channel-names default
+
+# Get delivery channel status
+aws configservice describe-delivery-channel-status
+
+# Get status of specific delivery channel
+aws configservice describe-delivery-channel-status \
+  --delivery-channel-names default
+```
+
+#### Delete Delivery Channel
+
+```bash
+# Delete delivery channel
+aws configservice delete-delivery-channel \
+  --delivery-channel-name default
+```
+
+### Config Rules Management
+
+#### Create Managed Config Rules
+
+```bash
+# Create a managed config rule (encrypted-volumes)
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"encrypted-volumes","Source":{"Owner":"AWS","SourceIdentifier":"ENCRYPTED_VOLUMES"}}'
+
+# Create managed rule with scope
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"s3-bucket-public-read-prohibited","Scope":{"ComplianceResourceTypes":["AWS::S3::Bucket"]},"Source":{"Owner":"AWS","SourceIdentifier":"S3_BUCKET_PUBLIC_READ_PROHIBITED"}}'
+
+# Create managed rule with input parameters
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"required-tags","InputParameters":"{\"tag1Key\":\"Environment\",\"tag2Key\":\"Owner\"}","Source":{"Owner":"AWS","SourceIdentifier":"REQUIRED_TAGS"}}'
+
+# Create rule with custom maximum execution frequency
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"iam-password-policy","Source":{"Owner":"AWS","SourceIdentifier":"IAM_PASSWORD_POLICY"},"MaximumExecutionFrequency":"TwentyFour_Hours"}'
+
+# Common managed rules examples
+# S3 bucket versioning enabled
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"s3-bucket-versioning-enabled","Scope":{"ComplianceResourceTypes":["AWS::S3::Bucket"]},"Source":{"Owner":"AWS","SourceIdentifier":"S3_BUCKET_VERSIONING_ENABLED"}}'
+
+# RDS storage encrypted
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"rds-storage-encrypted","Scope":{"ComplianceResourceTypes":["AWS::RDS::DBInstance"]},"Source":{"Owner":"AWS","SourceIdentifier":"RDS_STORAGE_ENCRYPTED"}}'
+
+# EC2 instances in VPC
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"ec2-instances-in-vpc","Scope":{"ComplianceResourceTypes":["AWS::EC2::Instance"]},"Source":{"Owner":"AWS","SourceIdentifier":"INSTANCES_IN_VPC"}}'
+```
+
+#### Create Custom Config Rules
+
+```bash
+# Create custom Lambda-based config rule
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"custom-compliance-rule","Source":{"Owner":"CUSTOM_LAMBDA","SourceIdentifier":"arn:aws:lambda:us-east-1:123456789012:function:CustomConfigRule","SourceDetails":[{"EventSource":"aws.config","MessageType":"ConfigurationItemChangeNotification"}]},"Scope":{"ComplianceResourceTypes":["AWS::EC2::Instance"]}}'
+
+# Create custom rule with periodic trigger
+aws configservice put-config-rule \
+  --config-rule '{"ConfigRuleName":"periodic-custom-rule","Source":{"Owner":"CUSTOM_LAMBDA","SourceIdentifier":"arn:aws:lambda:us-east-1:123456789012:function:PeriodicCheck","SourceDetails":[{"EventSource":"aws.config","MessageType":"ScheduledNotification","MaximumExecutionFrequency":"TwentyFour_Hours"}]}}'
+
+# Create custom rule from file
+aws configservice put-config-rule \
+  --config-rule file://custom-rule-config.json
+```
+
+#### Describe Config Rules
+
+```bash
+# List all config rules
+aws configservice describe-config-rules
+
+# Describe specific config rule
+aws configservice describe-config-rules \
+  --config-rule-names encrypted-volumes
+
+# List multiple rules
+aws configservice describe-config-rules \
+  --config-rule-names encrypted-volumes s3-bucket-versioning-enabled
+
+# Get rule with output in table format
+aws configservice describe-config-rules \
+  --output table
+```
+
+#### Delete Config Rules
+
+```bash
+# Delete a config rule
+aws configservice delete-config-rule \
+  --config-rule-name encrypted-volumes
+```
+
+### Compliance Status and Evaluation
+
+#### Check Compliance Status
+
+```bash
+# Get compliance summary by config rule
+aws configservice describe-compliance-by-config-rule
+
+# Get compliance for specific rule
+aws configservice describe-compliance-by-config-rule \
+  --config-rule-names encrypted-volumes
+
+# Get compliance summary by resource
+aws configservice describe-compliance-by-resource
+
+# Get compliance for specific resource type
+aws configservice describe-compliance-by-resource \
+  --resource-type AWS::EC2::Instance
+
+# Get compliance for specific resource
+aws configservice describe-compliance-by-resource \
+  --resource-type AWS::S3::Bucket \
+  --resource-id my-bucket
+
+# Get aggregate compliance status
+aws configservice get-aggregate-compliance-details-by-config-rule \
+  --configuration-aggregator-name my-aggregator \
+  --config-rule-name encrypted-volumes \
+  --account-id 123456789012 \
+  --aws-region us-east-1
+```
+
+#### Trigger Rule Evaluation
+
+```bash
+# Start config rule evaluation
+aws configservice start-config-rules-evaluation \
+  --config-rule-names encrypted-volumes
+
+# Start evaluation for multiple rules
+aws configservice start-config-rules-evaluation \
+  --config-rule-names encrypted-volumes s3-bucket-versioning-enabled
+```
+
+#### Get Compliance Details
+
+```bash
+# Get evaluation results for a rule
+aws configservice get-compliance-details-by-config-rule \
+  --config-rule-name encrypted-volumes
+
+# Get evaluation results for a resource
+aws configservice get-compliance-details-by-resource \
+  --resource-type AWS::EC2::Instance \
+  --resource-id i-1234567890abcdef0
+
+# Get compliance summary
+aws configservice get-compliance-summary-by-config-rule
+
+# Get compliance summary by resource type
+aws configservice get-compliance-summary-by-resource-type
+```
+
+### Resource Configuration History
+
+#### Query Configuration History
+
+```bash
+# List discovered resources
+aws configservice list-discovered-resources \
+  --resource-type AWS::EC2::Instance
+
+# List discovered resources with resource IDs
+aws configservice list-discovered-resources \
+  --resource-type AWS::S3::Bucket \
+  --resource-ids my-bucket another-bucket
+
+# Get resource configuration history
+aws configservice get-resource-config-history \
+  --resource-type AWS::EC2::Instance \
+  --resource-id i-1234567890abcdef0
+
+# Get configuration history with time range
+aws configservice get-resource-config-history \
+  --resource-type AWS::EC2::SecurityGroup \
+  --resource-id sg-12345678 \
+  --earlier-time 2024-01-01T00:00:00Z \
+  --later-time 2024-01-31T23:59:59Z
+
+# Get configuration history with pagination
+aws configservice get-resource-config-history \
+  --resource-type AWS::EC2::Instance \
+  --resource-id i-1234567890abcdef0 \
+  --limit 10
+
+# Get current configuration for a resource
+aws configservice batch-get-resource-config \
+  --resource-keys '[{"resourceType":"AWS::EC2::Instance","resourceId":"i-1234567890abcdef0"}]'
+
+# Get configuration for multiple resources
+aws configservice batch-get-resource-config \
+  --resource-keys '[{"resourceType":"AWS::EC2::Instance","resourceId":"i-1234567890abcdef0"},{"resourceType":"AWS::S3::Bucket","resourceId":"my-bucket"}]'
+```
+
+#### Get Aggregate Resource Configuration
+
+```bash
+# Get aggregate resource count
+aws configservice get-aggregate-discovered-resource-counts \
+  --configuration-aggregator-name my-aggregator
+
+# Get aggregate resource count by resource type
+aws configservice get-aggregate-discovered-resource-counts \
+  --configuration-aggregator-name my-aggregator \
+  --filters '{"ResourceType":"AWS::EC2::Instance"}'
+
+# List aggregate discovered resources
+aws configservice list-aggregate-discovered-resources \
+  --configuration-aggregator-name my-aggregator \
+  --resource-type AWS::EC2::Instance
+
+# Get aggregate resource configuration
+aws configservice batch-get-aggregate-resource-config \
+  --configuration-aggregator-name my-aggregator \
+  --resource-identifiers '[{"SourceAccountId":"123456789012","SourceRegion":"us-east-1","ResourceId":"i-1234567890abcdef0","ResourceType":"AWS::EC2::Instance"}]'
+```
+
+### Configuration Aggregator
+
+#### Create Configuration Aggregator
+
+```bash
+# Create aggregator for specific accounts
+aws configservice put-configuration-aggregator \
+  --configuration-aggregator-name my-aggregator \
+  --account-aggregation-sources '[{"AccountIds":["111111111111","222222222222"],"AllAwsRegions":true}]'
+
+# Create aggregator for organization
+aws configservice put-configuration-aggregator \
+  --configuration-aggregator-name org-aggregator \
+  --organization-aggregation-source '{"RoleArn":"arn:aws:iam::123456789012:role/aws-config-aggregator-role","AllAwsRegions":true}'
+
+# Create aggregator with specific regions
+aws configservice put-configuration-aggregator \
+  --configuration-aggregator-name regional-aggregator \
+  --account-aggregation-sources '[{"AccountIds":["111111111111","222222222222"],"AwsRegions":["us-east-1","us-west-2"]}]'
+```
+
+#### Describe Configuration Aggregators
+
+```bash
+# List all configuration aggregators
+aws configservice describe-configuration-aggregators
+
+# Describe specific aggregator
+aws configservice describe-configuration-aggregators \
+  --configuration-aggregator-names my-aggregator
+
+# Get aggregator source status
+aws configservice describe-configuration-aggregator-sources-status \
+  --configuration-aggregator-name my-aggregator
+```
+
+#### Delete Configuration Aggregator
+
+```bash
+# Delete configuration aggregator
+aws configservice delete-configuration-aggregator \
+  --configuration-aggregator-name my-aggregator
+```
+
+### Conformance Packs
+
+#### Deploy Conformance Packs
+
+```bash
+# Deploy conformance pack from template
+aws configservice put-conformance-pack \
+  --conformance-pack-name operational-best-practices-for-s3 \
+  --template-s3-uri s3://my-bucket/conformance-packs/s3-best-practices.yaml
+
+# Deploy conformance pack with inline template
+aws configservice put-conformance-pack \
+  --conformance-pack-name my-conformance-pack \
+  --template-body file://conformance-pack-template.yaml
+
+# Deploy conformance pack with parameters
+aws configservice put-conformance-pack \
+  --conformance-pack-name parameterized-pack \
+  --template-s3-uri s3://my-bucket/conformance-packs/template.yaml \
+  --conformance-pack-input-parameters '[{"ParameterName":"MinimumPasswordLength","ParameterValue":"14"}]'
+
+# Deploy conformance pack across organization
+aws configservice put-organization-conformance-pack \
+  --organization-conformance-pack-name org-security-pack \
+  --template-s3-uri s3://my-bucket/conformance-packs/security-baseline.yaml
+```
+
+#### Describe Conformance Packs
+
+```bash
+# List all conformance packs
+aws configservice describe-conformance-packs
+
+# Describe specific conformance pack
+aws configservice describe-conformance-packs \
+  --conformance-pack-names operational-best-practices-for-s3
+
+# Get conformance pack status
+aws configservice describe-conformance-pack-status
+
+# Get conformance pack status for specific pack
+aws configservice describe-conformance-pack-status \
+  --conformance-pack-names operational-best-practices-for-s3
+
+# Get conformance pack compliance
+aws configservice describe-conformance-pack-compliance \
+  --conformance-pack-name operational-best-practices-for-s3
+
+# Get conformance pack compliance details
+aws configservice get-conformance-pack-compliance-details \
+  --conformance-pack-name operational-best-practices-for-s3
+```
+
+#### Delete Conformance Packs
+
+```bash
+# Delete conformance pack
+aws configservice delete-conformance-pack \
+  --conformance-pack-name operational-best-practices-for-s3
+
+# Delete organization conformance pack
+aws configservice delete-organization-conformance-pack \
+  --organization-conformance-pack-name org-security-pack
+```
+
+### Organization Config Rules
+
+#### Deploy Organization Config Rules
+
+```bash
+# Deploy organization-wide managed rule
+aws configservice put-organization-config-rule \
+  --organization-config-rule-name org-encrypted-volumes \
+  --organization-managed-rule-metadata '{"RuleIdentifier":"ENCRYPTED_VOLUMES","Description":"Ensure all EBS volumes are encrypted"}'
+
+# Deploy organization custom rule
+aws configservice put-organization-config-rule \
+  --organization-config-rule-name org-custom-compliance \
+  --organization-custom-rule-metadata '{"LambdaFunctionArn":"arn:aws:lambda:us-east-1:123456789012:function:OrgCustomRule","OrganizationConfigRuleTriggerTypes":["ConfigurationItemChangeNotification"],"ResourceTypesScope":["AWS::EC2::Instance"]}'
+
+# Deploy organization rule with exclusions
+aws configservice put-organization-config-rule \
+  --organization-config-rule-name org-s3-encryption \
+  --organization-managed-rule-metadata '{"RuleIdentifier":"S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"}' \
+  --excluded-accounts '111111111111' '222222222222'
+```
+
+#### Describe Organization Config Rules
+
+```bash
+# List all organization config rules
+aws configservice describe-organization-config-rules
+
+# Describe specific organization rule
+aws configservice describe-organization-config-rules \
+  --organization-config-rule-names org-encrypted-volumes
+
+# Get organization rule status
+aws configservice get-organization-config-rule-detailed-status \
+  --organization-config-rule-name org-encrypted-volumes
+```
+
+#### Delete Organization Config Rules
+
+```bash
+# Delete organization config rule
+aws configservice delete-organization-config-rule \
+  --organization-config-rule-name org-encrypted-volumes
+```
+
+### Remediation Configurations
+
+#### Configure Automatic Remediation
+
+```bash
+# Create remediation configuration using SSM automation
+aws configservice put-remediation-configurations \
+  --remediation-configurations '[{
+    "ConfigRuleName": "s3-bucket-public-read-prohibited",
+    "TargetType": "SSM_DOCUMENT",
+    "TargetIdentifier": "AWS-PublishSNSNotification",
+    "TargetVersion": "1",
+    "Parameters": {
+      "AutomationAssumeRole": {"StaticValue": {"Values": ["arn:aws:iam::123456789012:role/AutomationRole"]}},
+      "TopicArn": {"StaticValue": {"Values": ["arn:aws:sns:us-east-1:123456789012:config-remediation"]}},
+      "Message": {"StaticValue": {"Values": ["S3 bucket has public read access"]}}
+    },
+    "Automatic": true,
+    "MaximumAutomaticAttempts": 5,
+    "RetryAttemptSeconds": 60
+  }]'
+
+# Create remediation with resource value parameters
+aws configservice put-remediation-configurations \
+  --remediation-configurations '[{
+    "ConfigRuleName": "encrypted-volumes",
+    "TargetType": "SSM_DOCUMENT",
+    "TargetIdentifier": "AWS-EnableEBSEncryptionByDefault",
+    "Parameters": {
+      "AutomationAssumeRole": {"StaticValue": {"Values": ["arn:aws:iam::123456789012:role/AutomationRole"]}}
+    },
+    "Automatic": true
+  }]'
+```
+
+#### Describe Remediation Configurations
+
+```bash
+# Get remediation configurations for a rule
+aws configservice describe-remediation-configurations \
+  --config-rule-names s3-bucket-public-read-prohibited
+
+# Get remediation execution status
+aws configservice describe-remediation-execution-status \
+  --config-rule-name s3-bucket-public-read-prohibited
+
+# Get remediation execution status for specific resource
+aws configservice describe-remediation-execution-status \
+  --config-rule-name encrypted-volumes \
+  --resource-keys '[{"resourceType":"AWS::EC2::Volume","resourceId":"vol-1234567890abcdef0"}]'
+```
+
+#### Start Manual Remediation
+
+```bash
+# Start remediation execution
+aws configservice start-remediation-execution \
+  --config-rule-name encrypted-volumes \
+  --resource-keys '[{"resourceType":"AWS::EC2::Volume","resourceId":"vol-1234567890abcdef0"}]'
+```
+
+#### Delete Remediation Configuration
+
+```bash
+# Delete remediation configuration
+aws configservice delete-remediation-configuration \
+  --config-rule-name s3-bucket-public-read-prohibited
+```
+
+### Configuration Snapshots
+
+```bash
+# Deliver configuration snapshot
+aws configservice deliver-config-snapshot \
+  --delivery-channel-name default
+
+# Get configuration snapshot (from S3 after delivery)
+# Note: Snapshots are delivered to S3 bucket specified in delivery channel
+aws s3 cp s3://my-config-bucket/AWSLogs/123456789012/Config/us-east-1/2024/1/15/ConfigSnapshot/123456789012_Config_us-east-1_ConfigSnapshot_20240115T120000Z.json.gz .
+```
+
+### Advanced Queries
+
+```bash
+# Select all EC2 instances
+aws configservice select-resource-config \
+  --expression "SELECT resourceId, resourceType, configuration.instanceType WHERE resourceType = 'AWS::EC2::Instance'"
+
+# Select S3 buckets with versioning disabled
+aws configservice select-resource-config \
+  --expression "SELECT resourceId WHERE resourceType = 'AWS::S3::Bucket' AND configuration.versioningConfiguration.status <> 'Enabled'"
+
+# Select security groups with specific rules
+aws configservice select-resource-config \
+  --expression "SELECT resourceId, resourceType WHERE resourceType = 'AWS::EC2::SecurityGroup' AND configuration.ipPermissions[*].fromPort = 22"
+
+# Select resources by tag
+aws configservice select-resource-config \
+  --expression "SELECT resourceId, resourceType WHERE tags.tag = 'Environment=Production'"
+
+# Aggregate query across accounts
+aws configservice select-aggregate-resource-config \
+  --configuration-aggregator-name my-aggregator \
+  --expression "SELECT accountId, resourceId, resourceType WHERE resourceType = 'AWS::EC2::Instance'"
+```
+
+### Retention Configuration
+
+```bash
+# Set retention period for configuration items
+aws configservice put-retention-configuration \
+  --retention-period-in-days 2557
+
+# Get current retention configuration
+aws configservice describe-retention-configurations
+
+# Delete retention configuration (revert to default)
+aws configservice delete-retention-configuration \
+  --retention-configuration-name default
+```
+
+### Automation Scripts
+
+```bash
+# Complete Config setup script
+#!/bin/bash
+REGION="us-east-1"
+ACCOUNT_ID="123456789012"
+CONFIG_BUCKET="my-config-bucket"
+CONFIG_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/aws-config-role"
+SNS_TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT_ID}:config-notifications"
+
+# Create configuration recorder
+aws configservice put-configuration-recorder \
+  --configuration-recorder name=default,roleARN="$CONFIG_ROLE_ARN" \
+  --recording-group allSupported=true,includeGlobalResourceTypes=true
+
+# Create delivery channel
+aws configservice put-delivery-channel \
+  --delivery-channel name=default,s3BucketName="$CONFIG_BUCKET",snsTopicARN="$SNS_TOPIC_ARN"
+
+# Start configuration recorder
+aws configservice start-configuration-recorder \
+  --configuration-recorder-name default
+
+# Deploy essential managed rules
+RULES=(
+  "encrypted-volumes:ENCRYPTED_VOLUMES"
+  "s3-bucket-versioning-enabled:S3_BUCKET_VERSIONING_ENABLED"
+  "rds-storage-encrypted:RDS_STORAGE_ENCRYPTED"
+  "ec2-instances-in-vpc:INSTANCES_IN_VPC"
+  "iam-password-policy:IAM_PASSWORD_POLICY"
+)
+
+for rule in "${RULES[@]}"; do
+  IFS=':' read -r rule_name rule_id <<< "$rule"
+  aws configservice put-config-rule \
+    --config-rule "{\"ConfigRuleName\":\"$rule_name\",\"Source\":{\"Owner\":\"AWS\",\"SourceIdentifier\":\"$rule_id\"}}"
+  echo "Created rule: $rule_name"
+done
+
+echo "AWS Config setup complete"
+```
+
+```bash
+# Compliance report script
+#!/bin/bash
+OUTPUT_FILE="config-compliance-report-$(date +%Y%m%d).json"
+
+echo "Generating AWS Config compliance report..."
+
+# Get compliance summary
+echo "Compliance Summary:"
+aws configservice get-compliance-summary-by-config-rule
+
+# Get detailed compliance for each rule
+echo "Detailed Compliance:"
+aws configservice describe-config-rules --query 'ConfigRules[*].ConfigRuleName' --output text | \
+while read rule_name; do
+  echo "\nRule: $rule_name"
+  aws configservice describe-compliance-by-config-rule \
+    --config-rule-names "$rule_name" \
+    --output json
+done > "$OUTPUT_FILE"
+
+echo "Report saved to $OUTPUT_FILE"
+```
+
+```bash
+# Bulk rule evaluation script
+#!/bin/bash
+echo "Starting evaluation of all config rules..."
+
+# Get all rule names
+RULE_NAMES=$(aws configservice describe-config-rules \
+  --query 'ConfigRules[*].ConfigRuleName' \
+  --output text)
+
+# Start evaluation for each rule
+for rule in $RULE_NAMES; do
+  echo "Evaluating rule: $rule"
+  aws configservice start-config-rules-evaluation \
+    --config-rule-names "$rule"
+  sleep 2  # Avoid throttling
+done
+
+echo "All rules evaluation started"
+```
 
 ---
 

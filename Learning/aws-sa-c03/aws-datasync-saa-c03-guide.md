@@ -13,7 +13,8 @@
 10. [Common Use Cases](#common-use-cases)
 11. [Best Practices](#best-practices)
 12. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-13. [Practice Questions](#practice-questions)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [Practice Questions](#practice-questions)
 
 ---
 
@@ -857,6 +858,523 @@ On-Premises ──► DataSync ──► S3 Glacier Deep Archive
 │   • SFTP to S3 → Transfer Family                               │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Creating DataSync Locations
+
+#### Amazon S3 Location
+```bash
+# Create an S3 location
+aws datasync create-location-s3 \
+  --s3-bucket-arn arn:aws:s3:::my-datasync-bucket \
+  --s3-storage-class STANDARD \
+  --s3-config BucketAccessRoleArn=arn:aws:iam::123456789012:role/DataSyncS3Role \
+  --subdirectory /data/migration \
+  --tags Key=Environment,Value=Production Key=Project,Value=Migration
+
+# Create S3 location with specific storage class
+aws datasync create-location-s3 \
+  --s3-bucket-arn arn:aws:s3:::archive-bucket \
+  --s3-storage-class GLACIER_INSTANT_RETRIEVAL \
+  --s3-config BucketAccessRoleArn=arn:aws:iam::123456789012:role/DataSyncS3Role
+```
+
+#### Amazon EFS Location
+```bash
+# Create an EFS location
+aws datasync create-location-efs \
+  --efs-filesystem-arn arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-1234567 \
+  --ec2-config SubnetArn=arn:aws:ec2:us-east-1:123456789012:subnet/subnet-12345678,SecurityGroupArns=arn:aws:ec2:us-east-1:123456789012:security-group/sg-12345678 \
+  --subdirectory /mount-path \
+  --tags Key=Environment,Value=Production
+
+# Create EFS location with in-transit encryption
+aws datasync create-location-efs \
+  --efs-filesystem-arn arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-1234567 \
+  --ec2-config SubnetArn=arn:aws:ec2:us-east-1:123456789012:subnet/subnet-12345678,SecurityGroupArns=arn:aws:ec2:us-east-1:123456789012:security-group/sg-12345678 \
+  --in-transit-encryption TLS1_2
+```
+
+#### Amazon FSx for Windows File Server Location
+```bash
+# Create FSx for Windows location
+aws datasync create-location-fsx-windows \
+  --fsx-filesystem-arn arn:aws:fsx:us-east-1:123456789012:file-system/fs-0123456789abcdef0 \
+  --security-group-arns arn:aws:ec2:us-east-1:123456789012:security-group/sg-12345678 \
+  --user administrator \
+  --password "YourSecurePassword" \
+  --domain example.com \
+  --subdirectory /share/data
+```
+
+#### Amazon FSx for Lustre Location
+```bash
+# Create FSx for Lustre location
+aws datasync create-location-fsx-lustre \
+  --fsx-filesystem-arn arn:aws:fsx:us-east-1:123456789012:file-system/fs-0123456789abcdef0 \
+  --security-group-arns arn:aws:ec2:us-east-1:123456789012:security-group/sg-12345678 \
+  --subdirectory /mount \
+  --tags Key=Project,Value=HPC
+```
+
+#### NFS Location
+```bash
+# Create on-premises NFS location
+aws datasync create-location-nfs \
+  --server-hostname nfs-server.example.com \
+  --subdirectory /exports/data \
+  --on-prem-config AgentArns=arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --mount-options Version=NFS3,RSize=65536,WSize=65536 \
+  --tags Key=Environment,Value=OnPremises
+
+# Create NFS location with NFS4 and specific mount options
+aws datasync create-location-nfs \
+  --server-hostname 10.0.1.50 \
+  --subdirectory /data/shared \
+  --on-prem-config AgentArns=arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --mount-options Version=NFS4_1,RSize=1048576,WSize=1048576,HardMount=true
+```
+
+#### SMB Location
+```bash
+# Create SMB location
+aws datasync create-location-smb \
+  --server-hostname smb-server.example.com \
+  --subdirectory /share/data \
+  --user "DOMAIN\\username" \
+  --password "YourSecurePassword" \
+  --agent-arns arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --mount-options Version=SMB3,RSize=65536,WSize=65536 \
+  --domain example.com
+```
+
+#### HDFS Location
+```bash
+# Create HDFS location
+aws datasync create-location-hdfs \
+  --name-nodes NameNode=hdfs-namenode.example.com,Port=8020 \
+  --subdirectory /data/warehouse \
+  --agent-arns arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --authentication-type SIMPLE \
+  --simple-user hadoop \
+  --block-size 134217728 \
+  --replication-factor 3
+
+# Create HDFS location with Kerberos authentication
+aws datasync create-location-hdfs \
+  --name-nodes NameNode=hdfs-namenode.example.com,Port=8020 \
+  --subdirectory /user/data \
+  --agent-arns arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --authentication-type KERBEROS \
+  --kerberos-principal datasync/datasync.example.com@EXAMPLE.COM \
+  --kerberos-keytab file://path/to/keytab \
+  --kerberos-krb5-conf file://path/to/krb5.conf
+```
+
+#### Object Storage Location
+```bash
+# Create object storage location (S3-compatible)
+aws datasync create-location-object-storage \
+  --server-hostname s3-compatible.example.com \
+  --server-port 443 \
+  --server-protocol HTTPS \
+  --subdirectory /bucket/prefix \
+  --bucket-name my-bucket \
+  --access-key AKIAIOSFODNN7EXAMPLE \
+  --secret-key "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+  --agent-arns arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef
+```
+
+### Managing DataSync Agents
+
+#### Create and Activate Agent
+```bash
+# Get agent activation key (after deploying agent VM/appliance)
+# Agent provides activation key via web interface at http://agent-ip/?gatewayType=SYNC
+
+# Activate agent
+aws datasync create-agent \
+  --activation-key ABCDE-12345-FGHIJ-67890-KLMNO \
+  --agent-name "Production-DataSync-Agent" \
+  --vpc-endpoint-id vpce-1234567890abcdef0 \
+  --subnet-arns arn:aws:ec2:us-east-1:123456789012:subnet/subnet-12345678 \
+  --security-group-arns arn:aws:ec2:us-east-1:123456789012:security-group/sg-12345678 \
+  --tags Key=Environment,Value=Production
+
+# List all agents
+aws datasync list-agents
+
+# Describe specific agent
+aws datasync describe-agent \
+  --agent-arn arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef
+
+# Update agent name
+aws datasync update-agent \
+  --agent-arn arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef \
+  --name "Production-Agent-Updated"
+
+# Delete agent
+aws datasync delete-agent \
+  --agent-arn arn:aws:datasync:us-east-1:123456789012:agent/agent-01234567890abcdef
+```
+
+### Creating and Managing Tasks
+
+#### Create Basic Task
+```bash
+# Create a simple sync task from NFS to S3
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "NFS-to-S3-Migration" \
+  --cloud-watch-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/datasync \
+  --tags Key=Project,Value=Migration Key=Environment,Value=Production
+```
+
+#### Create Task with Options
+```bash
+# Create task with comprehensive options
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Advanced-Sync-Task" \
+  --options '{
+    "VerifyMode": "POINT_IN_TIME_CONSISTENT",
+    "OverwriteMode": "ALWAYS",
+    "Atime": "BEST_EFFORT",
+    "Mtime": "PRESERVE",
+    "Uid": "INT_VALUE",
+    "Gid": "INT_VALUE",
+    "PreserveDeletedFiles": "PRESERVE",
+    "PreserveDevices": "NONE",
+    "PosixPermissions": "PRESERVE",
+    "BytesPerSecond": 104857600,
+    "TaskQueueing": "ENABLED",
+    "LogLevel": "TRANSFER",
+    "TransferMode": "CHANGED",
+    "SecurityDescriptorCopyFlags": "OWNER_DACL",
+    "ObjectTags": "PRESERVE"
+  }' \
+  --cloud-watch-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/datasync
+```
+
+#### Create Task with File Filters
+```bash
+# Create task with include/exclude filters
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Filtered-Sync-Task" \
+  --excludes FilterType=SIMPLE_PATTERN,Value="*.tmp" FilterType=SIMPLE_PATTERN,Value=".git/*" \
+  --includes FilterType=SIMPLE_PATTERN,Value="*.jpg" FilterType=SIMPLE_PATTERN,Value="*.png"
+
+# Create task excluding specific directories and file types
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Production-Backup" \
+  --excludes \
+    FilterType=SIMPLE_PATTERN,Value="/temp/*" \
+    FilterType=SIMPLE_PATTERN,Value="/cache/*" \
+    FilterType=SIMPLE_PATTERN,Value="*.log" \
+    FilterType=SIMPLE_PATTERN,Value="*.tmp"
+```
+
+#### Create Task with Schedule
+```bash
+# Create task with hourly schedule
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Scheduled-Hourly-Sync" \
+  --schedule ScheduleExpression="cron(0 * * * ? *)" \
+  --cloud-watch-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/datasync
+
+# Create task with daily schedule at 2 AM
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Daily-Backup" \
+  --schedule ScheduleExpression="cron(0 2 * * ? *)"
+
+# Create task with weekly schedule (every Sunday at 3 AM)
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef1 \
+  --name "Weekly-Archive" \
+  --schedule ScheduleExpression="cron(0 3 ? * SUN *)"
+```
+
+#### List and Describe Tasks
+```bash
+# List all tasks
+aws datasync list-tasks
+
+# List tasks with filters
+aws datasync list-tasks \
+  --filters Name=LocationId,Values=loc-0123456789abcdef0,Operator=Equals
+
+# Describe specific task
+aws datasync describe-task \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+
+# Update task options
+aws datasync update-task \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --name "Updated-Task-Name" \
+  --options VerifyMode=ONLY_FILES_TRANSFERRED,TransferMode=CHANGED,LogLevel=TRANSFER
+
+# Update task schedule
+aws datasync update-task \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --schedule ScheduleExpression="cron(0 4 * * ? *)"
+
+# Delete task
+aws datasync delete-task \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+```
+
+### Task Execution
+
+#### Start Task Execution
+```bash
+# Start immediate task execution
+aws datasync start-task-execution \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+
+# Start task execution with specific options override
+aws datasync start-task-execution \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --override-options VerifyMode=NONE,LogLevel=BASIC,TransferMode=ALL
+
+# Start task execution with includes/excludes override
+aws datasync start-task-execution \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --includes FilterType=SIMPLE_PATTERN,Value="*.pdf" \
+  --excludes FilterType=SIMPLE_PATTERN,Value="*.tmp"
+```
+
+#### Monitor Task Executions
+```bash
+# List task executions for a specific task
+aws datasync list-task-executions \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+
+# List task executions with max results
+aws datasync list-task-executions \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --max-results 10
+
+# Describe specific task execution
+aws datasync describe-task-execution \
+  --task-execution-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0/execution/exec-0123456789abcdef0
+
+# Get detailed status of running execution
+aws datasync describe-task-execution \
+  --task-execution-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0/execution/exec-0123456789abcdef0 \
+  --query '{Status:Status,BytesTransferred:BytesTransferred,FilesTransferred:FilesTransferred,Result:Result}'
+```
+
+#### Cancel Task Execution
+```bash
+# Cancel running task execution
+aws datasync cancel-task-execution \
+  --task-execution-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0/execution/exec-0123456789abcdef0
+```
+
+### Schedule Expressions Reference
+
+```bash
+# Common schedule expressions (cron format)
+
+# Every hour
+cron(0 * * * ? *)
+
+# Every 6 hours
+cron(0 */6 * * ? *)
+
+# Every day at 2:00 AM
+cron(0 2 * * ? *)
+
+# Every weekday at 6:00 AM
+cron(0 6 ? * MON-FRI *)
+
+# Every Sunday at 3:00 AM
+cron(0 3 ? * SUN *)
+
+# First day of every month at midnight
+cron(0 0 1 * ? *)
+
+# Every 15 minutes
+cron(0/15 * * * ? *)
+
+# Twice daily (6 AM and 6 PM)
+cron(0 6,18 * * ? *)
+```
+
+### Managing Tags
+
+```bash
+# Add tags to a task
+aws datasync tag-resource \
+  --resource-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --tags Key=CostCenter,Value=Engineering Key=Owner,Value=DataTeam
+
+# List tags for a resource
+aws datasync list-tags-for-resource \
+  --resource-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0
+
+# Remove tags from a resource
+aws datasync untag-resource \
+  --resource-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --tag-keys CostCenter Owner
+```
+
+### CloudWatch Logging
+
+```bash
+# Create CloudWatch log group for DataSync
+aws logs create-log-group \
+  --log-group-name /aws/datasync
+
+# Set retention policy (7 days)
+aws logs put-retention-policy \
+  --log-group-name /aws/datasync \
+  --retention-in-days 7
+
+# Update task with CloudWatch logging
+aws datasync update-task \
+  --task-arn arn:aws:datasync:us-east-1:123456789012:task/task-0123456789abcdef0 \
+  --cloud-watch-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/datasync
+
+# Query CloudWatch logs for task execution
+aws logs filter-log-events \
+  --log-group-name /aws/datasync \
+  --filter-pattern "task-0123456789abcdef0" \
+  --start-time 1640000000000
+
+# Get log streams for DataSync
+aws logs describe-log-streams \
+  --log-group-name /aws/datasync \
+  --order-by LastEventTime \
+  --descending \
+  --max-items 10
+```
+
+### Advanced Task Options
+
+```bash
+# Task with bandwidth throttling (100 MB/s)
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-source \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-dest \
+  --name "Throttled-Task" \
+  --options BytesPerSecond=104857600
+
+# Task with verification disabled for speed
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-source \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-dest \
+  --name "Fast-Transfer" \
+  --options VerifyMode=NONE,TransferMode=CHANGED
+
+# Task that preserves deleted files
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-source \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-dest \
+  --name "Preserve-Deletes" \
+  --options PreserveDeletedFiles=PRESERVE,TransferMode=CHANGED
+
+# Task with full metadata preservation
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-source \
+  --destination-location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-dest \
+  --name "Full-Metadata-Sync" \
+  --options '
+  {
+    "Atime": "BEST_EFFORT",
+    "Mtime": "PRESERVE",
+    "Uid": "INT_VALUE",
+    "Gid": "INT_VALUE",
+    "PosixPermissions": "PRESERVE",
+    "PreserveDeletedFiles": "PRESERVE",
+    "PreserveDevices": "PRESERVE",
+    "SecurityDescriptorCopyFlags": "OWNER_DACL_SACL",
+    "ObjectTags": "PRESERVE"
+  }'
+```
+
+### Listing Locations
+
+```bash
+# List all locations
+aws datasync list-locations
+
+# List locations with pagination
+aws datasync list-locations --max-results 20
+
+# Describe S3 location
+aws datasync describe-location-s3 \
+  --location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0
+
+# Describe EFS location
+aws datasync describe-location-efs \
+  --location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0
+
+# Describe NFS location
+aws datasync describe-location-nfs \
+  --location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0
+
+# Update S3 location storage class
+aws datasync update-location-s3 \
+  --location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0 \
+  --s3-storage-class INTELLIGENT_TIERING
+
+# Delete location
+aws datasync delete-location \
+  --location-arn arn:aws:datasync:us-east-1:123456789012:location/loc-0123456789abcdef0
+```
+
+### Monitoring and Metrics
+
+```bash
+# Get CloudWatch metrics for DataSync task
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/DataSync \
+  --metric-name BytesTransferred \
+  --dimensions Name=TaskId,Value=task-0123456789abcdef0 \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z \
+  --period 3600 \
+  --statistics Sum
+
+# Get files transferred metric
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/DataSync \
+  --metric-name FilesTransferred \
+  --dimensions Name=TaskId,Value=task-0123456789abcdef0 \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z \
+  --period 3600 \
+  --statistics Sum
+
+# Create CloudWatch alarm for task failures
+aws cloudwatch put-metric-alarm \
+  --alarm-name datasync-task-failure \
+  --alarm-description "Alert when DataSync task fails" \
+  --metric-name TaskExecutionStatus \
+  --namespace AWS/DataSync \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 1 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --dimensions Name=TaskId,Value=task-0123456789abcdef0 \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:datasync-alerts
 ```
 
 ---

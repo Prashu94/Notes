@@ -15,7 +15,8 @@
 12. [Fault Tolerance and High Availability](#fault-tolerance-and-high-availability)
 13. [Service Limits](#service-limits)
 14. [Real-World Scenarios](#real-world-scenarios)
-15. [Exam Tips](#exam-tips)
+15. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+16. [Exam Tips](#exam-tips)
 
 ---
 
@@ -889,6 +890,438 @@ def disaster_recovery_setup():
 - Achieved 99.95% uptime SLA
 - RTO reduced from 4 hours to 15 minutes
 - RPO reduced from 24 hours to 1 hour
+
+---
+
+## AWS CLI Commands Reference
+
+### Describe Available Checks
+
+```bash
+# List all available Trusted Advisor checks
+aws support describe-trusted-advisor-checks \
+  --language en
+
+# List checks for specific category (cost-optimization, security, fault-tolerance, performance, service-limits)
+aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[?category==`security`].[name,id,category]' \
+  --output table
+
+# Get detailed information about a specific check
+aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[?contains(name, `Low Utilization`)]' \
+  --output json
+
+# List only check IDs and names
+aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[*].[id,name]' \
+  --output table
+```
+
+### Refresh Check Status
+
+```bash
+# Refresh a specific Trusted Advisor check
+# Note: Checks can only be refreshed once every 5 minutes
+aws support refresh-trusted-advisor-check \
+  --check-id eW7HH0l7J9
+
+# The command returns a status object with:
+# - checkId: The ID of the check
+# - status: Current refresh status (none, enqueued, processing, success, abandoned)
+# - millisUntilNextRefreshable: Time until check can be refreshed again
+
+# Example: Refresh security group checks
+SG_CHECK_ID="1iG5NDGVre"
+aws support refresh-trusted-advisor-check \
+  --check-id $SG_CHECK_ID
+```
+
+### Describe Check Result
+
+```bash
+# Get detailed results for a specific check
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9
+
+# Get results in a formatted table
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.[status,timestamp,resourcesSummary]' \
+  --output table
+
+# Get only flagged resources from a check
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[*]' \
+  --output json
+
+# Extract specific fields from flagged resources
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[*].[resourceId,status,metadata]' \
+  --output table
+```
+
+### Describe Check Summaries
+
+```bash
+# Get summary of all Trusted Advisor checks
+aws support describe-trusted-advisor-check-summaries \
+  --check-ids $(aws support describe-trusted-advisor-checks \
+    --language en \
+    --query 'checks[*].id' \
+    --output text)
+
+# Get summaries for specific checks
+aws support describe-trusted-advisor-check-summaries \
+  --check-ids eW7HH0l7J9 1iG5NDGVre zXCkfM1nI3
+
+# Get summary with resource counts
+aws support describe-trusted-advisor-check-summaries \
+  --check-ids eW7HH0l7J9 \
+  --query 'summaries[*].[checkId,status,resourcesSummary]' \
+  --output table
+
+# Count checks by status (error, warning, ok)
+aws support describe-trusted-advisor-check-summaries \
+  --check-ids $(aws support describe-trusted-advisor-checks \
+    --language en --query 'checks[*].id' --output text) \
+  --query 'summaries[*].status' \
+  --output text | sort | uniq -c
+```
+
+### Exclude Recommendations
+
+```bash
+# Exclude specific resources from a check
+# Note: This is done through the console or by updating check preferences
+# The CLI doesn't have a direct exclude command, but you can filter results
+
+# Filter out specific resource IDs from results
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[?resourceId!=`i-1234567890abcdef0`]' \
+  --output json
+
+# Create a custom script to exclude resources
+EXCLUDE_LIST=("i-1234567890abcdef0" "i-0987654321fedcba0")
+
+RESOURCES=$(aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[*].[resourceId,status]' \
+  --output text)
+
+while read -r resource status; do
+  if [[ ! " ${EXCLUDE_LIST[@]} " =~ " ${resource} " ]]; then
+    echo "$resource - $status"
+  fi
+done <<< "$RESOURCES"
+```
+
+### Include Recommendations  
+
+```bash
+# Include all recommendations (default behavior)
+# Get all flagged resources without filters
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[*]'
+
+# Include only resources with specific status
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[?status==`error`]'
+
+# Include resources from specific regions
+aws support describe-trusted-advisor-check-result \
+  --check-id eW7HH0l7J9 \
+  --query 'result.flaggedResources[?metadata[0]==`us-east-1`]'
+```
+
+### Common Check IDs Reference
+
+```bash
+# Here are some commonly used Trusted Advisor check IDs:
+
+# Security
+SECURITY_GROUPS_UNRESTRICTED="1iG5NDGVre"  # Security Groups - Unrestricted Access
+IAM_USE="zXCkfM1nI3"                        # IAM Use
+MFA_ROOT="7DAFEmoDos"                       # MFA on Root Account
+EBS_PUBLIC_SNAPSHOTS="ePs02jT06w"          # EBS Public Snapshots
+RDS_PUBLIC_SNAPSHOTS="rSs93HQwa1"          # RDS Public Snapshots
+
+# Cost Optimization
+LOW_UTILIZATION_EC2="Qch7DwouX1"           # Low Utilization EC2 Instances
+UNDERUTILIZED_EBS="DAvU99Dc4C"             # Underutilized EBS Volumes
+UNASSOCIATED_EIP="Z4AUBRNSmz"              # Unassociated Elastic IP Addresses
+IDLE_RDS="Ti39halfu8"                       # Idle RDS DB Instances
+IDLE_LOAD_BALANCER="hjLMh88uM8"            # Idle Load Balancers
+
+# Performance
+HIGH_UTILIZATION_EC2="ZRxQlPsb6j"          # High Utilization EC2 Instances
+OVERUTILIZED_EBS="Cb877eB72b"              # Overutilized EBS Volumes
+
+# Service Limits
+EC2_INSTANCES="0Xc6LMYG8P"                 # EC2 Instance Limit
+VPC_LIMIT="jL7PP0l7J9"                     # VPC Limit
+EBS_VOLUMES="gH5CC0e3J9"                   # EBS Volume Limit
+```
+
+### Practical Examples
+
+#### Check All Security Issues
+
+```bash
+#!/bin/bash
+# Script to check all security-related Trusted Advisor findings
+
+echo "Fetching all security checks..."
+
+# Get all security check IDs
+SECURITY_CHECKS=$(aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[?category==`security`].id' \
+  --output text)
+
+# Check each security item
+for CHECK_ID in $SECURITY_CHECKS; do
+  echo "\nChecking: $CHECK_ID"
+  
+  # Get check name
+  CHECK_NAME=$(aws support describe-trusted-advisor-checks \
+    --language en \
+    --query "checks[?id=='$CHECK_ID'].name" \
+    --output text)
+  
+  echo "Check Name: $CHECK_NAME"
+  
+  # Get results
+  RESULT=$(aws support describe-trusted-advisor-check-result \
+    --check-id $CHECK_ID \
+    --query 'result.[status,resourcesSummary]' \
+    --output json)
+  
+  echo "Result: $RESULT"
+done
+```
+
+#### Automated Check Refresh and Report
+
+```bash
+#!/bin/bash
+# Refresh all checks and generate summary report
+
+REPORT_FILE="trusted-advisor-report-$(date +%Y%m%d).txt"
+
+echo "Trusted Advisor Report - $(date)" > $REPORT_FILE
+echo "======================================" >> $REPORT_FILE
+
+# Get all check IDs
+CHECK_IDS=$(aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[*].id' \
+  --output text)
+
+# Refresh each check (with rate limiting)
+for CHECK_ID in $CHECK_IDS; do
+  echo "Refreshing check: $CHECK_ID"
+  aws support refresh-trusted-advisor-check --check-id $CHECK_ID 2>/dev/null
+  sleep 5  # Wait 5 seconds between refreshes
+done
+
+echo "\nWaiting 60 seconds for refreshes to complete..."
+sleep 60
+
+# Generate summary
+echo "\nCheck Summaries" >> $REPORT_FILE
+echo "---------------" >> $REPORT_FILE
+
+aws support describe-trusted-advisor-check-summaries \
+  --check-ids $CHECK_IDS \
+  --query 'summaries[*].[checkId,status,resourcesSummary]' \
+  --output table >> $REPORT_FILE
+
+echo "\nReport generated: $REPORT_FILE"
+```
+
+#### Monitor Service Limits
+
+```bash
+#!/bin/bash
+# Monitor service limits and alert if approaching threshold
+
+THRESHOLD=80  # Alert if usage > 80%
+
+echo "Checking service limits..."
+
+# Get service limit checks
+LIMIT_CHECKS=$(aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[?category==`service_limits`].id' \
+  --output text)
+
+for CHECK_ID in $LIMIT_CHECKS; do
+  # Get check results
+  RESULT=$(aws support describe-trusted-advisor-check-result \
+    --check-id $CHECK_ID \
+    --query 'result' \
+    --output json)
+  
+  # Parse flagged resources (those approaching limits)
+  FLAGGED=$(echo $RESULT | jq -r '.flaggedResources[] | select(.status=="warning" or .status=="error")')
+  
+  if [ ! -z "$FLAGGED" ]; then
+    CHECK_NAME=$(aws support describe-trusted-advisor-checks \
+      --language en \
+      --query "checks[?id=='$CHECK_ID'].name" \
+      --output text)
+    
+    echo "⚠️  ALERT: $CHECK_NAME"
+    echo "$FLAGGED" | jq -r '.metadata'
+    echo "---"
+  fi
+done
+```
+
+#### Cost Optimization Report
+
+```bash
+#!/bin/bash
+# Generate cost optimization recommendations
+
+echo "Cost Optimization Report"
+echo "========================"
+echo ""
+
+# Define cost optimization checks
+COST_CHECKS=(
+  "Qch7DwouX1:Low Utilization EC2 Instances"
+  "DAvU99Dc4C:Underutilized EBS Volumes"
+  "Z4AUBRNSmz:Unassociated Elastic IP Addresses"
+  "Ti39halfu8:Idle RDS DB Instances"
+  "hjLMh88uM8:Idle Load Balancers"
+)
+
+TOTAL_SAVINGS=0
+
+for CHECK_INFO in "${COST_CHECKS[@]}"; do
+  IFS=':' read -r CHECK_ID CHECK_NAME <<< "$CHECK_INFO"
+  
+  echo "Checking: $CHECK_NAME"
+  
+  # Get results and estimated savings
+  RESULT=$(aws support describe-trusted-advisor-check-result \
+    --check-id $CHECK_ID \
+    --query 'result.[resourcesSummary.resourcesFlagged,categorySpecificSummary.costOptimizing.estimatedMonthlySavings]' \
+    --output text)
+  
+  read FLAGGED_COUNT SAVINGS <<< "$RESULT"
+  
+  if [ "$FLAGGED_COUNT" -gt 0 ]; then
+    echo "  ⚠️  Flagged Resources: $FLAGGED_COUNT"
+    echo "  💰 Estimated Monthly Savings: \$$SAVINGS"
+    TOTAL_SAVINGS=$(echo "$TOTAL_SAVINGS + $SAVINGS" | bc)
+  else
+    echo "  ✅ No issues found"
+  fi
+  echo ""
+done
+
+echo "Total Estimated Monthly Savings: \$$TOTAL_SAVINGS"
+```
+
+### Integration with EventBridge (via CloudWatch Events)
+
+```bash
+# Note: Trusted Advisor events are published to EventBridge automatically
+# You can create rules to act on these events
+
+# Example: Create EventBridge rule for Trusted Advisor check status changes
+aws events put-rule \
+  --name TrustedAdvisorStatusChangeRule \
+  --event-pattern '{
+    "source": ["aws.trustedadvisor"],
+    "detail-type": ["Trusted Advisor Check Item Refresh Notification"]
+  }' \
+  --state ENABLED
+
+# Add Lambda target to process the events
+aws events put-targets \
+  --rule TrustedAdvisorStatusChangeRule \
+  --targets "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:ProcessTrustedAdvisorEvents"
+```
+
+### Best Practices Script
+
+```bash
+#!/bin/bash
+# Comprehensive Trusted Advisor monitoring script
+
+set -e
+
+LOG_FILE="ta-monitoring-$(date +%Y%m%d-%H%M%S).log"
+ALERT_EMAIL="alerts@example.com"
+
+log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a $LOG_FILE
+}
+
+log "Starting Trusted Advisor monitoring..."
+
+# Get all checks
+ALL_CHECKS=$(aws support describe-trusted-advisor-checks \
+  --language en \
+  --query 'checks[*].[id,name,category]' \
+  --output text)
+
+# Initialize counters
+ERROR_COUNT=0
+WARNING_COUNT=0
+
+# Process each check
+while IFS=$'\t' read -r CHECK_ID CHECK_NAME CATEGORY; do
+  log "Processing: $CHECK_NAME ($CATEGORY)"
+  
+  # Get check results
+  STATUS=$(aws support describe-trusted-advisor-check-result \
+    --check-id $CHECK_ID \
+    --query 'result.status' \
+    --output text 2>/dev/null || echo "error")
+  
+  case $STATUS in
+    error)
+      ((ERROR_COUNT++))
+      log "❌ ERROR: $CHECK_NAME"
+      ;;
+    warning)
+      ((WARNING_COUNT++))
+      log "⚠️  WARNING: $CHECK_NAME"
+      ;;
+    ok)
+      log "✅ OK: $CHECK_NAME"
+      ;;
+    *)
+      log "❓ UNKNOWN: $CHECK_NAME"
+      ;;
+  esac
+done <<< "$ALL_CHECKS"
+
+log "Monitoring complete"
+log "Errors: $ERROR_COUNT, Warnings: $WARNING_COUNT"
+
+# Send alert if critical issues found
+if [ $ERROR_COUNT -gt 0 ]; then
+  log "Sending alert email..."
+  aws sns publish \
+    --topic-arn arn:aws:sns:us-east-1:123456789012:TrustedAdvisorAlerts \
+    --subject "Trusted Advisor Critical Alert" \
+    --message "Found $ERROR_COUNT critical issues. Check log: $LOG_FILE"
+fi
+```
 
 ---
 

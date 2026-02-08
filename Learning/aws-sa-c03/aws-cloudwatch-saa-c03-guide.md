@@ -15,7 +15,8 @@
 12. [Cost Optimization](#cost-optimization)
 13. [Security and Access Control](#security-and-access-control)
 14. [Troubleshooting](#troubleshooting)
-15. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+15. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+16. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 
 ---
 
@@ -798,6 +799,854 @@ aws cloudwatch put-metric-data \
     --namespace "Test/Namespace" \
     --metric-data MetricName=TestMetric,Value=1.0,Unit=Count \
     --dry-run
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Metrics Operations
+
+#### Put Custom Metrics
+```bash
+# Put a simple metric
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-name "PageLoadTime" \
+    --value 250 \
+    --unit Milliseconds
+
+# Put metric with dimensions
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-name "PageLoadTime" \
+    --value 250 \
+    --unit Milliseconds \
+    --dimensions Environment=Production,Region=us-east-1
+
+# Put metric with timestamp
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-name "RequestCount" \
+    --value 100 \
+    --timestamp "2024-01-15T12:00:00Z" \
+    --unit Count
+
+# Put multiple metrics at once
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-data \
+      MetricName=ResponseTime,Value=150,Unit=Milliseconds,Timestamp=2024-01-15T12:00:00Z \
+      MetricName=ErrorCount,Value=5,Unit=Count,Timestamp=2024-01-15T12:00:00Z
+
+# Put metric with statistic set
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-name "ProcessingTime" \
+    --statistic-values Sum=1500,Minimum=100,Maximum=500,SampleCount=5
+```
+
+#### Get Metric Statistics
+```bash
+# Get average CPU utilization for last hour
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/EC2 \
+    --metric-name CPUUtilization \
+    --dimensions Name=InstanceId,Value=i-1234567890abcdef0 \
+    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 300 \
+    --statistics Average
+
+# Get multiple statistics
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/RDS \
+    --metric-name DatabaseConnections \
+    --dimensions Name=DBInstanceIdentifier,Value=mydb \
+    --start-time $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 3600 \
+    --statistics Average,Maximum,Minimum
+
+# Get metric statistics with extended statistics (percentiles)
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/ApplicationELB \
+    --metric-name TargetResponseTime \
+    --dimensions Name=LoadBalancer,Value=app/my-load-balancer/50dc6c495c0c9188 \
+    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 60 \
+    --extended-statistics p50,p90,p99
+```
+
+#### List Metrics
+```bash
+# List all metrics in a namespace
+aws cloudwatch list-metrics \
+    --namespace AWS/EC2
+
+# List metrics with specific metric name
+aws cloudwatch list-metrics \
+    --namespace AWS/EC2 \
+    --metric-name CPUUtilization
+
+# List metrics with dimensions
+aws cloudwatch list-metrics \
+    --namespace AWS/EC2 \
+    --dimensions Name=InstanceType,Value=t2.micro
+
+# List metrics with multiple dimension filters
+aws cloudwatch list-metrics \
+    --namespace "MyApplication/Performance" \
+    --dimensions Name=Environment,Value=Production Name=Region,Value=us-east-1
+
+# List all custom metrics (exclude AWS namespaces)
+aws cloudwatch list-metrics \
+    --query 'Metrics[?!starts_with(Namespace, `AWS/`)]'
+
+# List metrics with pagination
+aws cloudwatch list-metrics \
+    --namespace AWS/Lambda \
+    --max-items 100
+```
+
+### Alarms Management
+
+#### Put Metric Alarms
+```bash
+# Create a simple threshold alarm
+aws cloudwatch put-metric-alarm \
+    --alarm-name "HighCPUUtilization" \
+    --alarm-description "Alert when CPU exceeds 80%" \
+    --metric-name CPUUtilization \
+    --namespace AWS/EC2 \
+    --dimensions Name=InstanceId,Value=i-1234567890abcdef0 \
+    --statistic Average \
+    --period 300 \
+    --threshold 80 \
+    --comparison-operator GreaterThanThreshold \
+    --evaluation-periods 2 \
+    --datapoints-to-alarm 2
+
+# Create alarm with SNS notification
+aws cloudwatch put-metric-alarm \
+    --alarm-name "DatabaseConnectionsHigh" \
+    --alarm-description "Alert when DB connections exceed 100" \
+    --metric-name DatabaseConnections \
+    --namespace AWS/RDS \
+    --dimensions Name=DBInstanceIdentifier,Value=mydb \
+    --statistic Average \
+    --period 300 \
+    --threshold 100 \
+    --comparison-operator GreaterThanThreshold \
+    --evaluation-periods 2 \
+    --alarm-actions arn:aws:sns:us-east-1:123456789012:MyTopic
+
+# Create alarm with multiple actions
+aws cloudwatch put-metric-alarm \
+    --alarm-name "CriticalAPIErrors" \
+    --alarm-description "Alert on API errors" \
+    --metric-name 4XXError \
+    --namespace AWS/ApiGateway \
+    --dimensions Name=ApiName,Value=MyAPI \
+    --statistic Sum \
+    --period 60 \
+    --threshold 10 \
+    --comparison-operator GreaterThanThreshold \
+    --evaluation-periods 1 \
+    --alarm-actions arn:aws:sns:us-east-1:123456789012:CriticalAlerts \
+    --ok-actions arn:aws:sns:us-east-1:123456789012:OKNotifications \
+    --insufficient-data-actions arn:aws:sns:us-east-1:123456789012:DataIssues
+
+# Create composite alarm
+aws cloudwatch put-composite-alarm \
+    --alarm-name "WebAppHealthComposite" \
+    --alarm-description "Combined health check for web application" \
+    --alarm-rule "ALARM(HighCPUUtilization) OR ALARM(HighMemoryUtilization)" \
+    --alarm-actions arn:aws:sns:us-east-1:123456789012:MyTopic
+
+# Create alarm with treat missing data behavior
+aws cloudwatch put-metric-alarm \
+    --alarm-name "LambdaErrors" \
+    --metric-name Errors \
+    --namespace AWS/Lambda \
+    --dimensions Name=FunctionName,Value=MyFunction \
+    --statistic Sum \
+    --period 60 \
+    --threshold 5 \
+    --comparison-operator GreaterThanThreshold \
+    --evaluation-periods 1 \
+    --treat-missing-data notBreaching
+```
+
+#### Describe Alarms
+```bash
+# Describe all alarms
+aws cloudwatch describe-alarms
+
+# Describe specific alarm
+aws cloudwatch describe-alarms \
+    --alarm-names "HighCPUUtilization"
+
+# Describe alarms by state
+aws cloudwatch describe-alarms \
+    --state-value ALARM
+
+# Describe alarms with prefix
+aws cloudwatch describe-alarms \
+    --alarm-name-prefix "Prod-"
+
+# Describe alarms for specific action
+aws cloudwatch describe-alarms \
+    --action-prefix arn:aws:sns:us-east-1:123456789012:
+
+# Get alarm history
+aws cloudwatch describe-alarm-history \
+    --alarm-name "HighCPUUtilization" \
+    --history-item-type StateUpdate \
+    --start-date 2024-01-01T00:00:00Z \
+    --end-date 2024-01-31T23:59:59Z
+
+# Describe alarms for specific metric
+aws cloudwatch describe-alarms-for-metric \
+    --metric-name CPUUtilization \
+    --namespace AWS/EC2 \
+    --dimensions Name=InstanceId,Value=i-1234567890abcdef0
+```
+
+#### Set Alarm State
+```bash
+# Set alarm to ALARM state (testing)
+aws cloudwatch set-alarm-state \
+    --alarm-name "HighCPUUtilization" \
+    --state-value ALARM \
+    --state-reason "Testing alarm notification"
+
+# Set alarm to OK state
+aws cloudwatch set-alarm-state \
+    --alarm-name "HighCPUUtilization" \
+    --state-value OK \
+    --state-reason "Manual reset after testing"
+
+# Set alarm to INSUFFICIENT_DATA state
+aws cloudwatch set-alarm-state \
+    --alarm-name "HighCPUUtilization" \
+    --state-value INSUFFICIENT_DATA \
+    --state-reason "Testing insufficient data handling"
+```
+
+#### Delete Alarms
+```bash
+# Delete a single alarm
+aws cloudwatch delete-alarms \
+    --alarm-names "HighCPUUtilization"
+
+# Delete multiple alarms
+aws cloudwatch delete-alarms \
+    --alarm-names "Alarm1" "Alarm2" "Alarm3"
+
+# Delete all alarms with specific prefix
+aws cloudwatch describe-alarms \
+    --alarm-name-prefix "Test-" \
+    --query 'MetricAlarms[*].AlarmName' \
+    --output text | xargs -n 1 aws cloudwatch delete-alarms --alarm-names
+```
+
+### Dashboard Operations
+
+#### Put Dashboard
+```bash
+# Create a simple dashboard
+aws cloudwatch put-dashboard \
+    --dashboard-name "MyDashboard" \
+    --dashboard-body '{"widgets":[{"type":"metric","properties":{"metrics":[["AWS/EC2","CPUUtilization",{"stat":"Average"}]],"period":300,"stat":"Average","region":"us-east-1","title":"EC2 CPU"}}]}'
+
+# Create dashboard from file
+aws cloudwatch put-dashboard \
+    --dashboard-name "ProductionDashboard" \
+    --dashboard-body file://dashboard-config.json
+```
+
+#### List and Get Dashboards
+```bash
+# List all dashboards
+aws cloudwatch list-dashboards
+
+# List dashboards with prefix
+aws cloudwatch list-dashboards \
+    --dashboard-name-prefix "Prod-"
+
+# Get dashboard definition
+aws cloudwatch get-dashboard \
+    --dashboard-name "MyDashboard"
+
+# Get dashboard and save to file
+aws cloudwatch get-dashboard \
+    --dashboard-name "MyDashboard" \
+    --query 'DashboardBody' \
+    --output text > dashboard-backup.json
+```
+
+#### Delete Dashboard
+```bash
+# Delete a dashboard
+aws cloudwatch delete-dashboards \
+    --dashboard-names "MyDashboard"
+
+# Delete multiple dashboards
+aws cloudwatch delete-dashboards \
+    --dashboard-names "Dashboard1" "Dashboard2" "Dashboard3"
+```
+
+### CloudWatch Logs Operations
+
+#### Log Groups Management
+```bash
+# Create log group
+aws logs create-log-group \
+    --log-group-name "/aws/lambda/my-function"
+
+# Create log group with KMS encryption
+aws logs create-log-group \
+    --log-group-name "/aws/application/production" \
+    --kms-key-id "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+# List log groups
+aws logs describe-log-groups
+
+# List log groups with prefix
+aws logs describe-log-groups \
+    --log-group-name-prefix "/aws/lambda/"
+
+# Set log group retention
+aws logs put-retention-policy \
+    --log-group-name "/aws/lambda/my-function" \
+    --retention-in-days 30
+
+# Delete retention policy (never expire)
+aws logs delete-retention-policy \
+    --log-group-name "/aws/lambda/my-function"
+
+# Tag log group
+aws logs tag-log-group \
+    --log-group-name "/aws/lambda/my-function" \
+    --tags Environment=Production,Application=MyApp
+
+# Delete log group
+aws logs delete-log-group \
+    --log-group-name "/aws/lambda/my-function"
+```
+
+#### Log Streams Management
+```bash
+# Create log stream
+aws logs create-log-stream \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123"
+
+# Describe log streams
+aws logs describe-log-streams \
+    --log-group-name "/aws/lambda/my-function"
+
+# Describe log streams ordered by last event time
+aws logs describe-log-streams \
+    --log-group-name "/aws/lambda/my-function" \
+    --order-by LastEventTime \
+    --descending \
+    --max-items 10
+
+# Delete log stream
+aws logs delete-log-stream \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123"
+```
+
+#### Put Log Events
+```bash
+# Put log events (requires sequence token)
+aws logs put-log-events \
+    --log-group-name "/aws/application/myapp" \
+    --log-stream-name "instance-001" \
+    --log-events timestamp=$(date +%s)000,message="Application started successfully"
+
+# Put multiple log events
+aws logs put-log-events \
+    --log-group-name "/aws/application/myapp" \
+    --log-stream-name "instance-001" \
+    --log-events \
+        timestamp=$(date +%s)000,message="Event 1" \
+        timestamp=$(($(date +%s)+1))000,message="Event 2" \
+        timestamp=$(($(date +%s)+2))000,message="Event 3"
+```
+
+#### Filter Log Events
+```bash
+# Filter log events by pattern
+aws logs filter-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-pattern "ERROR"
+
+# Filter log events with time range
+aws logs filter-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --start-time $(date -d '1 hour ago' +%s)000 \
+    --end-time $(date +%s)000 \
+    --filter-pattern "[time, request_id, level = ERROR, ...]"
+
+# Filter log events from specific log stream
+aws logs filter-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-names "2024/01/15/[$LATEST]abc123" \
+    --filter-pattern "timeout"
+
+# Filter with JSON parsing
+aws logs filter-log-events \
+    --log-group-name "/aws/application/myapp" \
+    --filter-pattern '{ $.status = "FAILED" }'
+
+# Get log events with interleave
+aws logs filter-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --interleaved \
+    --filter-pattern "ERROR" \
+    --max-items 100
+```
+
+#### Get Log Events
+```bash
+# Get log events from a specific stream
+aws logs get-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123"
+
+# Get log events with limit
+aws logs get-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123" \
+    --limit 100
+
+# Get log events in reverse order (newest first)
+aws logs get-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123" \
+    --start-from-head false
+
+# Get log events with time range
+aws logs get-log-events \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name "2024/01/15/[$LATEST]abc123" \
+    --start-time $(date -d '1 hour ago' +%s)000 \
+    --end-time $(date +%s)000
+```
+
+### Metric Filters
+
+#### Create Metric Filters
+```bash
+# Create metric filter for error counting
+aws logs put-metric-filter \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name "ErrorCount" \
+    --filter-pattern "[time, request_id, level = ERROR, ...]" \
+    --metric-transformations \
+        metricName=ErrorCount,metricNamespace=MyApplication,metricValue=1,defaultValue=0
+
+# Create metric filter with dimensions
+aws logs put-metric-filter \
+    --log-group-name "/aws/application/myapp" \
+    --filter-name "HTTPStatusCodes" \
+    --filter-pattern '[ip, id, user, timestamp, request, status_code, bytes]' \
+    --metric-transformations \
+        metricName=HTTPRequests,metricNamespace=MyApplication,metricValue=1,defaultValue=0,dimensions='{"StatusCode":"$status_code"}'
+
+# Create metric filter for JSON logs
+aws logs put-metric-filter \
+    --log-group-name "/aws/application/myapp" \
+    --filter-name "FailedTransactions" \
+    --filter-pattern '{ $.transaction.status = "FAILED" }' \
+    --metric-transformations \
+        metricName=FailedTransactions,metricNamespace=MyApplication,metricValue=1
+
+# Create metric filter extracting values
+aws logs put-metric-filter \
+    --log-group-name "/aws/application/myapp" \
+    --filter-name "ResponseTime" \
+    --filter-pattern '[time, level, msg, duration]' \
+    --metric-transformations \
+        metricName=ResponseTime,metricNamespace=MyApplication,metricValue='$duration',unit=Milliseconds
+```
+
+#### Describe and Delete Metric Filters
+```bash
+# Describe all metric filters for a log group
+aws logs describe-metric-filters \
+    --log-group-name "/aws/lambda/my-function"
+
+# Describe specific metric filter
+aws logs describe-metric-filters \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name-prefix "Error"
+
+# Delete metric filter
+aws logs delete-metric-filter \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name "ErrorCount"
+```
+
+### CloudWatch Logs Insights
+
+#### Start and Manage Queries
+```bash
+# Start a logs insights query
+aws logs start-query \
+    --log-group-name "/aws/lambda/my-function" \
+    --start-time $(date -d '1 hour ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'fields @timestamp, @message | filter @message like /ERROR/ | sort @timestamp desc | limit 20'
+
+# Start query across multiple log groups
+aws logs start-query \
+    --log-group-names "/aws/lambda/function1" "/aws/lambda/function2" \
+    --start-time $(date -d '24 hours ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'fields @timestamp, @message | stats count() by bin(5m)'
+
+# Get query results
+QUERY_ID=$(aws logs start-query \
+    --log-group-name "/aws/lambda/my-function" \
+    --start-time $(date -d '1 hour ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'fields @timestamp, @message | limit 20' \
+    --query 'queryId' --output text)
+
+# Check query status and get results
+aws logs get-query-results --query-id $QUERY_ID
+
+# Stop a running query
+aws logs stop-query --query-id $QUERY_ID
+
+# Describe queries
+aws logs describe-queries \
+    --log-group-name "/aws/lambda/my-function" \
+    --status Running
+```
+
+#### Common Insights Query Examples
+```bash
+# Count errors by type
+aws logs start-query \
+    --log-group-name "/aws/lambda/my-function" \
+    --start-time $(date -d '24 hours ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'fields @message | filter @message like /ERROR/ | parse @message /ERROR: (?<error_type>.*)/ | stats count() by error_type'
+
+# Calculate percentiles for duration
+aws logs start-query \
+    --log-group-name "/aws/lambda/my-function" \
+    --start-time $(date -d '1 hour ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'filter @type = "REPORT" | stats avg(@duration), max(@duration), min(@duration), pct(@duration, 50), pct(@duration, 95), pct(@duration, 99)'
+
+# Find most frequent error messages
+aws logs start-query \
+    --log-group-name "/aws/application/myapp" \
+    --start-time $(date -d '1 hour ago' +%s) \
+    --end-time $(date +%s) \
+    --query-string 'fields @message | filter level = "ERROR" | stats count() as error_count by @message | sort error_count desc | limit 10'
+```
+
+### Subscription Filters
+
+#### Create Subscription Filters
+```bash
+# Create subscription filter to Lambda
+aws logs put-subscription-filter \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name "ErrorsToLambda" \
+    --filter-pattern "ERROR" \
+    --destination-arn "arn:aws:lambda:us-east-1:123456789012:function:ProcessLogs"
+
+# Create subscription filter to Kinesis stream
+aws logs put-subscription-filter \
+    --log-group-name "/aws/application/myapp" \
+    --filter-name "AllLogsToKinesis" \
+    --filter-pattern "" \
+    --destination-arn "arn:aws:kinesis:us-east-1:123456789012:stream/LogStream" \
+    --role-arn "arn:aws:iam::123456789012:role/CloudWatchLogsRole"
+
+# Create subscription filter to Kinesis Firehose
+aws logs put-subscription-filter \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name "LogsToFirehose" \
+    --filter-pattern "[time, request_id, event_type, ...]" \
+    --destination-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/LogDelivery" \
+    --role-arn "arn:aws:iam::123456789012:role/FirehoseRole"
+```
+
+#### Describe and Delete Subscription Filters
+```bash
+# Describe subscription filters
+aws logs describe-subscription-filters \
+    --log-group-name "/aws/lambda/my-function"
+
+# Delete subscription filter
+aws logs delete-subscription-filter \
+    --log-group-name "/aws/lambda/my-function" \
+    --filter-name "ErrorsToLambda"
+```
+
+### Export Logs to S3
+
+#### Create Export Task
+```bash
+# Export logs to S3
+aws logs create-export-task \
+    --log-group-name "/aws/lambda/my-function" \
+    --from $(date -d '7 days ago' +%s)000 \
+    --to $(date +%s)000 \
+    --destination "my-log-export-bucket" \
+    --destination-prefix "lambda-logs/my-function/"
+
+# Export with specific log stream prefix
+aws logs create-export-task \
+    --log-group-name "/aws/lambda/my-function" \
+    --log-stream-name-prefix "2024/01/" \
+    --from $(date -d '7 days ago' +%s)000 \
+    --to $(date +%s)000 \
+    --destination "my-log-export-bucket" \
+    --destination-prefix "lambda-logs/january-2024/"
+
+# Describe export tasks
+aws logs describe-export-tasks \
+    --task-id "export-task-id"
+
+# Describe all export tasks
+aws logs describe-export-tasks
+
+# Cancel export task
+aws logs cancel-export-task \
+    --task-id "export-task-id"
+```
+
+### CloudWatch Events / EventBridge
+
+#### Put Rule
+```bash
+# Create scheduled rule (cron)
+aws events put-rule \
+    --name "DailyBackup" \
+    --description "Trigger daily backup at 2 AM UTC" \
+    --schedule-expression "cron(0 2 * * ? *)"
+
+# Create scheduled rule (rate)
+aws events put-rule \
+    --name "Every5Minutes" \
+    --description "Trigger every 5 minutes" \
+    --schedule-expression "rate(5 minutes)"
+
+# Create event pattern rule
+aws events put-rule \
+    --name "EC2StateChange" \
+    --description "Trigger on EC2 state changes" \
+    --event-pattern '{"source":["aws.ec2"],"detail-type":["EC2 Instance State-change Notification"]}'
+
+# Create custom event pattern
+aws events put-rule \
+    --name "CustomAppEvents" \
+    --description "Monitor custom application events" \
+    --event-pattern '{"source":["custom.myapp"],"detail-type":["transaction"],"detail":{"status":["FAILED"]}}'
+```
+
+#### Put Targets
+```bash
+# Add Lambda target to rule
+aws events put-targets \
+    --rule "DailyBackup" \
+    --targets "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:BackupFunction"
+
+# Add SNS target
+aws events put-targets \
+    --rule "EC2StateChange" \
+    --targets "Id"="1","Arn"="arn:aws:sns:us-east-1:123456789012:EC2Notifications"
+
+# Add multiple targets
+aws events put-targets \
+    --rule "CustomAppEvents" \
+    --targets \
+        "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:ProcessEvent" \
+        "Id"="2","Arn"="arn:aws:sqs:us-east-1:123456789012:EventQueue"
+
+# Add target with input transformer
+aws events put-targets \
+    --rule "EC2StateChange" \
+    --targets "Id"="1","Arn"="arn:aws:lambda:us-east-1:123456789012:function:NotifyFunction","InputTransformer"='{"InputPathsMap":{"instance":"$.detail.instance-id","state":"$.detail.state"},"InputTemplate":"\"Instance <instance> is now <state>\""}'
+```
+
+#### Describe and Delete Rules
+```bash
+# List all rules
+aws events list-rules
+
+# List rules with name prefix
+aws events list-rules \
+    --name-prefix "Prod-"
+
+# Describe specific rule
+aws events describe-rule \
+    --name "DailyBackup"
+
+# List targets for rule
+aws events list-targets-by-rule \
+    --rule "DailyBackup"
+
+# Remove targets from rule
+aws events remove-targets \
+    --rule "DailyBackup" \
+    --ids "1" "2"
+
+# Delete rule
+aws events delete-rule \
+    --name "DailyBackup"
+
+# Disable rule
+aws events disable-rule \
+    --name "DailyBackup"
+
+# Enable rule
+aws events enable-rule \
+    --name "DailyBackup"
+```
+
+#### Put Events
+```bash
+# Put custom event
+aws events put-events \
+    --entries '[{"Source":"custom.myapp","DetailType":"transaction","Detail":"{\"status\":\"SUCCESS\",\"amount\":100}"}]'
+
+# Put multiple events
+aws events put-events \
+    --entries \
+        '[{"Source":"custom.myapp","DetailType":"user.login","Detail":"{\"userId\":\"user123\"}"},
+          {"Source":"custom.myapp","DetailType":"order.created","Detail":"{\"orderId\":\"order456\"}"}]'
+```
+
+### CloudWatch Agent Configuration
+
+#### SSM Parameter Store Commands
+```bash
+# Store CloudWatch agent configuration
+aws ssm put-parameter \
+    --name "CloudWatch-Agent-Config" \
+    --type "String" \
+    --value file://cloudwatch-config.json \
+    --description "CloudWatch Agent configuration for EC2 instances"
+
+# Get agent configuration
+aws ssm get-parameter \
+    --name "CloudWatch-Agent-Config" \
+    --query 'Parameter.Value' \
+    --output text
+
+# Update agent configuration
+aws ssm put-parameter \
+    --name "CloudWatch-Agent-Config" \
+    --type "String" \
+    --value file://cloudwatch-config-updated.json \
+    --overwrite
+
+# Delete agent configuration
+aws ssm delete-parameter \
+    --name "CloudWatch-Agent-Config"
+```
+
+### Advanced Operations
+
+#### Tagging Operations
+```bash
+# Tag log group
+aws logs tag-log-group \
+    --log-group-name "/aws/lambda/my-function" \
+    --tags Project=MyProject,Environment=Production,CostCenter=Engineering
+
+# List tags for log group
+aws logs list-tags-log-group \
+    --log-group-name "/aws/lambda/my-function"
+
+# Untag log group
+aws logs untag-log-group \
+    --log-group-name "/aws/lambda/my-function" \
+    --tags Project Environment
+
+# Tag alarm
+aws cloudwatch tag-resource \
+    --resource-arn "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization" \
+    --tags Key=Environment,Value=Production Key=Application,Value=WebServer
+
+# List tags for alarm
+aws cloudwatch list-tags-for-resource \
+    --resource-arn "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
+
+# Untag alarm
+aws cloudwatch untag-resource \
+    --resource-arn "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization" \
+    --tag-keys Environment Application
+```
+
+#### Cross-Account and Cross-Region Operations
+```bash
+# Put metric data to different region
+aws cloudwatch put-metric-data \
+    --namespace "MyApplication/Performance" \
+    --metric-name "RequestCount" \
+    --value 100 \
+    --region us-west-2
+
+# Get metrics from different account (requires assume role)
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/EC2 \
+    --metric-name CPUUtilization \
+    --dimensions Name=InstanceId,Value=i-1234567890abcdef0 \
+    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+    --period 300 \
+    --statistics Average \
+    --profile cross-account-profile
+
+# Create cross-region dashboard
+aws cloudwatch put-dashboard \
+    --dashboard-name "MultiRegionDashboard" \
+    --dashboard-body file://cross-region-dashboard.json
+```
+
+#### Batch Operations
+```bash
+# Delete all alarms in ALARM state
+aws cloudwatch describe-alarms \
+    --state-value ALARM \
+    --query 'MetricAlarms[*].AlarmName' \
+    --output text | xargs -n 1 aws cloudwatch delete-alarms --alarm-names
+
+# Export all log groups to S3
+aws logs describe-log-groups \
+    --query 'logGroups[*].logGroupName' \
+    --output text | while read group; do
+        aws logs create-export-task \
+            --log-group-name "$group" \
+            --from $(date -d '30 days ago' +%s)000 \
+            --to $(date +%s)000 \
+            --destination "my-backup-bucket" \
+            --destination-prefix "logs/${group#/}/"
+    done
+
+# Update retention for all Lambda log groups
+aws logs describe-log-groups \
+    --log-group-name-prefix "/aws/lambda/" \
+    --query 'logGroups[*].logGroupName' \
+    --output text | while read group; do
+        aws logs put-retention-policy \
+            --log-group-name "$group" \
+            --retention-in-days 7
+    done
 ```
 
 ---

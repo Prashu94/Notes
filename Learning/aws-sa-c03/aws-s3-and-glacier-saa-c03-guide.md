@@ -8,7 +8,8 @@
 5. [Amazon Glacier](#amazon-glacier)
 6. [Lifecycle Management](#lifecycle-management)
 7. [Advanced Features](#advanced-features)
-8. [SAA-C03 Exam Scenarios](#saa-c03-exam-scenarios)
+8. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+9. [SAA-C03 Exam Scenarios](#saa-c03-exam-scenarios)
 
 ## S3 Fundamentals
 
@@ -1196,6 +1197,551 @@ Archive + Hours OK → S3 Glacier Flexible Retrieval
 Long-term Archive → S3 Glacier Deep Archive
 Unknown Patterns → S3 Intelligent-Tiering
 ```
+
+---
+
+## AWS CLI Commands Reference
+
+### Bucket Operations
+
+#### Create and Manage Buckets
+```bash
+# Create a bucket
+aws s3 mb s3://my-bucket-name --region us-east-1
+
+# Create a bucket with specific configuration
+aws s3api create-bucket \
+    --bucket my-bucket-name \
+    --region us-west-2 \
+    --create-bucket-configuration LocationConstraint=us-west-2
+
+# List all buckets
+aws s3 ls
+
+# List contents of a bucket
+aws s3 ls s3://my-bucket-name
+
+# List with details
+aws s3 ls s3://my-bucket-name --recursive --human-readable --summarize
+
+# Delete an empty bucket
+aws s3 rb s3://my-bucket-name
+
+# Delete bucket and all contents (force)
+aws s3 rb s3://my-bucket-name --force
+```
+
+#### Bucket Configuration
+```bash
+# Enable versioning
+aws s3api put-bucket-versioning \
+    --bucket my-bucket-name \
+    --versioning-configuration Status=Enabled
+
+# Get versioning status
+aws s3api get-bucket-versioning --bucket my-bucket-name
+
+# Enable server access logging
+aws s3api put-bucket-logging \
+    --bucket my-bucket-name \
+    --bucket-logging-status file://logging.json
+
+# Enable bucket encryption
+aws s3api put-bucket-encryption \
+    --bucket my-bucket-name \
+    --server-side-encryption-configuration file://encryption.json
+
+# Get bucket encryption
+aws s3api get-bucket-encryption --bucket my-bucket-name
+
+# Enable Transfer Acceleration
+aws s3api put-bucket-accelerate-configuration \
+    --bucket my-bucket-name \
+    --accelerate-configuration Status=Enabled
+```
+
+### Object Operations
+
+#### Upload and Download Objects
+```bash
+# Upload a file
+aws s3 cp myfile.txt s3://my-bucket-name/
+
+# Upload with storage class
+aws s3 cp myfile.txt s3://my-bucket-name/ \
+    --storage-class STANDARD_IA
+
+# Upload directory recursively
+aws s3 cp mydir/ s3://my-bucket-name/mydir/ --recursive
+
+# Upload with server-side encryption
+aws s3 cp myfile.txt s3://my-bucket-name/ \
+    --server-side-encryption AES256
+
+# Upload with KMS encryption
+aws s3 cp myfile.txt s3://my-bucket-name/ \
+    --server-side-encryption aws:kms \
+    --ssekms-key-id alias/my-key
+
+# Download a file
+aws s3 cp s3://my-bucket-name/myfile.txt ./
+
+# Download directory recursively
+aws s3 cp s3://my-bucket-name/mydir/ ./mydir/ --recursive
+
+# Sync local directory to S3
+aws s3 sync ./local-dir s3://my-bucket-name/remote-dir/
+
+# Sync S3 to local directory
+aws s3 sync s3://my-bucket-name/remote-dir/ ./local-dir
+
+# Sync with delete (remove files not in source)
+aws s3 sync ./local-dir s3://my-bucket-name/remote-dir/ --delete
+```
+
+#### Move and Delete Objects
+```bash
+# Move/rename object
+aws s3 mv s3://my-bucket-name/oldfile.txt s3://my-bucket-name/newfile.txt
+
+# Move local file to S3
+aws s3 mv myfile.txt s3://my-bucket-name/
+
+# Delete an object
+aws s3 rm s3://my-bucket-name/myfile.txt
+
+# Delete all objects in a directory
+aws s3 rm s3://my-bucket-name/mydir/ --recursive
+
+# Delete specific version of object
+aws s3api delete-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --version-id versionId123
+```
+
+#### Object Metadata and Properties
+```bash
+# Get object metadata
+aws s3api head-object \
+    --bucket my-bucket-name \
+    --key myfile.txt
+
+# Copy object with new metadata
+aws s3api copy-object \
+    --bucket my-bucket-name \
+    --copy-source my-bucket-name/myfile.txt \
+    --key myfile.txt \
+    --metadata Key1=Value1,Key2=Value2 \
+    --metadata-directive REPLACE
+
+# Change storage class of existing object
+aws s3api copy-object \
+    --bucket my-bucket-name \
+    --copy-source my-bucket-name/myfile.txt \
+    --key myfile.txt \
+    --storage-class GLACIER \
+    --metadata-directive COPY
+
+# Set object ACL
+aws s3api put-object-acl \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --acl public-read
+
+# Get object ACL
+aws s3api get-object-acl \
+    --bucket my-bucket-name \
+    --key myfile.txt
+```
+
+### Multipart Upload
+
+```bash
+# Initiate multipart upload
+aws s3api create-multipart-upload \
+    --bucket my-bucket-name \
+    --key large-file.zip
+
+# Upload parts (example for part 1)
+aws s3api upload-part \
+    --bucket my-bucket-name \
+    --key large-file.zip \
+    --part-number 1 \
+    --body part1.zip \
+    --upload-id <upload-id>
+
+# Complete multipart upload
+aws s3api complete-multipart-upload \
+    --bucket my-bucket-name \
+    --key large-file.zip \
+    --upload-id <upload-id> \
+    --multipart-upload file://parts.json
+
+# Abort multipart upload
+aws s3api abort-multipart-upload \
+    --bucket my-bucket-name \
+    --key large-file.zip \
+    --upload-id <upload-id>
+
+# List multipart uploads
+aws s3api list-multipart-uploads \
+    --bucket my-bucket-name
+```
+
+### Versioning
+
+```bash
+# List object versions
+aws s3api list-object-versions \
+    --bucket my-bucket-name \
+    --prefix myfile.txt
+
+# Get specific version of object
+aws s3api get-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --version-id versionId123 \
+    myfile-version.txt
+
+# Restore deleted object (remove delete marker)
+aws s3api delete-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --version-id <delete-marker-id>
+```
+
+### Bucket Policies and ACLs
+
+```bash
+# Get bucket policy
+aws s3api get-bucket-policy \
+    --bucket my-bucket-name
+
+# Set bucket policy
+aws s3api put-bucket-policy \
+    --bucket my-bucket-name \
+    --policy file://policy.json
+
+# Delete bucket policy
+aws s3api delete-bucket-policy \
+    --bucket my-bucket-name
+
+# Get bucket ACL
+aws s3api get-bucket-acl \
+    --bucket my-bucket-name
+
+# Set bucket ACL
+aws s3api put-bucket-acl \
+    --bucket my-bucket-name \
+    --acl private
+
+# Block public access
+aws s3api put-public-access-block \
+    --bucket my-bucket-name \
+    --public-access-block-configuration \
+    "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+# Get public access block configuration
+aws s3api get-public-access-block-configuration \
+    --bucket my-bucket-name
+```
+
+### Lifecycle Policies
+
+```bash
+# Set lifecycle policy
+aws s3api put-bucket-lifecycle-configuration \
+    --bucket my-bucket-name \
+    --lifecycle-configuration file://lifecycle.json
+
+# Get lifecycle policy
+aws s3api get-bucket-lifecycle-configuration \
+    --bucket my-bucket-name
+
+# Delete lifecycle policy
+aws s3api delete-bucket-lifecycle \
+    --bucket my-bucket-name
+
+# Example lifecycle.json
+# {
+#   "Rules": [
+#     {
+#       "Id": "MoveToIA",
+#       "Status": "Enabled",
+#       "Transitions": [
+#         {
+#           "Days": 30,
+#           "StorageClass": "STANDARD_IA"
+#         },
+#         {
+#           "Days": 90,
+#           "StorageClass": "GLACIER"
+#         }
+#       ],
+#       "Filter": {
+#         "Prefix": "documents/"
+#       }
+#     }
+#   ]
+# }
+```
+
+### Replication
+
+```bash
+# Configure replication
+aws s3api put-bucket-replication \
+    --bucket my-bucket-name \
+    --replication-configuration file://replication.json
+
+# Get replication configuration
+aws s3api get-bucket-replication \
+    --bucket my-bucket-name
+
+# Delete replication configuration
+aws s3api delete-bucket-replication \
+    --bucket my-bucket-name
+```
+
+### Static Website Hosting
+
+```bash
+# Enable static website hosting
+aws s3api put-bucket-website \
+    --bucket my-bucket-name \
+    --website-configuration file://website.json
+
+# Get website configuration
+aws s3api get-bucket-website \
+    --bucket my-bucket-name
+
+# Delete website configuration
+aws s3api delete-bucket-website \
+    --bucket my-bucket-name
+
+# Example website.json
+# {
+#   "IndexDocument": {
+#     "Suffix": "index.html"
+#   },
+#   "ErrorDocument": {
+#     "Key": "error.html"
+#   }
+# }
+```
+
+### Pre-signed URLs
+
+```bash
+# Generate pre-signed URL (valid for 1 hour)
+aws s3 presign s3://my-bucket-name/myfile.txt \
+    --expires-in 3600
+
+# Generate pre-signed URL for upload
+aws s3 presign s3://my-bucket-name/upload-file.txt \
+    --expires-in 3600
+```
+
+### Bucket Notifications
+
+```bash
+# Configure bucket notifications
+aws s3api put-bucket-notification-configuration \
+    --bucket my-bucket-name \
+    --notification-configuration file://notification.json
+
+# Get notification configuration
+aws s3api get-bucket-notification-configuration \
+    --bucket my-bucket-name
+
+# Example notification.json for Lambda
+# {
+#   "LambdaFunctionConfigurations": [
+#     {
+#       "Id": "ObjectCreated",
+#       "LambdaFunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:MyFunction",
+#       "Events": ["s3:ObjectCreated:*"]
+#     }
+#   ]
+# }
+```
+
+### Glacier Operations
+
+```bash
+# Initiate restore from Glacier
+aws s3api restore-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --restore-request '{"Days":7,"GlacierJobParameters":{"Tier":"Standard"}}'
+
+# Check restore status
+aws s3api head-object \
+    --bucket my-bucket-name \
+    --key myfile.txt
+
+# Expedited retrieval
+aws s3api restore-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --restore-request '{"Days":1,"GlacierJobParameters":{"Tier":"Expedited"}}'
+
+# Bulk retrieval
+aws s3api restore-object \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --restore-request '{"Days":7,"GlacierJobParameters":{"Tier":"Bulk"}}'
+```
+
+### Glacier Vault Operations
+
+```bash
+# Create a vault
+aws glacier create-vault \
+    --account-id - \
+    --vault-name my-vault
+
+# List vaults
+aws glacier list-vaults --account-id -
+
+# Describe vault
+aws glacier describe-vault \
+    --account-id - \
+    --vault-name my-vault
+
+# Delete vault
+aws glacier delete-vault \
+    --account-id - \
+    --vault-name my-vault
+
+# Initiate archive retrieval
+aws glacier initiate-job \
+    --account-id - \
+    --vault-name my-vault \
+    --job-parameters '{"Type":"archive-retrieval","ArchiveId":"archive-id","Tier":"Standard"}'
+
+# List jobs
+aws glacier list-jobs \
+    --account-id - \
+    --vault-name my-vault
+
+# Get job output
+aws glacier get-job-output \
+    --account-id - \
+    --vault-name my-vault \
+    --job-id job-id \
+    output-file.txt
+```
+
+### S3 Analytics and Inventory
+
+```bash
+# Configure S3 analytics
+aws s3api put-bucket-analytics-configuration \
+    --bucket my-bucket-name \
+    --id analytics-id \
+    --analytics-configuration file://analytics.json
+
+# Get analytics configuration
+aws s3api get-bucket-analytics-configuration \
+    --bucket my-bucket-name \
+    --id analytics-id
+
+# Configure S3 inventory
+aws s3api put-bucket-inventory-configuration \
+    --bucket my-bucket-name \
+    --id inventory-id \
+    --inventory-configuration file://inventory.json
+
+# Get inventory configuration
+aws s3api get-bucket-inventory-configuration \
+    --bucket my-bucket-name \
+    --id inventory-id
+```
+
+### Tagging
+
+```bash
+# Add tags to bucket
+aws s3api put-bucket-tagging \
+    --bucket my-bucket-name \
+    --tagging 'TagSet=[{Key=Environment,Value=Production},{Key=Owner,Value=TeamA}]'
+
+# Get bucket tags
+aws s3api get-bucket-tagging \
+    --bucket my-bucket-name
+
+# Delete bucket tags
+aws s3api delete-bucket-tagging \
+    --bucket my-bucket-name
+
+# Add tags to object
+aws s3api put-object-tagging \
+    --bucket my-bucket-name \
+    --key myfile.txt \
+    --tagging 'TagSet=[{Key=Category,Value=Documents}]'
+
+# Get object tags
+aws s3api get-object-tagging \
+    --bucket my-bucket-name \
+    --key myfile.txt
+```
+
+### CORS Configuration
+
+```bash
+# Set CORS configuration
+aws s3api put-bucket-cors \
+    --bucket my-bucket-name \
+    --cors-configuration file://cors.json
+
+# Get CORS configuration
+aws s3api get-bucket-cors \
+    --bucket my-bucket-name
+
+# Delete CORS configuration
+aws s3api delete-bucket-cors \
+    --bucket my-bucket-name
+
+# Example cors.json
+# {
+#   "CORSRules": [
+#     {
+#       "AllowedOrigins": ["https://example.com"],
+#       "AllowedMethods": ["GET", "PUT", "POST"],
+#       "AllowedHeaders": ["*"],
+#       "MaxAgeSeconds": 3000
+#     }
+#   ]
+# }
+```
+
+### Requester Pays and Other Features
+
+```bash
+# Enable Requester Pays
+aws s3api put-bucket-request-payment \
+    --bucket my-bucket-name \
+    --request-payment-configuration Payer=Requester
+
+# Get request payment configuration
+aws s3api get-bucket-request-payment \
+    --bucket my-bucket-name
+
+# Enable Object Lock
+aws s3api put-object-lock-configuration \
+    --bucket my-bucket-name \
+    --object-lock-configuration file://object-lock.json
+
+# Get Object Lock configuration
+aws s3api get-object-lock-configuration \
+    --bucket my-bucket-name
+```
+
+---
+
+## SAA-C03 Exam Scenarios
 
 #### Security Decision Framework
 1. **Encryption**: Always encrypt sensitive data

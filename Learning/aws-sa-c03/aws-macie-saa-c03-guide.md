@@ -11,8 +11,9 @@
 8. [Security and Compliance](#security-and-compliance)
 9. [Pricing and Cost Optimization](#pricing-and-cost-optimization)
 10. [Best Practices](#best-practices)
-11. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-12. [Practice Questions](#practice-questions)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
+13. [Practice Questions](#practice-questions)
 
 ---
 
@@ -671,6 +672,655 @@ Macie helps with compliance for:
 2. **Enable for all accounts**: Ensure comprehensive coverage
 3. **Standardize configurations**: Use consistent custom identifiers
 4. **Centralize findings**: Export to central S3 bucket for analysis
+
+---
+
+## AWS CLI Commands Reference
+
+### Enable and Configure Macie
+
+#### Enable Macie
+
+```bash
+# Enable Macie in current region
+aws macie2 enable-macie \
+  --status ENABLED \
+  --finding-publishing-frequency FIFTEEN_MINUTES
+
+# Available publishing frequencies:
+# - FIFTEEN_MINUTES
+# - ONE_HOUR  
+# - SIX_HOURS
+
+# Check Macie status
+aws macie2 get-macie-session
+
+# Update Macie configuration
+aws macie2 update-macie-session \
+  --status ENABLED \
+  --finding-publishing-frequency ONE_HOUR
+
+# Disable Macie (this deletes all Macie resources)
+aws macie2 disable-macie
+```
+
+### Classification Jobs
+
+#### Create Classification Jobs
+
+```bash
+# Create a one-time classification job for specific S3 buckets
+aws macie2 create-classification-job \
+  --job-type ONE_TIME \
+  --name "PII-Discovery-Job-$(date +%Y%m%d)" \
+  --description "Scan production buckets for PII" \
+  --s3-job-definition '{
+    "bucketDefinitions": [
+      {
+        "accountId": "123456789012",
+        "buckets": ["my-production-bucket", "user-data-bucket"]
+      }
+    ],
+    "scoping": {
+      "includes": {
+        "and": [
+          {
+            "simpleScopeTerm": {
+              "key": "OBJECT_EXTENSION",
+              "comparator": "EQ",
+              "values": ["csv", "json", "txt"]
+            }
+          }
+        ]
+      }
+    }
+  }' \
+  --managed-data-identifier-ids \
+    CREDIT_CARD_NUMBER \
+    US_SOCIAL_SECURITY_NUMBER \
+    EMAIL_ADDRESS
+
+# Create scheduled classification job (daily)
+aws macie2 create-classification-job \
+  --job-type SCHEDULED \
+  --name "Daily-Sensitive-Data-Scan" \
+  --schedule-frequency '{
+    "dailySchedule": {}
+  }' \
+  --s3-job-definition '{
+    "bucketDefinitions": [
+      {
+        "accountId": "123456789012",
+        "buckets": ["data-lake-bucket"]
+      }
+    ]
+  }'
+
+# Create job with custom data identifiers
+CUSTOM_IDENTIFIER_ID="custom-12345678-1234-1234-1234-123456789012"
+
+aws macie2 create-classification-job \
+  --job-type ONE_TIME \
+  --name "Custom-Pattern-Scan" \
+  --s3-job-definition '{
+    "bucketDefinitions": [
+      {
+        "accountId": "123456789012",
+        "buckets": ["logs-bucket"]
+      }
+    ]
+  }' \
+  --custom-data-identifier-ids $CUSTOM_IDENTIFIER_ID
+
+# List all classification jobs
+aws macie2 list-classification-jobs \
+  --filter-criteria '{
+    "includes": [
+      {
+        "key": "jobStatus",
+        "values": ["RUNNING", "PAUSED"]
+      }
+    ]
+  }'
+
+# Describe a specific job
+JOB_ID="job-12345678-1234-1234-1234-123456789012"
+aws macie2 describe-classification-job \
+  --job-id $JOB_ID
+
+# Get job statistics
+aws macie2 get-classification-job-statistics \
+  --job-id $JOB_ID
+```
+
+#### Manage Classification Jobs
+
+```bash
+# Pause a classification job
+aws macie2 update-classification-job \
+  --job-id $JOB_ID \
+  --job-status PAUSED
+
+# Resume a paused job
+aws macie2 update-classification-job \
+  --job-id $JOB_ID \
+  --job-status RUNNING
+
+# Cancel a job
+aws macie2 update-classification-job \
+  --job-id $JOB_ID \
+  --job-status CANCELLED
+
+# Delete a job and its findings
+aws macie2 delete-classification-job \
+  --job-id $JOB_ID
+```
+
+### Findings Management
+
+#### List Findings
+
+```bash
+# List all findings
+aws macie2 list-findings
+
+# List findings with filters
+aws macie2 list-findings \
+  --finding-criteria '{
+    "criterion": {
+      "severity.description": {
+        "eq": ["High"]
+      },
+      "type": {
+        "eq": ["SensitiveData:S3Object/Personal"]
+      }
+    }
+  }'
+
+# List findings from last 24 hours
+aws macie2 list-findings \
+  --finding-criteria '{
+    "criterion": {
+      "createdAt": {
+        "gte": '$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')'
+      }
+    }
+  }'
+
+# List findings for specific bucket
+aws macie2 list-findings \
+  --finding-criteria '{
+    "criterion": {
+      "resourcesAffected.s3Bucket.name": {
+        "eq": ["my-sensitive-data-bucket"]
+      }
+    }
+  }'
+
+# Sort findings by severity
+aws macie2 list-findings \
+  --sort-criteria '{
+    "attributeName": "severity.score",
+    "orderBy": "DESC"
+  }' \
+  --max-results 50
+```
+
+#### Get Finding Details
+
+```bash
+# Get details for specific findings
+FINDING_ID="finding-12345678901234567890123456789012"
+
+aws macie2 get-findings \
+  --finding-ids $FINDING_ID
+
+# Get multiple findings
+aws macie2 get-findings \
+  --finding-ids \
+    "finding-12345678901234567890123456789012" \
+    "finding-98765432109876543210987654321098"
+
+# Get findings and extract specific fields
+aws macie2 get-findings \
+  --finding-ids $FINDING_ID \
+  --query 'findings[*].[id,type,severity.description,resourcesAffected.s3Object.key]' \
+  --output table
+```
+
+#### Update Finding Status
+
+```bash
+# Archive a finding
+aws macie2 update-findings \
+  --finding-ids $FINDING_ID \
+  --status ARCHIVED
+
+# Archive with comment
+aws macie2 update-findings \
+  --finding-ids $FINDING_ID \
+  --status ARCHIVED \
+  --comment "False positive - test data"
+
+# Unarchive a finding
+aws macie2 update-findings \
+  --finding-ids $FINDING_ID \
+  --status UNARCHIVED
+```
+
+### Custom Data Identifiers
+
+```bash
+# Create custom data identifier with regex
+aws macie2 create-custom-data-identifier \
+  --name "Employee-ID-Pattern" \
+  --description "Detects company employee IDs" \
+  --regex "EMP-[0-9]{6}" \
+  --maximum-match-distance 50 \
+  --keywords "employee" "personnel" "staff"
+
+# Create custom identifier with ignore words
+aws macie2 create-custom-data-identifier \
+  --name "API-Key-Pattern" \
+  --description "Detects API keys" \
+  --regex "[A-Z0-9]{32}" \
+  --keywords "api_key" "apikey" "key" \
+  --ignore-words "example" "sample" "test"
+
+# List all custom data identifiers
+aws macie2 list-custom-data-identifiers
+
+# Get custom identifier details
+CUSTOM_ID="custom-12345678-1234-1234-1234-123456789012"
+aws macie2 get-custom-data-identifier \
+  --id $CUSTOM_ID
+
+# Update custom data identifier
+aws macie2 update-custom-data-identifier \
+  --id $CUSTOM_ID \
+  --description "Updated description" \
+  --name "Employee-ID-Pattern-v2"
+
+# Delete custom data identifier
+aws macie2 delete-custom-data-identifier \
+  --id $CUSTOM_ID
+
+# Test custom data identifier
+aws macie2 test-custom-data-identifier \
+  --regex "EMP-[0-9]{6}" \
+  --sample-text "Employee ID: EMP-123456. Contact: john@example.com"
+```
+
+### Allow Lists
+
+```bash
+# Create S3-based allow list
+aws macie2 create-allow-list \
+  --name "Known-Test-Data" \
+  --description "Test data to exclude from findings" \
+  --criteria '{
+    "s3WordsList": {
+      "bucketName": "macie-allow-lists",
+      "objectKey": "test-data-patterns.txt"
+    }
+  }'
+
+# Create regex-based allow list
+aws macie2 create-allow-list \
+  --name "Test-Accounts-Regex" \
+  --description "Exclude test account numbers" \
+  --criteria '{
+    "regex": "(000-00-0000|111-11-1111|123-45-6789)"
+  }'
+
+# List all allow lists
+aws macie2 list-allow-lists
+
+# Get allow list details
+ALLOW_LIST_ID="allowlist-12345678-1234-1234-1234-123456789012"
+aws macie2 get-allow-list \
+  --id $ALLOW_LIST_ID
+
+# Update allow list
+aws macie2 update-allow-list \
+  --id $ALLOW_LIST_ID \
+  --description "Updated allow list description"
+
+# Delete allow list
+aws macie2 delete-allow-list \
+  --id $ALLOW_LIST_ID
+```
+
+### Sensitive Data Discovery
+
+```bash
+# Get sensitive data discovery configuration
+aws macie2 get-automated-discovery-configuration
+
+# Enable automated sensitive data discovery
+aws macie2 update-automated-discovery-configuration \
+  --status ENABLED
+
+# Disable automated discovery
+aws macie2 update-automated-discovery-configuration \
+  --status DISABLED
+
+# List managed data identifiers
+aws macie2 list-managed-data-identifiers
+
+# Get usage statistics for sensitive data discovery
+aws macie2 get-usage-statistics \
+  --time-range '{
+    "key": "PAST_30_DAYS"
+  }' \
+  --filter-by '[
+    {
+      "key": "accountId",
+      "values": ["123456789012"]
+    }
+  ]'
+
+# Get sensitive data occurrences
+aws macie2 get-sensitive-data-occurrences \
+  --finding-id $FINDING_ID
+
+# Retrieve sample occurrences from findings
+aws macie2 get-sensitive-data-occurrences-availability \
+  --finding-id $FINDING_ID
+```
+
+### S3 Bucket Configuration
+
+```bash
+# List S3 buckets tracked by Macie
+aws macie2 describe-buckets
+
+# Get specific bucket details
+aws macie2 describe-buckets \
+  --criteria '{
+    "bucketName": {
+      "eq": ["my-sensitive-bucket"]
+    }
+  }'
+
+# Update bucket classification scope
+aws macie2 update-classification-scope \
+  --id "bucket-scope-123" \
+  --s3 '{
+    "excludes": {
+      "bucketNames": ["logs-bucket", "temp-bucket"]
+    }
+  }'
+
+# Get bucket statistics
+aws macie2 get-bucket-statistics \
+  --account-id 123456789012
+
+# Update S3 resource classification
+aws macie2 update-resource-profile \
+  --resource-arn "arn:aws:s3:::my-bucket" \
+  --sensitivity-score-override 75
+
+# Detach S3 resources from Macie
+aws macie2 update-resource-profile-detections \
+  --resource-arn "arn:aws:s3:::my-bucket" \
+  --suppress-data-identifiers \
+    custom-12345678-1234-1234-1234-123456789012
+```
+
+### Member Account Management
+
+```bash
+# Create Macie member accounts (run from administrator account)
+aws macie2 create-member \
+  --account '{
+    "accountId": "123456789012",
+    "email": "member@example.com"
+  }'
+
+# Invite member account
+aws macie2 create-invitations \
+  --account-ids 123456789012 234567890123 \
+  --disable-email-notification
+
+# List member accounts
+aws macie2 list-members
+
+# Get member account details
+aws macie2 get-member \
+  --id 123456789012
+
+# Accept invitation (run from member account)
+aws macie2 accept-invitation \
+  --administrator-account-id 111111111111 \
+  --invitation-id inv-12345678901234567890
+
+# Decline invitation (run from member account)
+aws macie2 decline-invitations \
+  --account-ids 111111111111
+
+# Disassociate from administrator (run from member account)
+aws macie2 disassociate-from-administrator-account
+
+# Disassociate member (run from administrator account)
+aws macie2 disassociate-member \
+  --id 123456789012
+
+# Delete member
+aws macie2 delete-member \
+  --id 123456789012
+
+# List invitations received
+aws macie2 list-invitations
+
+# Get administrator account info (run from member)
+aws macie2 get-administrator-account
+```
+
+### Organization Delegated Administrator
+
+```bash
+# Enable Macie delegated administrator (run from management account)
+aws macie2 enable-organization-admin-account \
+  --admin-account-id 123456789012
+
+# List delegated administrators
+aws macie2 list-organization-admin-accounts
+
+# Disable delegated administrator
+aws macie2 disable-organization-admin-account \
+  --admin-account-id 123456789012
+```
+
+### Finding Filters
+
+```bash
+# Create finding filter to auto-archive findings
+aws macie2 create-findings-filter \
+  --name "Auto-Archive-Test-Findings" \
+  --description "Automatically archive findings in test buckets" \
+  --action ARCHIVE \
+  --finding-criteria '{
+    "criterion": {
+      "resourcesAffected.s3Bucket.name": {
+        "eq": ["test-bucket", "dev-bucket"]
+      }
+    }
+  }'
+
+# Create filter for high severity findings
+aws macie2 create-findings-filter \
+  --name "High-Severity-Alert" \
+  --description "Tag high severity findings" \
+  --action NOOP \
+  --finding-criteria '{
+    "criterion": {
+      "severity.description": {
+        "eq": ["High"]
+      }
+    }
+  }'
+
+# List finding filters
+aws macie2 list-findings-filters
+
+# Get finding filter details
+FILTER_ID="filter-12345678-1234-1234-1234-123456789012"
+aws macie2 get-findings-filter \
+  --id $FILTER_ID
+
+# Update finding filter
+aws macie2 update-findings-filter \
+  --id $FILTER_ID \
+  --action ARCHIVE \
+  --description "Updated filter description"
+
+# Delete finding filter
+aws macie2 delete-findings-filter \
+  --id $FILTER_ID
+```
+
+### Export and Reporting
+
+```bash
+# Configure finding publication to S3
+aws macie2 put-findings-publication-configuration \
+  --destination-configuration '{
+    "s3Destination": {
+      "bucketName": "macie-findings-export",
+      "keyPrefix": "findings/",
+      "kmsKeyArn": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+    }
+  }'
+
+# Get finding publication configuration
+aws macie2 get-findings-publication-configuration
+
+# Get finding statistics
+aws macie2 get-finding-statistics \
+  --group-by "type" \
+  --finding-criteria '{
+    "criterion": {
+      "createdAt": {
+        "gte": "2024-01-01T00:00:00Z"
+      }
+    }
+  }'
+
+# Get finding statistics by severity
+aws macie2 get-finding-statistics \
+  --group-by "severity.description"
+```
+
+### Practical Automation Scripts
+
+#### Comprehensive Findings Report
+
+```bash
+#!/bin/bash
+# Generate comprehensive Macie findings report
+
+REPORT_FILE="macie-findings-report-$(date +%Y%m%d).json"
+
+echo "Generating Macie findings report..."
+
+# Get all findings
+FINDINGS=$(aws macie2 list-findings --max-results 1000 --output json)
+FINDING_IDS=$(echo $FINDINGS | jq -r '.findingIds[]')
+
+if [ -z "$FINDING_IDS" ]; then
+  echo "No findings found"
+  exit 0
+fi
+
+# Get detailed findings
+IDS_ARRAY=$(echo $FINDING_IDS | jq -R 'split(" ")' | jq -c '.')
+aws macie2 get-findings --finding-ids $(echo $FINDING_IDS | tr '\n' ' ') > $REPORT_FILE
+
+echo "Report generated: $REPORT_FILE"
+
+# Generate summary
+echo "\nFindings Summary:"
+jq -r '.findings | group_by(.severity.description) | .[] | "\(.[] |.severity.description): \(length)"' $REPORT_FILE | sort | uniq
+```
+
+#### Auto-Remediation Script
+
+```bash
+#!/bin/bash
+# Automatically remediate public S3 buckets found by Macie
+
+echo "Checking for public bucket findings..."
+
+# Find policy findings for public buckets
+FINDINGS=$(aws macie2 list-findings \
+  --finding-criteria '{
+    "criterion": {
+      "category": {"eq": ["POLICY"]},
+      "type": {"eq": ["Policy:IAMUser/S3BucketPublic"]}
+    }
+  }' --query 'findingIds' --output text)
+
+if [ -z "$FINDINGS" ]; then
+  echo "No public bucket findings"
+  exit 0
+fi
+
+# Process each finding
+for FINDING_ID in $FINDINGS; do
+  echo "Processing finding: $FINDING_ID"
+  
+  # Get bucket name from finding
+  BUCKET=$(aws macie2 get-findings \
+    --finding-ids $FINDING_ID \
+    --query 'findings[0].resourcesAffected.s3Bucket.name' \
+    --output text)
+  
+  echo "Remediating bucket: $BUCKET"
+  
+  # Block public access
+  aws s3api put-public-access-block \
+    --bucket $BUCKET \
+    --public-access-block-configuration \
+      "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+  
+  if [ $? -eq 0 ]; then
+    echo "✅ Remediated: $BUCKET"
+    
+    # Archive the finding
+    aws macie2 update-findings \
+      --finding-ids $FINDING_ID \
+      --status ARCHIVED \
+      --comment "Auto-remediated: Public access blocked"
+  else
+    echo "❌ Failed to remediate: $BUCKET"
+  fi
+done
+```
+
+#### Multi-Region Macie Setup
+
+```bash
+#!/bin/bash
+# Enable Macie across all regions
+
+REGIONS=("us-east-1" "us-west-2" "eu-west-1" "ap-southeast-1")
+
+for REGION in "${REGIONS[@]}"; do
+  echo "Enabling Macie in $REGION..."
+  
+  aws macie2 enable-macie \
+    --region $REGION \
+    --status ENABLED \
+    --finding-publishing-frequency FIFTEEN_MINUTES
+  
+  if [ $? -eq 0 ]; then
+    echo "✅ Enabled in $REGION"
+  else
+    echo "❌ Failed in $REGION"
+  fi
+done
+```
 
 ---
 

@@ -18,7 +18,8 @@
 15. [Best Practices](#best-practices)
 16. [Common Use Cases](#common-use-cases)
 17. [Troubleshooting](#troubleshooting)
-18. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
+18. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+19. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
 
 ## Overview
 
@@ -725,6 +726,1055 @@ aws cloudwatch put-metric-alarm \
 - Process monitoring
 - Real-time performance data
 - Resource utilization details
+
+## AWS CLI Commands Reference
+
+### DB Instance Management
+
+#### Create DB Instances
+```bash
+# Create a MySQL DB instance
+aws rds create-db-instance \
+    --db-instance-identifier mydb-instance \
+    --db-instance-class db.t3.medium \
+    --engine mysql \
+    --engine-version 8.0.35 \
+    --master-username admin \
+    --master-user-password MyPassword123! \
+    --allocated-storage 100 \
+    --storage-type gp3 \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group \
+    --backup-retention-period 7 \
+    --preferred-backup-window "03:00-04:00" \
+    --preferred-maintenance-window "mon:04:00-mon:05:00" \
+    --storage-encrypted \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Create a PostgreSQL DB instance with Multi-AZ
+aws rds create-db-instance \
+    --db-instance-identifier postgres-prod \
+    --db-instance-class db.r5.xlarge \
+    --engine postgres \
+    --engine-version 15.4 \
+    --master-username postgres \
+    --master-user-password SecurePass123! \
+    --allocated-storage 500 \
+    --storage-type io1 \
+    --iops 3000 \
+    --multi-az \
+    --db-subnet-group-name prod-db-subnet-group \
+    --vpc-security-group-ids sg-0987654321fedcba0 \
+    --backup-retention-period 14 \
+    --enable-cloudwatch-logs-exports '["postgresql"]' \
+    --storage-encrypted
+
+# Create SQL Server DB instance
+aws rds create-db-instance \
+    --db-instance-identifier sqlserver-prod \
+    --db-instance-class db.m5.2xlarge \
+    --engine sqlserver-se \
+    --engine-version 15.00.4335.1.v1 \
+    --master-username admin \
+    --master-user-password Password123! \
+    --allocated-storage 400 \
+    --storage-type gp3 \
+    --iops 12000 \
+    --license-model license-included \
+    --multi-az \
+    --storage-encrypted
+
+# Create Oracle DB instance with BYOL
+aws rds create-db-instance \
+    --db-instance-identifier oracle-prod \
+    --db-instance-class db.m5.4xlarge \
+    --engine oracle-ee \
+    --engine-version 19.0.0.0.ru-2023-10.rur-2023-10.r1 \
+    --master-username admin \
+    --master-user-password OraclePass123! \
+    --allocated-storage 1000 \
+    --storage-type io2 \
+    --iops 10000 \
+    --license-model bring-your-own-license \
+    --multi-az \
+    --storage-encrypted
+```
+
+#### List and Describe DB Instances
+```bash
+# List all DB instances
+aws rds describe-db-instances
+
+# List specific DB instance
+aws rds describe-db-instances \
+    --db-instance-identifier mydb-instance
+
+# List DB instances with specific engine
+aws rds describe-db-instances \
+    --query 'DBInstances[?Engine==`mysql`].[DBInstanceIdentifier,DBInstanceClass,EngineVersion]' \
+    --output table
+
+# List Multi-AZ instances
+aws rds describe-db-instances \
+    --query 'DBInstances[?MultiAZ==`true`].[DBInstanceIdentifier,Engine,MultiAZ]' \
+    --output table
+
+# Get DB instance endpoint
+aws rds describe-db-instances \
+    --db-instance-identifier mydb-instance \
+    --query 'DBInstances[0].Endpoint.[Address,Port]' \
+    --output text
+```
+
+#### Modify DB Instances
+```bash
+# Modify DB instance class (scale up)
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --db-instance-class db.r5.2xlarge \
+    --apply-immediately
+
+# Modify storage (increase size and IOPS)
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --allocated-storage 200 \
+    --storage-type gp3 \
+    --iops 6000 \
+    --apply-immediately
+
+# Enable Multi-AZ
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --multi-az \
+    --apply-immediately
+
+# Disable Multi-AZ
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --no-multi-az \
+    --apply-immediately
+
+# Change backup retention period
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --backup-retention-period 14 \
+    --preferred-backup-window "02:00-03:00"
+
+# Enable Performance Insights
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --enable-performance-insights \
+    --performance-insights-retention-period 7 \
+    --apply-immediately
+
+# Enable Enhanced Monitoring
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --monitoring-interval 60 \
+    --monitoring-role-arn arn:aws:iam::123456789012:role/rds-monitoring-role \
+    --apply-immediately
+
+# Enable deletion protection
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --deletion-protection \
+    --apply-immediately
+
+# Disable deletion protection
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --no-deletion-protection \
+    --apply-immediately
+```
+
+#### Start, Stop, and Reboot Instances
+```bash
+# Stop a DB instance
+aws rds stop-db-instance \
+    --db-instance-identifier mydb-instance
+
+# Start a stopped DB instance
+aws rds start-db-instance \
+    --db-instance-identifier mydb-instance
+
+# Reboot a DB instance
+aws rds reboot-db-instance \
+    --db-instance-identifier mydb-instance
+
+# Reboot with failover (Multi-AZ)
+aws rds reboot-db-instance \
+    --db-instance-identifier mydb-instance \
+    --force-failover
+```
+
+#### Delete DB Instances
+```bash
+# Delete DB instance without final snapshot
+aws rds delete-db-instance \
+    --db-instance-identifier mydb-instance \
+    --skip-final-snapshot
+
+# Delete DB instance with final snapshot
+aws rds delete-db-instance \
+    --db-instance-identifier mydb-instance \
+    --final-db-snapshot-identifier mydb-final-snapshot-2024
+
+# Delete DB instance and delete automated backups
+aws rds delete-db-instance \
+    --db-instance-identifier mydb-instance \
+    --skip-final-snapshot \
+    --delete-automated-backups
+```
+
+### Snapshot Management
+
+#### Create DB Snapshots
+```bash
+# Create manual DB snapshot
+aws rds create-db-snapshot \
+    --db-instance-identifier mydb-instance \
+    --db-snapshot-identifier mydb-snapshot-20240208
+
+# Create snapshot with tags
+aws rds create-db-snapshot \
+    --db-instance-identifier mydb-instance \
+    --db-snapshot-identifier mydb-snapshot-prod \
+    --tags Key=Environment,Value=Production Key=Backup,Value=Manual
+```
+
+#### List and Describe Snapshots
+```bash
+# List all DB snapshots
+aws rds describe-db-snapshots
+
+# List snapshots for specific DB instance
+aws rds describe-db-snapshots \
+    --db-instance-identifier mydb-instance
+
+# List manual snapshots
+aws rds describe-db-snapshots \
+    --snapshot-type manual
+
+# List automated snapshots
+aws rds describe-db-snapshots \
+    --snapshot-type automated
+
+# Describe specific snapshot
+aws rds describe-db-snapshots \
+    --db-snapshot-identifier mydb-snapshot-20240208
+
+# List snapshots with specific tag
+aws rds describe-db-snapshots \
+    --query 'DBSnapshots[?contains(Tags[?Key==`Environment`].Value, `Production`)].[DBSnapshotIdentifier,SnapshotCreateTime]' \
+    --output table
+```
+
+#### Restore from Snapshot
+```bash
+# Restore DB instance from snapshot
+aws rds restore-db-instance-from-db-snapshot \
+    --db-instance-identifier mydb-restored \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --db-instance-class db.t3.medium \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group
+
+# Restore with different storage type
+aws rds restore-db-instance-from-db-snapshot \
+    --db-instance-identifier mydb-restored \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --db-instance-class db.r5.xlarge \
+    --storage-type gp3 \
+    --iops 4000 \
+    --multi-az
+
+# Restore to specific availability zone
+aws rds restore-db-instance-from-db-snapshot \
+    --db-instance-identifier mydb-restored \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --availability-zone us-east-1a
+```
+
+#### Copy Snapshots
+```bash
+# Copy snapshot within same region
+aws rds copy-db-snapshot \
+    --source-db-snapshot-identifier mydb-snapshot-20240208 \
+    --target-db-snapshot-identifier mydb-snapshot-copy-20240208
+
+# Copy snapshot to another region (cross-region)
+aws rds copy-db-snapshot \
+    --source-db-snapshot-identifier arn:aws:rds:us-east-1:123456789012:snapshot:mydb-snapshot-20240208 \
+    --target-db-snapshot-identifier mydb-snapshot-dr \
+    --region us-west-2
+
+# Copy encrypted snapshot
+aws rds copy-db-snapshot \
+    --source-db-snapshot-identifier mydb-snapshot-20240208 \
+    --target-db-snapshot-identifier mydb-snapshot-encrypted \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Copy snapshot with option to share
+aws rds copy-db-snapshot \
+    --source-db-snapshot-identifier mydb-snapshot-20240208 \
+    --target-db-snapshot-identifier mydb-snapshot-shared \
+    --copy-tags
+```
+
+#### Share and Modify Snapshots
+```bash
+# Share snapshot with another AWS account
+aws rds modify-db-snapshot-attribute \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --attribute-name restore \
+    --values-to-add 987654321098
+
+# Make snapshot public (use with caution)
+aws rds modify-db-snapshot-attribute \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --attribute-name restore \
+    --values-to-add all
+
+# Remove account access from snapshot
+aws rds modify-db-snapshot-attribute \
+    --db-snapshot-identifier mydb-snapshot-20240208 \
+    --attribute-name restore \
+    --values-to-remove 987654321098
+
+# Describe snapshot attributes
+aws rds describe-db-snapshot-attributes \
+    --db-snapshot-identifier mydb-snapshot-20240208
+```
+
+#### Delete Snapshots
+```bash
+# Delete manual snapshot
+aws rds delete-db-snapshot \
+    --db-snapshot-identifier mydb-snapshot-20240208
+```
+
+### Read Replicas
+
+#### Create Read Replicas
+```bash
+# Create read replica in same region
+aws rds create-db-instance-read-replica \
+    --db-instance-identifier mydb-replica-1 \
+    --source-db-instance-identifier mydb-instance \
+    --db-instance-class db.t3.medium \
+    --availability-zone us-east-1b
+
+# Create read replica in different AZ
+aws rds create-db-instance-read-replica \
+    --db-instance-identifier mydb-replica-2 \
+    --source-db-instance-identifier mydb-instance \
+    --db-instance-class db.r5.large \
+    --availability-zone us-east-1c \
+    --storage-type gp3 \
+    --iops 4000
+
+# Create cross-region read replica
+aws rds create-db-instance-read-replica \
+    --db-instance-identifier mydb-replica-west \
+    --source-db-instance-identifier arn:aws:rds:us-east-1:123456789012:db:mydb-instance \
+    --db-instance-class db.t3.large \
+    --region us-west-2 \
+    --vpc-security-group-ids sg-0987654321fedcba0 \
+    --db-subnet-group-name west-db-subnet-group
+
+# Create read replica with encryption
+aws rds create-db-instance-read-replica \
+    --db-instance-identifier mydb-replica-encrypted \
+    --source-db-instance-identifier mydb-instance \
+    --storage-encrypted \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Create read replica with auto minor version upgrade
+aws rds create-db-instance-read-replica \
+    --db-instance-identifier mydb-replica-auto \
+    --source-db-instance-identifier mydb-instance \
+    --db-instance-class db.t3.medium \
+    --auto-minor-version-upgrade
+```
+
+#### Promote Read Replica
+```bash
+# Promote read replica to standalone instance
+aws rds promote-read-replica \
+    --db-instance-identifier mydb-replica-1
+
+# Promote with custom backup retention
+aws rds promote-read-replica \
+    --db-instance-identifier mydb-replica-1 \
+    --backup-retention-period 7 \
+    --preferred-backup-window "03:00-04:00"
+```
+
+### Point-in-Time Recovery
+
+```bash
+# Restore DB instance to specific point in time
+aws rds restore-db-instance-to-point-in-time \
+    --source-db-instance-identifier mydb-instance \
+    --target-db-instance-identifier mydb-restored-pitr \
+    --restore-time 2024-02-08T10:30:00Z
+
+# Restore to latest restorable time
+aws rds restore-db-instance-to-point-in-time \
+    --source-db-instance-identifier mydb-instance \
+    --target-db-instance-identifier mydb-restored-latest \
+    --use-latest-restorable-time
+
+# Restore PITR with different configuration
+aws rds restore-db-instance-to-point-in-time \
+    --source-db-instance-identifier mydb-instance \
+    --target-db-instance-identifier mydb-restored-pitr \
+    --restore-time 2024-02-08T10:30:00Z \
+    --db-instance-class db.r5.xlarge \
+    --multi-az \
+    --vpc-security-group-ids sg-0123456789abcdef0
+
+# Get latest restorable time
+aws rds describe-db-instances \
+    --db-instance-identifier mydb-instance \
+    --query 'DBInstances[0].LatestRestorableTime'
+```
+
+### Parameter Groups
+
+#### Create and Manage Parameter Groups
+```bash
+# Create DB parameter group
+aws rds create-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params \
+    --db-parameter-group-family mysql8.0 \
+    --description "Custom MySQL 8.0 parameters"
+
+# List parameter groups
+aws rds describe-db-parameter-groups
+
+# List specific parameter group
+aws rds describe-db-parameter-groups \
+    --db-parameter-group-name mysql-custom-params
+
+# Describe parameters in a group
+aws rds describe-db-parameters \
+    --db-parameter-group-name mysql-custom-params
+
+# Describe specific parameter
+aws rds describe-db-parameters \
+    --db-parameter-group-name mysql-custom-params \
+    --query 'Parameters[?ParameterName==`max_connections`]'
+```
+
+#### Modify Parameter Groups
+```bash
+# Modify single parameter
+aws rds modify-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params \
+    --parameters "ParameterName=max_connections,ParameterValue=200,ApplyMethod=immediate"
+
+# Modify multiple parameters
+aws rds modify-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params \
+    --parameters \
+        "ParameterName=max_connections,ParameterValue=200,ApplyMethod=immediate" \
+        "ParameterName=innodb_buffer_pool_size,ParameterValue={DBInstanceClassMemory*3/4},ApplyMethod=pending-reboot"
+
+# Reset parameter group to defaults
+aws rds reset-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params \
+    --reset-all-parameters
+
+# Reset specific parameters
+aws rds reset-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params \
+    --parameters "ParameterName=max_connections,ApplyMethod=immediate"
+```
+
+#### Copy Parameter Groups
+```bash
+# Copy parameter group
+aws rds copy-db-parameter-group \
+    --source-db-parameter-group-identifier mysql-custom-params \
+    --target-db-parameter-group-identifier mysql-custom-params-copy \
+    --target-db-parameter-group-description "Copy of custom MySQL parameters"
+```
+
+#### Delete Parameter Groups
+```bash
+# Delete parameter group
+aws rds delete-db-parameter-group \
+    --db-parameter-group-name mysql-custom-params
+```
+
+### Option Groups
+
+#### Create and Manage Option Groups
+```bash
+# Create option group
+aws rds create-option-group \
+    --option-group-name mysql-audit-group \
+    --engine-name mysql \
+    --major-engine-version 8.0 \
+    --option-group-description "MySQL audit plugin options"
+
+# List option groups
+aws rds describe-option-groups
+
+# Describe specific option group
+aws rds describe-option-groups \
+    --option-group-name mysql-audit-group
+
+# List available options for engine
+aws rds describe-option-group-options \
+    --engine-name mysql \
+    --major-engine-version 8.0
+```
+
+#### Modify Option Groups
+```bash
+# Add option to option group
+aws rds modify-option-group \
+    --option-group-name mysql-audit-group \
+    --options-to-include \
+        "OptionName=MARIADB_AUDIT_PLUGIN,OptionSettings=[{Name=SERVER_AUDIT_EVENTS,Value=CONNECT}]"
+
+# Remove option from option group
+aws rds modify-option-group \
+    --option-group-name mysql-audit-group \
+    --options-to-remove MARIADB_AUDIT_PLUGIN \
+    --apply-immediately
+```
+
+#### Copy and Delete Option Groups
+```bash
+# Copy option group
+aws rds copy-option-group \
+    --source-option-group-identifier mysql-audit-group \
+    --target-option-group-identifier mysql-audit-group-copy \
+    --target-option-group-description "Copy of MySQL audit options"
+
+# Delete option group
+aws rds delete-option-group \
+    --option-group-name mysql-audit-group
+```
+
+### Subnet Groups
+
+#### Create and Manage DB Subnet Groups
+```bash
+# Create DB subnet group
+aws rds create-db-subnet-group \
+    --db-subnet-group-name my-db-subnet-group \
+    --db-subnet-group-description "Database subnet group for VPC" \
+    --subnet-ids subnet-12345678 subnet-87654321 subnet-11223344
+
+# List DB subnet groups
+aws rds describe-db-subnet-groups
+
+# Describe specific subnet group
+aws rds describe-db-subnet-groups \
+    --db-subnet-group-name my-db-subnet-group
+```
+
+#### Modify Subnet Groups
+```bash
+# Modify DB subnet group (add/remove subnets)
+aws rds modify-db-subnet-group \
+    --db-subnet-group-name my-db-subnet-group \
+    --subnet-ids subnet-12345678 subnet-87654321 subnet-99887766
+```
+
+#### Delete Subnet Groups
+```bash
+# Delete DB subnet group
+aws rds delete-db-subnet-group \
+    --db-subnet-group-name my-db-subnet-group
+```
+
+### Security Groups
+
+#### Manage DB Security Groups (EC2-Classic)
+```bash
+# Note: DB Security Groups are for EC2-Classic only
+# For VPC, use VPC Security Groups instead
+
+# Create DB security group (EC2-Classic)
+aws rds create-db-security-group \
+    --db-security-group-name mydb-secgroup \
+    --db-security-group-description "Database security group"
+
+# Authorize CIDR range
+aws rds authorize-db-security-group-ingress \
+    --db-security-group-name mydb-secgroup \
+    --cidrip 10.0.0.0/24
+
+# Authorize EC2 security group
+aws rds authorize-db-security-group-ingress \
+    --db-security-group-name mydb-secgroup \
+    --ec2-security-group-name app-secgroup \
+    --ec2-security-group-owner-id 123456789012
+
+# Revoke access
+aws rds revoke-db-security-group-ingress \
+    --db-security-group-name mydb-secgroup \
+    --cidrip 10.0.0.0/24
+
+# List DB security groups
+aws rds describe-db-security-groups
+
+# Delete DB security group
+aws rds delete-db-security-group \
+    --db-security-group-name mydb-secgroup
+```
+
+### Automated Backups
+
+#### Manage Automated Backups
+```bash
+# Describe automated backups
+aws rds describe-db-instance-automated-backups
+
+# Describe automated backups for specific instance
+aws rds describe-db-instance-automated-backups \
+    --db-instance-identifier mydb-instance
+
+# Describe retained automated backups
+aws rds describe-db-instance-automated-backups \
+    --db-instance-automated-backups-arn arn:aws:rds:us-east-1:123456789012:auto-backup:ab-abcdefgh12345678
+
+# Delete automated backup
+aws rds delete-db-instance-automated-backup \
+    --dbi-resource-id db-ABCDEFGHIJKLMNOP
+
+# Start backup retention (retain automated backups after deletion)
+aws rds stop-db-instance \
+    --db-instance-identifier mydb-instance
+```
+
+### Aurora Clusters
+
+#### Create Aurora Clusters
+```bash
+# Create Aurora MySQL cluster
+aws rds create-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --engine aurora-mysql \
+    --engine-version 8.0.mysql_aurora.3.04.0 \
+    --master-username admin \
+    --master-user-password AuroraPass123! \
+    --database-name mydb \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group \
+    --backup-retention-period 7 \
+    --storage-encrypted
+
+# Create Aurora PostgreSQL cluster
+aws rds create-db-cluster \
+    --db-cluster-identifier aurora-postgres-cluster \
+    --engine aurora-postgresql \
+    --engine-version 15.4 \
+    --master-username postgres \
+    --master-user-password PostgresPass123! \
+    --database-name mydb \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group \
+    --backup-retention-period 14 \
+    --storage-encrypted \
+    --enable-cloudwatch-logs-exports '["postgresql"]'
+
+# Create Aurora Serverless v2 cluster
+aws rds create-db-cluster \
+    --db-cluster-identifier aurora-serverless-cluster \
+    --engine aurora-mysql \
+    --engine-version 8.0.mysql_aurora.3.04.0 \
+    --master-username admin \
+    --master-user-password ServerlessPass123! \
+    --database-name mydb \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group \
+    --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=2 \
+    --storage-encrypted
+```
+
+#### Create Aurora Cluster Instances
+```bash
+# Create Aurora cluster writer instance
+aws rds create-db-instance \
+    --db-instance-identifier aurora-mysql-instance-1 \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --db-instance-class db.r5.large \
+    --engine aurora-mysql
+
+# Create Aurora cluster reader instance
+aws rds create-db-instance \
+    --db-instance-identifier aurora-mysql-instance-2 \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --db-instance-class db.r5.large \
+    --engine aurora-mysql
+
+# Create Aurora Serverless v2 instance
+aws rds create-db-instance \
+    --db-instance-identifier aurora-serverless-instance-1 \
+    --db-cluster-identifier aurora-serverless-cluster \
+    --db-instance-class db.serverless \
+    --engine aurora-mysql
+```
+
+#### Manage Aurora Clusters
+```bash
+# List DB clusters
+aws rds describe-db-clusters
+
+# Describe specific cluster
+aws rds describe-db-clusters \
+    --db-cluster-identifier aurora-mysql-cluster
+
+# Modify Aurora cluster
+aws rds modify-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --backup-retention-period 14 \
+    --preferred-backup-window "03:00-04:00" \
+    --apply-immediately
+
+# Enable backtrack for Aurora MySQL
+aws rds modify-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --backtrack-window 72 \
+    --apply-immediately
+
+# Stop Aurora cluster
+aws rds stop-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster
+
+# Start Aurora cluster
+aws rds start-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster
+
+# Delete Aurora cluster
+aws rds delete-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --skip-final-snapshot
+
+# Delete Aurora cluster with final snapshot
+aws rds delete-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --final-db-snapshot-identifier aurora-final-snapshot-2024
+```
+
+#### Aurora Cluster Snapshots
+```bash
+# Create cluster snapshot
+aws rds create-db-cluster-snapshot \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --db-cluster-snapshot-identifier aurora-snapshot-20240208
+
+# List cluster snapshots
+aws rds describe-db-cluster-snapshots
+
+# Restore cluster from snapshot
+aws rds restore-db-cluster-from-snapshot \
+    --db-cluster-identifier aurora-restored \
+    --snapshot-identifier aurora-snapshot-20240208 \
+    --engine aurora-mysql \
+    --vpc-security-group-ids sg-0123456789abcdef0 \
+    --db-subnet-group-name my-db-subnet-group
+
+# Copy cluster snapshot
+aws rds copy-db-cluster-snapshot \
+    --source-db-cluster-snapshot-identifier aurora-snapshot-20240208 \
+    --target-db-cluster-snapshot-identifier aurora-snapshot-copy
+
+# Delete cluster snapshot
+aws rds delete-db-cluster-snapshot \
+    --db-cluster-snapshot-identifier aurora-snapshot-20240208
+```
+
+### Aurora Global Database
+
+#### Create and Manage Global Database
+```bash
+# Create Aurora global database cluster
+aws rds create-global-cluster \
+    --global-cluster-identifier my-global-cluster \
+    --engine aurora-mysql \
+    --engine-version 8.0.mysql_aurora.3.04.0
+
+# Add primary cluster to global database
+aws rds modify-db-cluster \
+    --db-cluster-identifier aurora-mysql-cluster \
+    --global-cluster-identifier my-global-cluster \
+    --apply-immediately
+
+# Create secondary cluster in another region
+aws rds create-db-cluster \
+    --db-cluster-identifier aurora-secondary-cluster \
+    --engine aurora-mysql \
+    --engine-version 8.0.mysql_aurora.3.04.0 \
+    --global-cluster-identifier my-global-cluster \
+    --vpc-security-group-ids sg-0987654321fedcba0 \
+    --db-subnet-group-name secondary-db-subnet-group \
+    --region us-west-2
+
+# List global clusters
+aws rds describe-global-clusters
+
+# Describe specific global cluster
+aws rds describe-global-clusters \
+    --global-cluster-identifier my-global-cluster
+
+# Remove cluster from global database
+aws rds remove-from-global-cluster \
+    --global-cluster-identifier my-global-cluster \
+    --db-cluster-identifier aurora-secondary-cluster \
+    --region us-west-2
+
+# Delete global cluster
+aws rds delete-global-cluster \
+    --global-cluster-identifier my-global-cluster
+
+# Failover global cluster (promote secondary to primary)
+aws rds failover-global-cluster \
+    --global-cluster-identifier my-global-cluster \
+    --target-db-cluster-identifier aurora-secondary-cluster \
+    --region us-west-2
+```
+
+### Performance Insights
+
+#### Enable and Query Performance Insights
+```bash
+# Enable Performance Insights (done via modify-db-instance, shown earlier)
+
+# Get Performance Insights metrics
+aws pi get-resource-metrics \
+    --service-type RDS \
+    --identifier db-ABCDEFGHIJKLMNOP \
+    --start-time 2024-02-08T00:00:00Z \
+    --end-time 2024-02-08T12:00:00Z \
+    --period-in-seconds 300 \
+    --metric-queries '[{"Metric":"db.load.avg"}]'
+
+# Get dimension keys (top SQL queries)
+aws pi describe-dimension-keys \
+    --service-type RDS \
+    --identifier db-ABCDEFGHIJKLMNOP \
+    --start-time 2024-02-08T00:00:00Z \
+    --end-time 2024-02-08T12:00:00Z \
+    --metric db.load.avg \
+    --group-by '{"Group":"db.sql"}'
+```
+
+### Enhanced Monitoring
+
+```bash
+# Enhanced Monitoring is enabled via modify-db-instance (shown earlier)
+# Metrics are available in CloudWatch Logs
+
+# List CloudWatch log streams for RDS Enhanced Monitoring
+aws logs describe-log-streams \
+    --log-group-name /aws/rds/instance/mydb-instance/enhanced-monitoring
+
+# Get Enhanced Monitoring logs
+aws logs get-log-events \
+    --log-group-name /aws/rds/instance/mydb-instance/enhanced-monitoring \
+    --log-stream-name db-ABCDEFGHIJKLMNOP
+```
+
+### Tags Management
+
+#### Add and Manage Tags
+```bash
+# Add tags to DB instance
+aws rds add-tags-to-resource \
+    --resource-name arn:aws:rds:us-east-1:123456789012:db:mydb-instance \
+    --tags Key=Environment,Value=Production Key=Application,Value=WebApp Key=Owner,Value=TeamA
+
+# List tags for resource
+aws rds list-tags-for-resource \
+    --resource-name arn:aws:rds:us-east-1:123456789012:db:mydb-instance
+
+# Remove tags from resource
+aws rds remove-tags-from-resource \
+    --resource-name arn:aws:rds:us-east-1:123456789012:db:mydb-instance \
+    --tag-keys Environment Owner
+
+# Add tags to snapshot
+aws rds add-tags-to-resource \
+    --resource-name arn:aws:rds:us-east-1:123456789012:snapshot:mydb-snapshot-20240208 \
+    --tags Key=Backup,Value=Daily Key=Retention,Value=30days
+
+# Add tags to parameter group
+aws rds add-tags-to-resource \
+    --resource-name arn:aws:rds:us-east-1:123456789012:pg:mysql-custom-params \
+    --tags Key=Team,Value=Database Key=Purpose,Value=CustomConfig
+```
+
+### CloudWatch Logs Export
+
+```bash
+# Enable CloudWatch Logs export for MySQL
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --cloudwatch-logs-export-configuration '{"LogTypesToEnable":["error","general","slowquery"]}' \
+    --apply-immediately
+
+# Enable CloudWatch Logs export for PostgreSQL
+aws rds modify-db-instance \
+    --db-instance-identifier postgres-instance \
+    --cloudwatch-logs-export-configuration '{"LogTypesToEnable":["postgresql"]}' \
+    --apply-immediately
+
+# Disable specific log exports
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --cloudwatch-logs-export-configuration '{"LogTypesToDisable":["general"]}' \
+    --apply-immediately
+```
+
+### Database Activity Streams
+
+```bash
+# Start database activity stream
+aws rds start-activity-stream \
+    --resource-arn arn:aws:rds:us-east-1:123456789012:db:mydb-instance \
+    --mode async \
+    --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Describe database activity stream
+aws rds describe-db-instances \
+    --db-instance-identifier mydb-instance \
+    --query 'DBInstances[0].ActivityStreamStatus'
+
+# Stop database activity stream
+aws rds stop-activity-stream \
+    --resource-arn arn:aws:rds:us-east-1:123456789012:db:mydb-instance
+```
+
+### IAM Database Authentication
+
+```bash
+# Enable IAM database authentication
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --enable-iam-database-authentication \
+    --apply-immediately
+
+# Generate authentication token
+aws rds generate-db-auth-token \
+    --hostname mydb-instance.abcdefg.us-east-1.rds.amazonaws.com \
+    --port 3306 \
+    --username iamuser \
+    --region us-east-1
+```
+
+### Events and Notifications
+
+#### Event Subscriptions
+```bash
+# Create event subscription
+aws rds create-event-subscription \
+    --subscription-name my-db-events \
+    --sns-topic-arn arn:aws:sns:us-east-1:123456789012:rds-notifications \
+    --source-type db-instance \
+    --event-categories availability backup failure configuration
+
+# List event subscriptions
+aws rds describe-event-subscriptions
+
+# Modify event subscription
+aws rds modify-event-subscription \
+    --subscription-name my-db-events \
+    --enabled
+
+# Delete event subscription
+aws rds delete-event-subscription \
+    --subscription-name my-db-events
+```
+
+#### Describe Events
+```bash
+# Describe recent events
+aws rds describe-events \
+    --duration 10080 \
+    --max-records 100
+
+# Describe events for specific instance
+aws rds describe-events \
+    --source-identifier mydb-instance \
+    --source-type db-instance
+
+# Describe events by category
+aws rds describe-events \
+    --source-type db-instance \
+    --event-categories availability failure
+
+# List event categories
+aws rds describe-event-categories
+```
+
+### Reserved Instances
+
+```bash
+# List available reserved instance offerings
+aws rds describe-reserved-db-instances-offerings \
+    --db-instance-class db.r5.xlarge \
+    --duration 31536000 \
+    --product-description mysql
+
+# Purchase reserved instance
+aws rds purchase-reserved-db-instances-offering \
+    --reserved-db-instances-offering-id 01234567-89ab-cdef-0123-456789abcdef \
+    --reserved-db-instance-id my-reserved-instance \
+    --db-instance-count 2
+
+# List purchased reserved instances
+aws rds describe-reserved-db-instances
+
+# Describe specific reserved instance
+aws rds describe-reserved-db-instances \
+    --reserved-db-instance-id my-reserved-instance
+```
+
+### Engine Version Management
+
+```bash
+# List available engine versions
+aws rds describe-db-engine-versions \
+    --engine mysql
+
+# List specific engine version details
+aws rds describe-db-engine-versions \
+    --engine mysql \
+    --engine-version 8.0.35
+
+# List upgradeable engine versions
+aws rds describe-db-engine-versions \
+    --engine mysql \
+    --engine-version 8.0.32 \
+    --query 'DBEngineVersions[0].ValidUpgradeTarget[*].[EngineVersion,Description]' \
+    --output table
+```
+
+### Maintenance and Upgrades
+
+```bash
+# Describe pending maintenance actions
+aws rds describe-pending-maintenance-actions
+
+# Apply pending maintenance immediately
+aws rds apply-pending-maintenance-action \
+    --resource-identifier arn:aws:rds:us-east-1:123456789012:db:mydb-instance \
+    --apply-action system-update \
+    --opt-in-type immediate
+
+# Modify maintenance window
+aws rds modify-db-instance \
+    --db-instance-identifier mydb-instance \
+    --preferred-maintenance-window sun:03:00-sun:04:00 \
+    --apply-immediately
+```
 
 ## SAA-C03 Exam Tips
 

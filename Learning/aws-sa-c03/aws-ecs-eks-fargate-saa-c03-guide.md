@@ -16,8 +16,9 @@
 13. [Cost Optimization](#cost-optimization)
 14. [Best Practices](#best-practices)
 15. [ECS vs EKS vs Fargate Comparison](#ecs-vs-eks-vs-fargate-comparison)
-16. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-17. [Practice Questions](#practice-questions)
+16. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+17. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
+18. [Practice Questions](#practice-questions)
 
 ---
 
@@ -996,6 +997,923 @@ For a workload requiring 4 vCPU and 8 GB memory running 24/7:
 - Variable workloads
 - No infrastructure management wanted
 - Rapid scaling required
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing Amazon ECS, EKS, Fargate, and Amazon ECR.
+
+### Prerequisites
+
+```bash
+# Install or update AWS CLI
+# macOS/Linux
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+
+# Configure AWS CLI
+aws configure
+# Enter: AWS Access Key ID, Secret Access Key, Default region, Output format (json)
+
+# Install eksctl (for EKS management)
+# macOS
+brew tap weaveworks/tap
+brew install weaveworks/tap/eksctl
+
+# Linux
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+
+# Verify eksctl installation
+eksctl version
+```
+
+### ECS Cluster Management
+
+```bash
+# Create ECS cluster (default - Fargate/EC2 compatible)
+aws ecs create-cluster \
+  --cluster-name production-cluster \
+  --tags key=Environment,value=Production key=Team,value=Platform
+
+# Create ECS cluster with Container Insights enabled
+aws ecs create-cluster \
+  --cluster-name production-cluster \
+  --settings name=containerInsights,value=enabled \
+  --tags key=Environment,value=Production
+
+# Create ECS cluster with capacity providers
+aws ecs create-cluster \
+  --cluster-name production-cluster \
+  --capacity-providers FARGATE FARGATE_SPOT \
+  --default-capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=1 \
+    capacityProvider=FARGATE_SPOT,weight=4
+
+# List ECS clusters
+aws ecs list-clusters
+
+# Describe ECS cluster
+aws ecs describe-clusters \
+  --clusters production-cluster
+
+# Get cluster details with statistics
+aws ecs describe-clusters \
+  --clusters production-cluster \
+  --include STATISTICS TAGS
+
+# Update cluster settings (enable Container Insights)
+aws ecs update-cluster-settings \
+  --cluster production-cluster \
+  --settings name=containerInsights,value=enabled
+
+# Put cluster capacity providers
+aws ecs put-cluster-capacity-providers \
+  --cluster production-cluster \
+  --capacity-providers FARGATE FARGATE_SPOT my-asg-capacity-provider \
+  --default-capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1 \
+    capacityProvider=FARGATE_SPOT,weight=2
+
+# Delete ECS cluster
+aws ecs delete-cluster \
+  --cluster production-cluster
+```
+
+### ECS Task Definitions
+
+```bash
+# Register task definition (Fargate)
+aws ecs register-task-definition \
+  --family web-app \
+  --network-mode awsvpc \
+  --requires-compatibilities FARGATE \
+  --cpu 256 \
+  --memory 512 \
+  --execution-role-arn arn:aws:iam::123456789012:role/ecsTaskExecutionRole \
+  --task-role-arn arn:aws:iam::123456789012:role/ecsTaskRole \
+  --container-definitions '[
+    {
+      "name": "web-container",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/web-app",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "environment": [
+        {
+          "name": "ENV",
+          "value": "production"
+        }
+      ]
+    }
+  ]'
+
+# Register task definition from JSON file
+aws ecs register-task-definition \
+  --cli-input-json file://task-definition.json
+
+# Register task definition with secrets from Parameter Store
+aws ecs register-task-definition \
+  --family app-with-secrets \
+  --network-mode awsvpc \
+  --requires-compatibilities FARGATE \
+  --cpu 512 \
+  --memory 1024 \
+  --execution-role-arn arn:aws:iam::123456789012:role/ecsTaskExecutionRole \
+  --container-definitions '[
+    {
+      "name": "app",
+      "image": "myapp:latest",
+      "secrets": [
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-1:123456789012:parameter/prod/db-password"
+        }
+      ]
+    }
+  ]'
+
+# Register task definition with EFS volume
+aws ecs register-task-definition \
+  --family app-with-efs \
+  --network-mode awsvpc \
+  --requires-compatibilities FARGATE \
+  --cpu 512 \
+  --memory 1024 \
+  --execution-role-arn arn:aws:iam::123456789012:role/ecsTaskExecutionRole \
+  --volumes '[
+    {
+      "name": "efs-storage",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-0123456789abcdef0",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": {
+          "accessPointId": "fsap-0123456789abcdef0",
+          "iam": "ENABLED"
+        }
+      }
+    }
+  ]' \
+  --container-definitions '[
+    {
+      "name": "app",
+      "image": "myapp:latest",
+      "mountPoints": [
+        {
+          "sourceVolume": "efs-storage",
+          "containerPath": "/data",
+          "readOnly": false
+        }
+      ]
+    }
+  ]'
+
+# List task definitions
+aws ecs list-task-definitions
+
+# List task definition families
+aws ecs list-task-definition-families
+
+# Describe task definition
+aws ecs describe-task-definition \
+  --task-definition web-app:5
+
+# Deregister task definition
+aws ecs deregister-task-definition \
+  --task-definition web-app:5
+```
+
+### ECS Services
+
+```bash
+# Create ECS service (Fargate)
+aws ecs create-service \
+  --cluster production-cluster \
+  --service-name web-service \
+  --task-definition web-app:1 \
+  --desired-count 3 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-0123456789abcdef0,subnet-0123456789abcdef1],
+    securityGroups=[sg-0123456789abcdef0],
+    assignPublicIp=DISABLED
+  }" \
+  --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/web-tg/50dc6c495c0c9188,containerName=web-container,containerPort=80" \
+  --health-check-grace-period-seconds 60 \
+  --tags key=Environment,value=Production
+
+# Create service with capacity provider strategy
+aws ecs create-service \
+  --cluster production-cluster \
+  --service-name api-service \
+  --task-definition api-app:1 \
+  --desired-count 5 \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=2 \
+    capacityProvider=FARGATE_SPOT,weight=3 \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-0123456789abcdef0],
+    securityGroups=[sg-0123456789abcdef0]
+  }"
+
+# Create service with Auto Scaling
+aws ecs create-service \
+  --cluster production-cluster \
+  --service-name worker-service \
+  --task-definition worker:1 \
+  --desired-count 2 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-0123456789abcdef0],
+    securityGroups=[sg-0123456789abcdef0]
+  }" \
+  --enable-execute-command
+
+# Create service with service discovery
+aws ecs create-service \
+  --cluster production-cluster \
+  --service-name backend-service \
+  --task-definition backend:1 \
+  --desired-count 2 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-0123456789abcdef0],
+    securityGroups=[sg-0123456789abcdef0]
+  }" \
+  --service-registries "registryArn=arn:aws:servicediscovery:us-east-1:123456789012:service/srv-0123456789abcdef0"
+
+# List services in cluster
+aws ecs list-services \
+  --cluster production-cluster
+
+# Describe services
+aws ecs describe-services \
+  --cluster production-cluster \
+  --services web-service api-service
+
+# Update service (change desired count)
+aws ecs update-service \
+  --cluster production-cluster \
+  --service web-service \
+  --desired-count 5
+
+# Update service (deploy new task definition)
+aws ecs update-service \
+  --cluster production-cluster \
+  --service web-service \
+  --task-definition web-app:2 \
+  --force-new-deployment
+
+# Update service (change capacity provider)
+aws ecs update-service \
+  --cluster production-cluster \
+  --service web-service \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1 \
+    capacityProvider=FARGATE_SPOT,weight=4
+
+# Delete service
+aws ecs delete-service \
+  --cluster production-cluster \
+  --service web-service \
+  --force
+```
+
+### ECS Tasks (Run Task)
+
+```bash
+# Run standalone task (Fargate)
+aws ecs run-task \
+  --cluster production-cluster \
+  --task-definition batch-job:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-0123456789abcdef0],
+    securityGroups=[sg-0123456789abcdef0],
+    assignPublicIp=ENABLED
+  }"
+
+# Run task with environment variable overrides
+aws ecs run-task \
+  --cluster production-cluster \
+  --task-definition data-processor:1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-0123456789abcdef0],securityGroups=[sg-0123456789abcdef0]}" \
+  --overrides '{
+    "containerOverrides": [
+      {
+        "name": "processor",
+        "environment": [
+          {
+            "name": "BATCH_SIZE",
+            "value": "1000"
+          }
+        ]
+      }
+    ]
+  }'
+
+# List running tasks
+aws ecs list-tasks \
+  --cluster production-cluster
+
+# List tasks by service
+aws ecs list-tasks \
+  --cluster production-cluster \
+  --service-name web-service
+
+# Describe tasks
+aws ecs describe-tasks \
+  --cluster production-cluster \
+  --tasks arn:aws:ecs:us-east-1:123456789012:task/production-cluster/1234567890abcdef
+
+# Stop task
+aws ecs stop-task \
+  --cluster production-cluster \
+  --task arn:aws:ecs:us-east-1:123456789012:task/production-cluster/1234567890abcdef \
+  --reason "Manual intervention required"
+
+# Execute command in running container (ECS Exec)
+aws ecs execute-command \
+  --cluster production-cluster \
+  --task arn:aws:ecs:us-east-1:123456789012:task/production-cluster/1234567890abcdef \
+  --container web-container \
+  --interactive \
+  --command "/bin/bash"
+```
+
+### ECS Auto Scaling
+
+```bash
+# Register ECS service with Application Auto Scaling
+aws application-autoscaling register-scalable-target \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service \
+  --scalable-dimension ecs:service:DesiredCount \
+  --min-capacity 2 \
+  --max-capacity 10
+
+# Create target tracking scaling policy (CPU)
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service \
+  --scalable-dimension ecs:service:DesiredCount \
+  --policy-name cpu-target-tracking \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{
+    "TargetValue": 70.0,
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+    },
+    "ScaleInCooldown": 300,
+    "ScaleOutCooldown": 60
+  }'
+
+# Create target tracking scaling policy (Memory)
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service \
+  --scalable-dimension ecs:service:DesiredCount \
+  --policy-name memory-target-tracking \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{
+    "TargetValue": 80.0,
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageMemoryUtilization"
+    }
+  }'
+
+# Create step scaling policy
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service \
+  --scalable-dimension ecs:service:DesiredCount \
+  --policy-name requests-step-scaling \
+  --policy-type StepScaling \
+  --step-scaling-policy-configuration '{
+    "AdjustmentType": "PercentChangeInCapacity",
+    "StepAdjustments": [
+      {
+        "MetricIntervalLowerBound": 0,
+        "MetricIntervalUpperBound": 10,
+        "ScalingAdjustment": 10
+      },
+      {
+        "MetricIntervalLowerBound": 10,
+        "ScalingAdjustment": 30
+      }
+    ],
+    "Cooldown": 60
+  }'
+
+# Describe scaling policies
+aws application-autoscaling describe-scaling-policies \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service
+
+# Deregister scalable target
+aws application-autoscaling deregister-scalable-target \
+  --service-namespace ecs \
+  --resource-id service/production-cluster/web-service \
+  --scalable-dimension ecs:service:DesiredCount
+```
+
+### Amazon ECR (Elastic Container Registry)
+
+```bash
+# Create ECR repository
+aws ecr create-repository \
+  --repository-name web-app \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  --tags Key=Environment,Value=Production
+
+# Create repository with KMS encryption
+aws ecr create-repository \
+  --repository-name secure-app \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=KMS,kmsKey=arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# List repositories
+aws ecr describe-repositories
+
+# Get repository details
+aws ecr describe-repositories \
+  --repository-names web-app
+
+# Get ECR login token and authenticate Docker
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
+
+# Tag Docker image for ECR
+docker tag web-app:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:latest
+docker tag web-app:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:v1.0.0
+
+# Push image to ECR
+docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:latest
+docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:v1.0.0
+
+# List images in repository
+aws ecr list-images \
+  --repository-name web-app
+
+# Describe images (detailed)
+aws ecr describe-images \
+  --repository-name web-app
+
+# Get specific image details
+aws ecr describe-images \
+  --repository-name web-app \
+  --image-ids imageTag=latest
+
+# Pull image from ECR
+docker pull 123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:latest
+
+# Set lifecycle policy (auto-delete old images)
+aws ecr put-lifecycle-policy \
+  --repository-name web-app \
+  --lifecycle-policy-text '{
+    "rules": [
+      {
+        "rulePriority": 1,
+        "description": "Keep last 10 images",
+        "selection": {
+          "tagStatus": "any",
+          "countType": "imageCountMoreThan",
+          "countNumber": 10
+        },
+        "action": {
+          "type": "expire"
+        }
+      }
+    ]
+  }'
+
+# Get lifecycle policy
+aws ecr get-lifecycle-policy \
+  --repository-name web-app
+
+# Set repository policy (cross-account access)
+aws ecr set-repository-policy \
+  --repository-name web-app \
+  --policy-text '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowPull",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::987654321098:root"
+        },
+        "Action": [
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:BatchCheckLayerAvailability"
+        ]
+      }
+    ]
+  }'
+
+# Get repository policy
+aws ecr get-repository-policy \
+  --repository-name web-app
+
+# Start image scan
+aws ecr start-image-scan \
+  --repository-name web-app \
+  --image-id imageTag=latest
+
+# Get image scan findings
+aws ecr describe-image-scan-findings \
+  --repository-name web-app \
+  --image-id imageTag=latest
+
+# Delete image
+aws ecr batch-delete-image \
+  --repository-name web-app \
+  --image-ids imageTag=v1.0.0
+
+# Delete multiple images
+aws ecr batch-delete-image \
+  --repository-name web-app \
+  --image-ids imageTag=v1.0.0 imageTag=v1.0.1 imageTag=v1.0.2
+
+# Delete repository
+aws ecr delete-repository \
+  --repository-name web-app \
+  --force
+```
+
+### Amazon EKS Cluster Management
+
+```bash
+# Create EKS cluster using eksctl (recommended)
+eksctl create cluster \
+  --name production-eks \
+  --region us-east-1 \
+  --version 1.28 \
+  --nodegroup-name standard-workers \
+  --node-type t3.medium \
+  --nodes 3 \
+  --nodes-min 2 \
+  --nodes-max 5 \
+  --managed \
+  --tags Environment=Production,Team=Platform
+
+# Create EKS cluster with Fargate profile
+eksctl create cluster \
+  --name fargate-eks \
+  --region us-east-1 \
+  --fargate
+
+# Create EKS cluster using AWS CLI
+aws eks create-cluster \
+  --name production-eks \
+  --role-arn arn:aws:iam::123456789012:role/EKSClusterRole \
+  --resources-vpc-config subnetIds=subnet-0123456789abcdef0,subnet-0123456789abcdef1,securityGroupIds=sg-0123456789abcdef0 \
+  --kubernetes-version 1.28 \
+  --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}' \
+  --tags Environment=Production
+
+# List EKS clusters
+aws eks list-clusters
+
+# Describe EKS cluster
+aws eks describe-cluster \
+  --name production-eks
+
+# Update cluster version
+aws eks update-cluster-version \
+  --name production-eks \
+  --kubernetes-version 1.29
+
+# Update cluster config (enable logging)
+aws eks update-cluster-config \
+  --name production-eks \
+  --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+
+# Get kubeconfig for cluster
+aws eks update-kubeconfig \
+  --name production-eks \
+  --region us-east-1
+
+# Delete EKS cluster (eksctl)
+eksctl delete cluster \
+  --name production-eks \
+  --region us-east-1
+
+# Delete EKS cluster (AWS CLI)
+aws eks delete-cluster \
+  --name production-eks
+```
+
+### EKS Node Groups
+
+```bash
+# Create managed node group
+aws eks create-nodegroup \
+  --cluster-name production-eks \
+  --nodegroup-name standard-workers \
+  --scaling-config minSize=2,maxSize=5,desiredSize=3 \
+  --subnets subnet-0123456789abcdef0 subnet-0123456789abcdef1 \
+  --instance-types t3.medium \
+  --node-role arn:aws:iam::123456789012:role/EKSNodeRole \
+  --tags Environment=Production,NodeType=Standard
+
+# Create node group with spot instances
+aws eks create-nodegroup \
+  --cluster-name production-eks \
+  --nodegroup-name spot-workers \
+  --scaling-config minSize=1,maxSize=10,desiredSize=3 \
+  --capacity-type SPOT \
+  --subnets subnet-0123456789abcdef0 subnet-0123456789abcdef1 \
+  --instance-types t3.medium t3.large \
+  --node-role arn:aws:iam::123456789012:role/EKSNodeRole
+
+# Create node group using eksctl
+eksctl create nodegroup \
+  --cluster production-eks \
+  --name gpu-workers \
+  --node-type g4dn.xlarge \
+  --nodes 2 \
+  --nodes-min 1 \
+  --nodes-max 4 \
+  --node-volume-size 100 \
+  --node-ami-family AmazonLinux2 \
+  --tags Environment=Production,Workload=ML
+
+# List node groups
+aws eks list-nodegroups \
+  --cluster-name production-eks
+
+# Describe node group
+aws eks describe-nodegroup \
+  --cluster-name production-eks \
+  --nodegroup-name standard-workers
+
+# Update node group configuration
+aws eks update-nodegroup-config \
+  --cluster-name production-eks \
+  --nodegroup-name standard-workers \
+  --scaling-config minSize=3,maxSize=10,desiredSize=5
+
+# Update node group version
+aws eks update-nodegroup-version \
+  --cluster-name production-eks \
+  --nodegroup-name standard-workers \
+  --kubernetes-version 1.28
+
+# Delete node group
+aws eks delete-nodegroup \
+  --cluster-name production-eks \
+  --nodegroup-name standard-workers
+
+# Delete node group using eksctl
+eksctl delete nodegroup \
+  --cluster production-eks \
+  --name gpu-workers
+```
+
+### EKS Fargate Profiles
+
+```bash
+# Create Fargate profile
+aws eks create-fargate-profile \
+  --cluster-name production-eks \
+  --fargate-profile-name app-profile \
+  --pod-execution-role-arn arn:aws:iam::123456789012:role/EKSFargatePodExecutionRole \
+  --subnets subnet-0123456789abcdef0 subnet-0123456789abcdef1 \
+  --selectors '[{"namespace":"production","labels":{"app":"web"}}]' \
+  --tags Environment=Production
+
+# Create Fargate profile for multiple namespaces
+aws eks create-fargate-profile \
+  --cluster-name production-eks \
+  --fargate-profile-name multi-ns-profile \
+  --pod-execution-role-arn arn:aws:iam::123456789012:role/EKSFargatePodExecutionRole \
+  --subnets subnet-0123456789abcdef0 subnet-0123456789abcdef1 \
+  --selectors '[{"namespace":"backend"},{"namespace":"frontend"}]'
+
+# Create Fargate profile using eksctl
+eksctl create fargateprofile \
+  --cluster production-eks \
+  --name app-profile \
+  --namespace production \
+  --labels app=web
+
+# List Fargate profiles
+aws eks list-fargate-profiles \
+  --cluster-name production-eks
+
+# Describe Fargate profile
+aws eks describe-fargate-profile \
+  --cluster-name production-eks \
+  --fargate-profile-name app-profile
+
+# Delete Fargate profile
+aws eks delete-fargate-profile \
+  --cluster-name production-eks \
+  --fargate-profile-name app-profile
+
+# Delete Fargate profile using eksctl
+eksctl delete fargateprofile \
+  --cluster production-eks \
+  --name app-profile
+```
+
+### EKS Add-ons
+
+```bash
+# List available add-ons
+aws eks describe-addon-versions
+
+# List add-ons for cluster
+aws eks list-addons \
+  --cluster-name production-eks
+
+# Create add-on (VPC CNI)
+aws eks create-addon \
+  --cluster-name production-eks \
+  --addon-name vpc-cni \
+  --addon-version v1.15.0-eksbuild.2 \
+  --service-account-role-arn arn:aws:iam::123456789012:role/VPCCNIRole \
+  --resolve-conflicts OVERWRITE
+
+# Create add-on (CoreDNS)
+aws eks create-addon \
+  --cluster-name production-eks \
+  --addon-name coredns \
+  --addon-version v1.10.1-eksbuild.2
+
+# Create add-on (kube-proxy)
+aws eks create-addon \
+  --cluster-name production-eks \
+  --addon-name kube-proxy \
+  --addon-version v1.28.2-eksbuild.2
+
+# Describe add-on
+aws eks describe-addon \
+  --cluster-name production-eks \
+  --addon-name vpc-cni
+
+# Update add-on
+aws eks update-addon \
+  --cluster-name production-eks \
+  --addon-name vpc-cni \
+  --addon-version v1.15.1-eksbuild.1 \
+  --resolve-conflicts OVERWRITE
+
+# Delete add-on
+aws eks delete-addon \
+  --cluster-name production-eks \
+  --addon-name vpc-cni
+```
+
+### ECS/EKS Tags and Resource Management
+
+```bash
+# Tag ECS cluster
+aws ecs tag-resource \
+  --resource-arn arn:aws:ecs:us-east-1:123456789012:cluster/production-cluster \
+  --tags key=CostCenter,value=Engineering key=Owner,value=PlatformTeam
+
+# List tags for ECS resource
+aws ecs list-tags-for-resource \
+  --resource-arn arn:aws:ecs:us-east-1:123456789012:cluster/production-cluster
+
+# Untag ECS resource
+aws ecs untag-resource \
+  --resource-arn arn:aws:ecs:us-east-1:123456789012:cluster/production-cluster \
+  --tag-keys CostCenter
+
+# Tag EKS cluster
+aws eks tag-resource \
+  --resource-arn arn:aws:eks:us-east-1:123456789012:cluster/production-eks \
+  --tags CostCenter=Engineering,Owner=PlatformTeam
+
+# List tags for EKS resource
+aws eks list-tags-for-resource \
+  --resource-arn arn:aws:eks:us-east-1:123456789012:cluster/production-eks
+
+# Untag EKS resource
+aws eks untag-resource \
+  --resource-arn arn:aws:eks:us-east-1:123456789012:cluster/production-eks \
+  --tag-keys CostCenter
+```
+
+### Kubernetes Operations on EKS
+
+```bash
+# After configuring kubeconfig, use kubectl commands
+
+# Get cluster info
+kubectl cluster-info
+
+# Get nodes
+kubectl get nodes
+
+# Get all resources
+kubectl get all --all-namespaces
+
+# Deploy application
+kubectl apply -f deployment.yaml
+
+# Create namespace
+kubectl create namespace production
+
+# Deploy to specific namespace
+kubectl apply -f deployment.yaml -n production
+
+# Scale deployment
+kubectl scale deployment web-app --replicas=5 -n production
+
+# Update deployment image
+kubectl set image deployment/web-app web-container=123456789012.dkr.ecr.us-east-1.amazonaws.com/web-app:v2.0.0 -n production
+
+# Rollout status
+kubectl rollout status deployment/web-app -n production
+
+# Rollback deployment
+kubectl rollout undo deployment/web-app -n production
+
+# Get pods
+kubectl get pods -n production
+
+# Get pod logs
+kubectl logs -f pod-name -n production
+
+# Execute command in pod
+kubectl exec -it pod-name -n production -- /bin/bash
+
+# Port forward
+kubectl port-forward pod/pod-name 8080:80 -n production
+
+# Get services
+kubectl get services -n production
+
+# Delete resources
+kubectl delete -f deployment.yaml -n production
+```
+
+### Monitoring and Troubleshooting
+
+```bash
+# Get ECS cluster metrics (requires CloudWatch Container Insights)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name CPUUtilization \
+  --dimensions Name=ClusterName,Value=production-cluster \
+  --start-time 2026-02-08T00:00:00Z \
+  --end-time 2026-02-08T23:59:59Z \
+  --period 3600 \
+  --statistics Average
+
+# Get ECS service events
+aws ecs describe-services \
+  --cluster production-cluster \
+  --services web-service \
+  --query 'services[0].events[0:10]'
+
+# List ECS container instances
+aws ecs list-container-instances \
+  --cluster production-cluster
+
+# Describe container instances
+aws ecs describe-container-instances \
+  --cluster production-cluster \
+  --container-instances arn:aws:ecs:us-east-1:123456789012:container-instance/production-cluster/1234567890abcdef
+
+# Get EKS cluster health
+kubectl get componentstatuses
+
+# Get EKS node status
+kubectl describe nodes
+
+# View EKS cluster logs (Control Plane)
+aws logs tail /aws/eks/production-eks/cluster --follow
+
+# Get ECR image vulnerabilities
+aws ecr describe-image-scan-findings \
+  --repository-name web-app \
+  --image-id imageTag=latest \
+  --query 'imageScanFindings.findings[?severity==`CRITICAL` || severity==`HIGH`]'
+```
 
 ---
 

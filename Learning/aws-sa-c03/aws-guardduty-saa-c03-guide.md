@@ -12,7 +12,8 @@
 9. [Pricing Model](#pricing-model)
 10. [Best Practices](#best-practices)
 11. [Common Exam Scenarios](#common-exam-scenarios)
-12. [Troubleshooting](#troubleshooting)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -416,6 +417,523 @@ CloudTrail Management Events:
 - Integrate with Security Hub for compliance reporting
 - Use Config Rules for configuration compliance
 - Implement comprehensive audit logging
+
+## AWS CLI Commands Reference
+
+### 1. Create and Enable Detector
+
+#### Create a GuardDuty Detector
+```bash
+# Create a GuardDuty detector in the current region
+aws guardduty create-detector \
+  --enable \
+  --finding-publishing-frequency FIFTEEN_MINUTES
+
+# Create detector with custom data sources configuration
+aws guardduty create-detector \
+  --enable \
+  --finding-publishing-frequency SIX_HOURS \
+  --data-sources '{"S3Logs":{"Enable":true},"Kubernetes":{"AuditLogs":{"Enable":true}},"MalwareProtection":{"ScanEc2InstanceWithFindings":{"EbsVolumes":{"Enable":true}}}}'
+```
+
+#### Enable an Existing Detector
+```bash
+# Get detector ID
+DETECTOR_ID=$(aws guardduty list-detectors --query 'DetectorIds[0]' --output text)
+
+# Enable the detector
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --enable
+
+# Enable detector with specific publishing frequency
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --enable \
+  --finding-publishing-frequency FIFTEEN_MINUTES
+```
+
+### 2. Get Findings
+
+#### List All Findings
+```bash
+# List all findings for a detector
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID
+
+# List findings with pagination
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID \
+  --max-results 50 \
+  --sort-criteria '{"AttributeName":"severity","OrderBy":"DESC"}'
+```
+
+#### Get Detailed Finding Information
+```bash
+# Get detailed information for specific findings
+aws guardduty get-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-ids "abcd1234efgh5678ijkl9012mnop3456" "qrst7890uvwx1234yzab5678cdef9012"
+
+# Get findings with severity filter
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-criteria '{"Criterion":{"severity":{"Gte":7}}}' \
+  --query 'FindingIds' \
+  --output text | xargs -I {} aws guardduty get-findings \
+    --detector-id $DETECTOR_ID \
+    --finding-ids {}
+```
+
+#### Filter Findings by Criteria
+```bash
+# Find high severity findings
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-criteria '{
+    "Criterion": {
+      "severity": {"Gte": 7},
+      "service.archived": {"Eq": ["false"]}
+    }
+  }'
+
+# Find findings by type
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-criteria '{
+    "Criterion": {
+      "type": {"Eq": ["Recon:EC2/PortProbeUnprotectedPort"]}
+    }
+  }'
+
+# Find recent findings (last 24 hours)
+aws guardduty list-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-criteria '{
+    "Criterion": {
+      "updatedAt": {"Gte": '$(date -u -d '24 hours ago' +%s)000'}
+    }
+  }'
+```
+
+### 3. Create IP Sets (Trusted/Threat Lists)
+
+#### Create Trusted IP Set (Allow List)
+```bash
+# Create S3 bucket and upload IP list
+echo -e "10.0.0.0/8\n192.168.1.0/24" > trusted-ips.txt
+aws s3 cp trusted-ips.txt s3://my-guardduty-lists/trusted-ips.txt
+
+# Create trusted IP set
+aws guardduty create-ip-set \
+  --detector-id $DETECTOR_ID \
+  --name TrustedIPList \
+  --format TXT \
+  --location s3://my-guardduty-lists/trusted-ips.txt \
+  --activate
+```
+
+#### Create Threat IP Set (Block List)
+```bash
+# Upload malicious IP list
+echo -e "203.0.113.0/24\n198.51.100.0/24" > threat-ips.txt
+aws s3 cp threat-ips.txt s3://my-guardduty-lists/threat-ips.txt
+
+# Create threat IP set
+aws guardduty create-ip-set \
+  --detector-id $DETECTOR_ID \
+  --name ThreatIPList \
+  --format TXT \
+  --location s3://my-guardduty-lists/threat-ips.txt \
+  --activate
+
+# List all IP sets
+aws guardduty list-ip-sets \
+  --detector-id $DETECTOR_ID
+
+# Get IP set details
+aws guardduty get-ip-set \
+  --detector-id $DETECTOR_ID \
+  --ip-set-id <ip-set-id>
+```
+
+#### Update IP Set
+```bash
+# Update IP set location or activation status
+aws guardduty update-ip-set \
+  --detector-id $DETECTOR_ID \
+  --ip-set-id <ip-set-id> \
+  --location s3://my-guardduty-lists/updated-threat-ips.txt \
+  --activate
+```
+
+### 4. Create Threat Intelligence Sets
+
+#### Create Custom Threat Intelligence Set
+```bash
+# Create threat intelligence set with malicious domains
+echo -e "malicious-domain.com\nevil-site.net" > threat-domains.txt
+aws s3 cp threat-domains.txt s3://my-guardduty-lists/threat-domains.txt
+
+# Create threat intel set
+aws guardduty create-threat-intel-set \
+  --detector-id $DETECTOR_ID \
+  --name CustomThreatIntel \
+  --format TXT \
+  --location s3://my-guardduty-lists/threat-domains.txt \
+  --activate
+
+# List threat intel sets
+aws guardduty list-threat-intel-sets \
+  --detector-id $DETECTOR_ID
+
+# Get threat intel set details
+aws guardduty get-threat-intel-set \
+  --detector-id $DETECTOR_ID \
+  --threat-intel-set-id <threat-intel-set-id>
+```
+
+#### Update Threat Intelligence Set
+```bash
+# Update existing threat intelligence set
+aws guardduty update-threat-intel-set \
+  --detector-id $DETECTOR_ID \
+  --threat-intel-set-id <threat-intel-set-id> \
+  --location s3://my-guardduty-lists/updated-threat-domains.txt \
+  --activate
+```
+
+### 5. Create Filters
+
+#### Create Finding Filter
+```bash
+# Create filter for high severity findings
+aws guardduty create-filter \
+  --detector-id $DETECTOR_ID \
+  --name HighSeverityFindings \
+  --description "Filter for high and critical severity findings" \
+  --action ARCHIVE \
+  --finding-criteria '{
+    "Criterion": {
+      "severity": {"Gte": 7}
+    }
+  }' \
+  --rank 1
+
+# Create filter to suppress specific finding types
+aws guardduty create-filter \
+  --detector-id $DETECTOR_ID \
+  --name SuppressTestFindings \
+  --description "Suppress findings from test environment" \
+  --action ARCHIVE \
+  --finding-criteria '{
+    "Criterion": {
+      "resource.instanceDetails.tags.Environment": {"Eq": ["test"]}
+    }
+  }' \
+  --rank 2
+
+# List all filters
+aws guardduty list-filters \
+  --detector-id $DETECTOR_ID
+
+# Get filter details
+aws guardduty get-filter \
+  --detector-id $DETECTOR_ID \
+  --filter-name HighSeverityFindings
+```
+
+#### Update Filter
+```bash
+# Update existing filter
+aws guardduty update-filter \
+  --detector-id $DETECTOR_ID \
+  --filter-name HighSeverityFindings \
+  --description "Updated filter description" \
+  --finding-criteria '{
+    "Criterion": {
+      "severity": {"Gte": 8}
+    }
+  }'
+```
+
+### 6. Update Findings Feedback
+
+#### Mark Findings as Useful or False Positive
+```bash
+# Mark finding as useful (true positive)
+aws guardduty update-findings-feedback \
+  --detector-id $DETECTOR_ID \
+  --finding-ids "abcd1234efgh5678ijkl9012mnop3456" \
+  --feedback USEFUL \
+  --comments "Confirmed malicious activity from this IP"
+
+# Mark finding as false positive
+aws guardduty update-findings-feedback \
+  --detector-id $DETECTOR_ID \
+  --finding-ids "qrst7890uvwx1234yzab5678cdef9012" \
+  --feedback NOT_USEFUL \
+  --comments "Known internal security scanning tool"
+
+# Archive findings
+aws guardduty archive-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-ids "abcd1234efgh5678ijkl9012mnop3456" "qrst7890uvwx1234yzab5678cdef9012"
+
+# Unarchive findings
+aws guardduty unarchive-findings \
+  --detector-id $DETECTOR_ID \
+  --finding-ids "abcd1234efgh5678ijkl9012mnop3456"
+```
+
+### 7. Member Accounts Management
+
+#### Invite Member Accounts
+```bash
+# Create members (administrator account)
+aws guardduty create-members \
+  --detector-id $DETECTOR_ID \
+  --account-details '[
+    {
+      "AccountId": "111122223333",
+      "Email": "security-team-1@example.com"
+    },
+    {
+      "AccountId": "444455556666",
+      "Email": "security-team-2@example.com"
+    }
+  ]'
+
+# Invite members
+aws guardduty invite-members \
+  --detector-id $DETECTOR_ID \
+  --account-ids "111122223333" "444455556666" \
+  --message "Please accept this GuardDuty invitation to enable centralized security monitoring"
+
+# List members
+aws guardduty list-members \
+  --detector-id $DETECTOR_ID
+
+# Get member details
+aws guardduty get-members \
+  --detector-id $DETECTOR_ID \
+  --account-ids "111122223333" "444455556666"
+```
+
+#### Accept Invitation (Member Account)
+```bash
+# List invitations
+aws guardduty list-invitations
+
+# Accept invitation from administrator account
+aws guardduty accept-invitation \
+  --detector-id $DETECTOR_ID \
+  --master-id "123456789012" \
+  --invitation-id <invitation-id>
+```
+
+#### Disassociate Members
+```bash
+# Disassociate members (administrator account)
+aws guardduty disassociate-members \
+  --detector-id $DETECTOR_ID \
+  --account-ids "111122223333" "444455556666"
+
+# Delete members
+aws guardduty delete-members \
+  --detector-id $DETECTOR_ID \
+  --account-ids "111122223333" "444455556666"
+
+# Disassociate from administrator (member account)
+aws guardduty disassociate-from-master-account \
+  --detector-id $DETECTOR_ID
+```
+
+#### Enable Organization Admin (Delegated Administrator)
+```bash
+# Enable GuardDuty as delegated administrator for organization
+aws organizations enable-aws-service-access \
+  --service-principal guardduty.amazonaws.com
+
+# Register delegated administrator
+aws organizations register-delegated-administrator \
+  --account-id "123456789012" \
+  --service-principal guardduty.amazonaws.com
+
+# Enable organization-wide auto-enable
+aws guardduty update-organization-configuration \
+  --detector-id $DETECTOR_ID \
+  --auto-enable \
+  --data-sources '{"S3Logs":{"AutoEnable":true},"Kubernetes":{"AuditLogs":{"AutoEnable":true}}}'
+
+# Describe organization configuration
+aws guardduty describe-organization-configuration \
+  --detector-id $DETECTOR_ID
+```
+
+### 8. Publishing Destination (S3)
+
+#### Create Publishing Destination
+```bash
+# Create S3 bucket for GuardDuty findings
+BUCKET_NAME="my-guardduty-findings-bucket"
+aws s3 mb s3://$BUCKET_NAME
+
+# Create and attach bucket policy
+cat > bucket-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowGuardDutyPutObject",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "guardduty.amazonaws.com"
+      },
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
+    },
+    {
+      "Sid": "AllowGuardDutyGetBucketLocation",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "guardduty.amazonaws.com"
+      },
+      "Action": "s3:GetBucketLocation",
+      "Resource": "arn:aws:s3:::$BUCKET_NAME"
+    }
+  ]
+}
+EOF
+
+aws s3api put-bucket-policy \
+  --bucket $BUCKET_NAME \
+  --policy file://bucket-policy.json
+
+# Create KMS key for encryption (optional)
+KMS_KEY_ID=$(aws kms create-key \
+  --description "GuardDuty findings encryption key" \
+  --query 'KeyMetadata.KeyId' \
+  --output text)
+
+# Create publishing destination
+aws guardduty create-publishing-destination \
+  --detector-id $DETECTOR_ID \
+  --destination-type S3 \
+  --destination-properties "DestinationArn=arn:aws:s3:::$BUCKET_NAME,KmsKeyArn=arn:aws:kms:us-east-1:123456789012:key/$KMS_KEY_ID"
+```
+
+#### List and Manage Publishing Destinations
+```bash
+# List publishing destinations
+aws guardduty list-publishing-destinations \
+  --detector-id $DETECTOR_ID
+
+# Describe publishing destination
+aws guardduty describe-publishing-destination \
+  --detector-id $DETECTOR_ID \
+  --destination-id <destination-id>
+
+# Update publishing destination
+aws guardduty update-publishing-destination \
+  --detector-id $DETECTOR_ID \
+  --destination-id <destination-id> \
+  --destination-properties "DestinationArn=arn:aws:s3:::new-bucket-name"
+
+# Delete publishing destination
+aws guardduty delete-publishing-destination \
+  --detector-id $DETECTOR_ID \
+  --destination-id <destination-id>
+```
+
+### 9. Data Sources Configuration
+
+#### Configure Data Sources
+```bash
+# Enable all data sources
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --data-sources '{
+    "S3Logs": {"Enable": true},
+    "Kubernetes": {
+      "AuditLogs": {"Enable": true}
+    },
+    "MalwareProtection": {
+      "ScanEc2InstanceWithFindings": {
+        "EbsVolumes": {"Enable": true}
+      }
+    }
+  }'
+
+# Disable specific data source (S3 logs)
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --data-sources '{"S3Logs": {"Enable": false}}'
+
+# Enable Kubernetes audit logs only
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --data-sources '{"Kubernetes": {"AuditLogs": {"Enable": true}}}'
+
+# Enable Malware Protection for EC2
+aws guardduty update-detector \
+  --detector-id $DETECTOR_ID \
+  --data-sources '{"MalwareProtection": {"ScanEc2InstanceWithFindings": {"EbsVolumes": {"Enable": true}}}}'
+```
+
+#### Get Data Source Status
+```bash
+# Get detector configuration including data sources
+aws guardduty get-detector \
+  --detector-id $DETECTOR_ID \
+  --query 'DataSources'
+
+# Check specific data source status
+aws guardduty get-detector \
+  --detector-id $DETECTOR_ID \
+  --query 'DataSources.S3Logs.Status' \
+  --output text
+```
+
+### 10. Additional Useful Commands
+
+#### Get Detector Statistics
+```bash
+# Get member account statistics
+aws guardduty get-member-detectors \
+  --detector-id $DETECTOR_ID \
+  --account-ids "111122223333" "444455556666"
+
+# Get usage statistics
+aws guardduty get-usage-statistics \
+  --detector-id $DETECTOR_ID \
+  --usage-statistic-type SUM_BY_DATA_SOURCE \
+  --usage-criteria '{"DataSources": ["FLOW_LOGS", "CLOUD_TRAIL", "DNS_LOGS", "S3_LOGS"]}'
+```
+
+#### Delete Detector
+```bash
+# Delete GuardDuty detector (disables GuardDuty)
+aws guardduty delete-detector \
+  --detector-id $DETECTOR_ID
+```
+
+#### Tag Resources
+```bash
+# Add tags to detector
+aws guardduty tag-resource \
+  --resource-arn arn:aws:guardduty:us-east-1:123456789012:detector/$DETECTOR_ID \
+  --tags Environment=Production,Team=Security,CostCenter=CC001
+
+# List tags
+aws guardduty list-tags-for-resource \
+  --resource-arn arn:aws:guardduty:us-east-1:123456789012:detector/$DETECTOR_ID
+
+# Remove tags
+aws guardduty untag-resource \
+  --resource-arn arn:aws:guardduty:us-east-1:123456789012:detector/$DETECTOR_ID \
+  --tag-keys Environment Team
+```
 
 ## Troubleshooting
 

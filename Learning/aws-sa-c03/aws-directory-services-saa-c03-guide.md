@@ -12,7 +12,8 @@
 9. [Cost Optimization](#cost-optimization)
 10. [Best Practices](#best-practices)
 11. [Common Exam Scenarios](#common-exam-scenarios)
-12. [Hands-On Labs](#hands-on-labs)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Hands-On Labs](#hands-on-labs)
 
 ---
 
@@ -644,6 +645,512 @@ Managed AD (Enterprise) $219                  N/A
 - No on-premises requirements
 - Cost-effective
 - Quick setup
+
+---
+
+## AWS CLI Commands Reference
+
+### Directory Management
+
+#### Create AWS Managed Microsoft AD
+```bash
+# Create a Standard Edition Managed Microsoft AD
+aws ds create-microsoft-ad \
+    --name corp.example.com \
+    --short-name CORP \
+    --password MySecureP@ssw0rd! \
+    --description "Corporate Active Directory" \
+    --vpc-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456 \
+    --edition Standard \
+    --tags Key=Environment,Value=Production Key=Owner,Value=IT
+
+# Create an Enterprise Edition Managed Microsoft AD
+aws ds create-microsoft-ad \
+    --name enterprise.example.com \
+    --short-name ENTERPRISE \
+    --password MySecureP@ssw0rd! \
+    --description "Enterprise Active Directory" \
+    --vpc-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456 \
+    --edition Enterprise \
+    --region us-east-1
+```
+
+#### Create AD Connector
+```bash
+# Create an AD Connector to on-premises Active Directory
+aws ds connect-directory \
+    --name onprem.example.com \
+    --short-name ONPREM \
+    --password ConnectorP@ssw0rd! \
+    --description "Connector to on-premises AD" \
+    --size Small \
+    --connect-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456,CustomerDnsIps=10.0.0.10,10.0.0.11,CustomerUserName=admin@onprem.example.com
+
+# Create a large AD Connector for higher throughput
+aws ds connect-directory \
+    --name onprem.example.com \
+    --short-name ONPREM \
+    --password ConnectorP@ssw0rd! \
+    --size Large \
+    --connect-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456,CustomerDnsIps=10.0.0.10,10.0.0.11,CustomerUserName=admin@onprem.example.com
+```
+
+#### Create Simple AD
+```bash
+# Create a Small Simple AD directory
+aws ds create-directory \
+    --name simple.example.com \
+    --short-name SIMPLE \
+    --password SimpleP@ssw0rd! \
+    --description "Simple AD for development" \
+    --size Small \
+    --vpc-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456
+
+# Create a Large Simple AD directory
+aws ds create-directory \
+    --name simple.example.com \
+    --short-name SIMPLE \
+    --password SimpleP@ssw0rd! \
+    --size Large \
+    --vpc-settings VpcId=vpc-0123456789abcdef0,SubnetIds=subnet-abc123,subnet-def456 \
+    --tags Key=Environment,Value=Development
+```
+
+### Directory Operations
+
+#### Describe Directories
+```bash
+# List all directories in the region
+aws ds describe-directories
+
+# Describe a specific directory
+aws ds describe-directories \
+    --directory-ids d-1234567890
+
+# Get directory details with specific output format
+aws ds describe-directories \
+    --directory-ids d-1234567890 \
+    --query 'DirectoryDescriptions[0].[DirectoryId,Name,Type,Stage]' \
+    --output table
+
+# List all directories and their status
+aws ds describe-directories \
+    --query 'DirectoryDescriptions[*].[DirectoryId,Name,Type,Stage]' \
+    --output table
+```
+
+#### Delete Directory
+```bash
+# Delete a directory
+aws ds delete-directory \
+    --directory-id d-1234567890
+
+# Delete directory without confirmation (use with caution)
+aws ds delete-directory \
+    --directory-id d-1234567890 \
+    --no-cli-auto-prompt
+```
+
+### Trust Relationships
+
+#### Create Trust Relationship
+```bash
+# Create one-way outgoing trust (AWS trusts on-premises)
+aws ds create-trust \
+    --directory-id d-1234567890 \
+    --remote-domain-name onprem.example.com \
+    --trust-password TrustP@ssw0rd! \
+    --trust-direction One-Way:Outgoing \
+    --trust-type Forest
+
+# Create two-way trust
+aws ds create-trust \
+    --directory-id d-1234567890 \
+    --remote-domain-name onprem.example.com \
+    --trust-password TrustP@ssw0rd! \
+    --trust-direction Two-Way \
+    --trust-type Forest
+
+# Create one-way incoming trust (on-premises trusts AWS)
+aws ds create-trust \
+    --directory-id d-1234567890 \
+    --remote-domain-name onprem.example.com \
+    --trust-password TrustP@ssw0rd! \
+    --trust-direction One-Way:Incoming \
+    --trust-type External
+```
+
+#### Manage Trusts
+```bash
+# Describe trusts for a directory
+aws ds describe-trusts \
+    --directory-id d-1234567890
+
+# Verify trust relationship
+aws ds verify-trust \
+    --trust-id t-0123456789abcdef0
+
+# Delete a trust relationship
+aws ds delete-trust \
+    --trust-id t-0123456789abcdef0
+
+# Update trust password
+aws ds update-trust \
+    --trust-id t-0123456789abcdef0 \
+    --selective-auth Enabled
+```
+
+### Conditional Forwarders
+
+#### Create Conditional Forwarder
+```bash
+# Create conditional forwarder for specific domain
+aws ds create-conditional-forwarder \
+    --directory-id d-1234567890 \
+    --remote-domain-name partner.example.com \
+    --dns-ip-addrs 10.0.0.100 10.0.0.101
+
+# Create multiple conditional forwarders
+aws ds create-conditional-forwarder \
+    --directory-id d-1234567890 \
+    --remote-domain-name vendor.example.com \
+    --dns-ip-addrs 192.168.1.10 192.168.1.11
+```
+
+#### Manage Conditional Forwarders
+```bash
+# Describe conditional forwarders
+aws ds describe-conditional-forwarders \
+    --directory-id d-1234567890
+
+# Describe specific conditional forwarder
+aws ds describe-conditional-forwarders \
+    --directory-id d-1234567890 \
+    --remote-domain-names partner.example.com
+
+# Update conditional forwarder DNS IPs
+aws ds update-conditional-forwarder \
+    --directory-id d-1234567890 \
+    --remote-domain-name partner.example.com \
+    --dns-ip-addrs 10.0.0.102 10.0.0.103
+
+# Delete conditional forwarder
+aws ds delete-conditional-forwarder \
+    --directory-id d-1234567890 \
+    --remote-domain-name partner.example.com
+```
+
+### Shared Directories
+
+#### Share Directory
+```bash
+# Share directory with another AWS account
+aws ds share-directory \
+    --directory-id d-1234567890 \
+    --share-target Id=123456789012,Type=ACCOUNT \
+    --share-method HANDSHAKE \
+    --share-notes "Sharing for cross-account EC2 domain join"
+
+# Share directory with organization
+aws ds share-directory \
+    --directory-id d-1234567890 \
+    --share-target Id=o-exampleorgid,Type=ORGANIZATION \
+    --share-method ORGANIZATIONS
+```
+
+#### Manage Shared Directories
+```bash
+# Describe shared directories
+aws ds describe-shared-directories \
+    --owner-directory-id d-1234567890
+
+# Accept shared directory invitation
+aws ds accept-shared-directory \
+    --shared-directory-id d-1234567890
+
+# Reject shared directory invitation
+aws ds reject-shared-directory \
+    --shared-directory-id d-1234567890
+
+# Unshare directory
+aws ds unshare-directory \
+    --directory-id d-1234567890 \
+    --unshare-target Id=123456789012,Type=ACCOUNT
+```
+
+### MFA Configuration
+
+#### Enable and Configure MFA
+```bash
+# Enable RADIUS-based MFA
+aws ds enable-radius \
+    --directory-id d-1234567890 \
+    --radius-settings DisplayLabel="Company MFA",RadiusServers=192.168.1.50,RadiusPort=1812,RadiusTimeout=5,RadiusRetries=3,SharedSecret=MyRadiusSecret123!,AuthenticationProtocol=PAP,UseSameUsername=true
+
+# Update RADIUS settings
+aws ds update-radius \
+    --directory-id d-1234567890 \
+    --radius-settings DisplayLabel="Updated MFA",RadiusServers=192.168.1.51,RadiusPort=1812,RadiusTimeout=10,RadiusRetries=3,SharedSecret=NewSecret123!,AuthenticationProtocol=CHAP,UseSameUsername=true
+
+# Disable RADIUS/MFA
+aws ds disable-radius \
+    --directory-id d-1234567890
+```
+
+### Snapshots Management
+
+#### Create and Manage Snapshots
+```bash
+# Create manual snapshot
+aws ds create-snapshot \
+    --directory-id d-1234567890 \
+    --name "pre-upgrade-snapshot-2026-02-08"
+
+# List all snapshots for a directory
+aws ds describe-snapshots \
+    --directory-id d-1234567890
+
+# List snapshots with specific details
+aws ds describe-snapshots \
+    --directory-id d-1234567890 \
+    --query 'Snapshots[*].[SnapshotId,Name,Status,StartTime]' \
+    --output table
+
+# Delete a snapshot
+aws ds delete-snapshot \
+    --snapshot-id s-0123456789abcdef0
+
+# Restore from snapshot (requires creating new directory)
+aws ds restore-from-snapshot \
+    --snapshot-id s-0123456789abcdef0
+```
+
+### Domain Controllers
+
+#### Manage Domain Controllers
+```bash
+# Add domain controller to directory
+aws ds add-region \
+    --directory-id d-1234567890 \
+    --region-name eu-west-1 \
+    --vpc-settings VpcId=vpc-eu123456,SubnetIds=subnet-eu1,subnet-eu2
+
+# Describe domain controllers
+aws ds describe-domain-controllers \
+    --directory-id d-1234567890
+
+# Describe domain controllers in specific region
+aws ds describe-domain-controllers \
+    --directory-id d-1234567890 \
+    --region us-east-1
+
+# List regions where directory is deployed
+aws ds list-log-subscriptions \
+    --directory-id d-1234567890
+```
+
+### Schema Extensions
+
+#### Manage Schema Extensions
+```bash
+# Start schema extension
+aws ds start-schema-extension \
+    --directory-id d-1234567890 \
+    --create-snapshot-before-schema-extension \
+    --ldif-content "$(cat schema-extension.ldif)" \
+    --description "Adding custom attributes for HR system"
+
+# Describe schema extensions
+aws ds describe-schema-extensions \
+    --directory-id d-1234567890
+
+# Cancel schema extension
+aws ds cancel-schema-extension \
+    --directory-id d-1234567890 \
+    --schema-extension-id extn-0123456789abcdef0
+```
+
+### Tags Management
+
+#### Add and Manage Tags
+```bash
+# Add tags to directory
+aws ds add-tags-to-resource \
+    --resource-id d-1234567890 \
+    --tags Key=Environment,Value=Production Key=CostCenter,Value=IT-001 Key=Owner,Value=admin@example.com
+
+# List tags for a directory
+aws ds list-tags-for-resource \
+    --resource-id d-1234567890
+
+# Remove tags from directory
+aws ds remove-tags-from-resource \
+    --resource-id d-1234567890 \
+    --tag-keys Environment CostCenter
+```
+
+### Directory Settings
+
+#### Update Directory Settings
+```bash
+# Update directory settings
+aws ds update-settings \
+    --directory-id d-1234567890 \
+    --settings Name=SSO,Value=true
+
+# Enable/Disable LDAPS
+aws ds enable-ldaps \
+    --directory-id d-1234567890 \
+    --type Client
+
+aws ds disable-ldaps \
+    --directory-id d-1234567890 \
+    --type Client
+
+# Describe LDAPS settings
+aws ds describe-ldaps-settings \
+    --directory-id d-1234567890
+```
+
+### IP Routes (for AD Connector and Managed AD)
+
+#### Manage IP Routes
+```bash
+# Add IP route for peered VPC
+aws ds add-ip-routes \
+    --directory-id d-1234567890 \
+    --ip-routes CidrIp=10.1.0.0/16,Description="Route to peered VPC"
+
+# List IP routes
+aws ds list-ip-routes \
+    --directory-id d-1234567890
+
+# Remove IP route
+aws ds remove-ip-routes \
+    --directory-id d-1234567890 \
+    --cidr-ips 10.1.0.0/16
+```
+
+### CloudWatch Log Integration
+
+#### Configure CloudWatch Logs
+```bash
+# Create log subscription
+aws ds create-log-subscription \
+    --directory-id d-1234567890 \
+    --log-group-name /aws/directoryservice/d-1234567890
+
+# List log subscriptions
+aws ds list-log-subscriptions \
+    --directory-id d-1234567890
+
+# Delete log subscription
+aws ds delete-log-subscription \
+    --directory-id d-1234567890
+```
+
+### Computer Objects
+
+#### Manage Computer Objects
+```bash
+# Create computer object for pre-staging
+aws ds create-computer \
+    --directory-id d-1234567890 \
+    --computer-name WEB-SERVER-01 \
+    --password ComputerP@ssw0rd! \
+    --organizational-unit-distinguished-name "OU=Servers,DC=corp,DC=example,DC=com" \
+    --computer-attributes Name=description,Value="Web Server in DMZ"
+```
+
+### Certificate Management
+
+#### Manage Certificates for LDAPS
+```bash
+# Register certificate for LDAPS
+aws ds register-certificate \
+    --directory-id d-1234567890 \
+    --certificate-data file://certificate.pem \
+    --type ClientCertAuth
+
+# List certificates
+aws ds list-certificates \
+    --directory-id d-1234567890
+
+# Describe certificate
+aws ds describe-certificate \
+    --directory-id d-1234567890 \
+    --certificate-id cert-0123456789abcdef0
+
+# Deregister certificate
+aws ds deregister-certificate \
+    --directory-id d-1234567890 \
+    --certificate-id cert-0123456789abcdef0
+```
+
+### Event Subscriptions
+
+#### Manage Event Subscriptions
+```bash
+# Register event topic
+aws ds register-event-topic \
+    --directory-id d-1234567890 \
+    --topic-name arn:aws:sns:us-east-1:123456789012:DirectoryServiceEvents
+
+# Describe event topics
+aws ds describe-event-topics \
+    --directory-id d-1234567890
+
+# Deregister event topic
+aws ds deregister-event-topic \
+    --directory-id d-1234567890 \
+    --topic-name arn:aws:sns:us-east-1:123456789012:DirectoryServiceEvents
+```
+
+### Client Authentication
+
+#### Configure Client Authentication
+```bash
+# Enable client authentication
+aws ds enable-client-authentication \
+    --directory-id d-1234567890 \
+    --type SmartCard
+
+# Describe client authentication settings
+aws ds describe-client-authentication-settings \
+    --directory-id d-1234567890
+
+# Disable client authentication
+aws ds disable-client-authentication \
+    --directory-id d-1234567890 \
+    --type SmartCard
+```
+
+### Useful Query Commands
+
+#### Advanced Queries
+```bash
+# Get all directories with their types and stages
+aws ds describe-directories \
+    --query 'DirectoryDescriptions[*].{ID:DirectoryId,Name:Name,Type:Type,Stage:Stage,Size:Size}' \
+    --output table
+
+# Find directories in specific VPC
+aws ds describe-directories \
+    --query 'DirectoryDescriptions[?VpcSettings.VpcId==`vpc-0123456789abcdef0`].[DirectoryId,Name]' \
+    --output table
+
+# Get directory DNS IPs
+aws ds describe-directories \
+    --directory-ids d-1234567890 \
+    --query 'DirectoryDescriptions[0].DnsIpAddrs' \
+    --output table
+
+# Check directory status across all regions
+for region in us-east-1 us-west-2 eu-west-1; do
+  echo "Region: $region"
+  aws ds describe-directories --region $region --query 'DirectoryDescriptions[*].[DirectoryId,Name,Stage]' --output table
+done
+```
 
 ---
 

@@ -13,7 +13,8 @@
 10. [Best Practices](#best-practices)
 11. [Common Use Cases](#common-use-cases)
 12. [Exam Tips](#exam-tips)
-13. [Hands-On Labs](#hands-on-labs)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [Hands-On Labs](#hands-on-labs)
 
 ## Overview
 
@@ -802,6 +803,830 @@ Setup:
 - Verify health check configuration for failover issues
 - Monitor CloudWatch metrics for DNS query patterns
 - Use Route 53 query logging for detailed analysis
+
+## AWS CLI Commands Reference
+
+### Hosted Zones Management
+
+#### Create Public Hosted Zone
+```bash
+# Create a public hosted zone for your domain
+aws route53 create-hosted-zone \
+  --name example.com \
+  --caller-reference $(date +%s) \
+  --hosted-zone-config Comment="Production domain for example.com"
+
+# Create hosted zone with tags
+aws route53 create-hosted-zone \
+  --name example.com \
+  --caller-reference $(date +%s) \
+  --hosted-zone-config Comment="Production domain" \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+```
+
+#### Create Private Hosted Zone
+```bash
+# Create private hosted zone associated with VPC
+aws route53 create-hosted-zone \
+  --name internal.company.com \
+  --caller-reference $(date +%s) \
+  --vpc VPCRegion=us-east-1,VPCId=vpc-12345678 \
+  --hosted-zone-config PrivateZone=true,Comment="Internal DNS for VPC"
+
+# Associate additional VPC with private hosted zone
+aws route53 associate-vpc-with-hosted-zone \
+  --hosted-zone-id Z1234567890ABC \
+  --vpc VPCRegion=us-west-2,VPCId=vpc-87654321
+```
+
+#### List and Get Hosted Zones
+```bash
+# List all hosted zones
+aws route53 list-hosted-zones
+
+# List hosted zones with pagination
+aws route53 list-hosted-zones \
+  --max-items 10 \
+  --page-size 5
+
+# Get details of a specific hosted zone
+aws route53 get-hosted-zone --id Z1234567890ABC
+
+# List hosted zones by name
+aws route53 list-hosted-zones-by-name --dns-name example.com
+```
+
+#### Delete Hosted Zone
+```bash
+# Delete a hosted zone (must delete all records except NS and SOA first)
+aws route53 delete-hosted-zone --id Z1234567890ABC
+```
+
+### Resource Record Sets Management
+
+#### Create A Record
+```bash
+# Create simple A record using change-resource-record-sets
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Comment": "Create A record for www",
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "www.example.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create multiple A records at once
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch file://create-records.json
+```
+
+#### Create Alias Record
+```bash
+# Create alias record pointing to CloudFront distribution
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "www.example.com",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "Z2FDTNDATAQYW2",
+          "DNSName": "d123456789.cloudfront.net",
+          "EvaluateTargetHealth": false
+        }
+      }
+    }]
+  }'
+
+# Create alias record pointing to ALB
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.example.com",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "Z35SXDOTRQ7X7K",
+          "DNSName": "my-alb-1234567890.us-east-1.elb.amazonaws.com",
+          "EvaluateTargetHealth": true
+        }
+      }
+    }]
+  }'
+```
+
+#### Update and Delete Records
+```bash
+# Update existing A record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "www.example.com",
+        "Type": "A",
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+
+# Delete record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "old.example.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "192.0.2.3"}]
+      }
+    }]
+  }'
+```
+
+#### List Resource Record Sets
+```bash
+# List all records in a hosted zone
+aws route53 list-resource-record-sets --hosted-zone-id Z1234567890ABC
+
+# List records starting from a specific name
+aws route53 list-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --start-record-name www.example.com
+
+# List records of a specific type
+aws route53 list-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --start-record-type A
+```
+
+### Health Checks
+
+#### Create Health Checks
+```bash
+# Create HTTP health check for an endpoint
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=HTTP,ResourcePath=/health,FullyQualifiedDomainName=api.example.com,Port=80,RequestInterval=30,FailureThreshold=3
+
+# Create HTTPS health check with string matching
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=HTTPS,ResourcePath=/status,FullyQualifiedDomainName=secure.example.com,Port=443,RequestInterval=30,FailureThreshold=2,SearchString="OK"
+
+# Create health check for IP address
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=HTTP,IPAddress=192.0.2.1,Port=80,ResourcePath=/health,RequestInterval=30,FailureThreshold=3
+
+# Create calculated health check (monitors multiple health checks)
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=CALCULATED,ChildHealthChecks=health-check-id-1,health-check-id-2,HealthThreshold=1
+
+# Create CloudWatch alarm health check
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=CLOUDWATCH_METRIC,AlarmIdentifier=Region=us-east-1,Name=MyAlarm,InsufficientDataHealthStatus=Healthy
+```
+
+#### Update and Manage Health Checks
+```bash
+# Update health check configuration
+aws route53 update-health-check \
+  --health-check-id abc12345-6789-0def-ghij-klmnopqrstuv \
+  --failure-threshold 2 \
+  --resource-path /new-health-path
+
+# Update health check with CloudWatch alarm
+aws route53 update-health-check \
+  --health-check-id abc12345-6789-0def-ghij-klmnopqrstuv \
+  --alarm-identifier Region=us-east-1,Name=UpdatedAlarm
+
+# List all health checks
+aws route53 list-health-checks
+
+# Get health check details
+aws route53 get-health-check --health-check-id abc12345-6789-0def-ghij-klmnopqrstuv
+
+# Get health check status
+aws route53 get-health-check-status --health-check-id abc12345-6789-0def-ghij-klmnopqrstuv
+
+# Delete health check
+aws route53 delete-health-check --health-check-id abc12345-6789-0def-ghij-klmnopqrstuv
+```
+
+#### Tag Health Checks
+```bash
+# Add tags to health check
+aws route53 change-tags-for-resource \
+  --resource-type healthcheck \
+  --resource-id abc12345-6789-0def-ghij-klmnopqrstuv \
+  --add-tags Key=Environment,Value=Production Key=Application,Value=API
+
+# List tags for health check
+aws route53 list-tags-for-resource \
+  --resource-type healthcheck \
+  --resource-id abc12345-6789-0def-ghij-klmnopqrstuv
+
+# Remove tags from health check
+aws route53 change-tags-for-resource \
+  --resource-type healthcheck \
+  --resource-id abc12345-6789-0def-ghij-klmnopqrstuv \
+  --remove-tag-keys Environment
+```
+
+### Routing Policies
+
+#### Simple Routing
+```bash
+# Simple routing with single IP
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "simple.example.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Simple routing with multiple IPs
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "simple.example.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          {"Value": "192.0.2.1"},
+          {"Value": "192.0.2.2"}
+        ]
+      }
+    }]
+  }'
+```
+
+#### Weighted Routing
+```bash
+# Create weighted routing policy - 70% traffic
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "weighted.example.com",
+        "Type": "A",
+        "SetIdentifier": "Primary-70",
+        "Weight": 70,
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create weighted routing policy - 30% traffic
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "weighted.example.com",
+        "Type": "A",
+        "SetIdentifier": "Secondary-30",
+        "Weight": 30,
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+```
+
+#### Latency-Based Routing
+```bash
+# Create latency record for US East
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "latency.example.com",
+        "Type": "A",
+        "SetIdentifier": "US-East-1",
+        "Region": "us-east-1",
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create latency record for EU West
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "latency.example.com",
+        "Type": "A",
+        "SetIdentifier": "EU-West-1",
+        "Region": "eu-west-1",
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+```
+
+#### Failover Routing
+```bash
+# Create primary failover record with health check
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "failover.example.com",
+        "Type": "A",
+        "SetIdentifier": "Primary",
+        "Failover": "PRIMARY",
+        "TTL": 60,
+        "HealthCheckId": "abc12345-6789-0def-ghij-klmnopqrstuv",
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create secondary failover record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "failover.example.com",
+        "Type": "A",
+        "SetIdentifier": "Secondary",
+        "Failover": "SECONDARY",
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+```
+
+#### Geolocation Routing
+```bash
+# Create geolocation record for North America
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "geo.example.com",
+        "Type": "A",
+        "SetIdentifier": "North-America",
+        "GeoLocation": {
+          "ContinentCode": "NA"
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create geolocation record for specific country
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "geo.example.com",
+        "Type": "A",
+        "SetIdentifier": "Germany",
+        "GeoLocation": {
+          "CountryCode": "DE"
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+
+# Create default geolocation record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "geo.example.com",
+        "Type": "A",
+        "SetIdentifier": "Default",
+        "GeoLocation": {
+          "ContinentCode": "*"
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.3"}]
+      }
+    }]
+  }'
+```
+
+#### Geoproximity Routing
+```bash
+# Create geoproximity record with bias
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "geoprox.example.com",
+        "Type": "A",
+        "SetIdentifier": "US-East-Datacenter",
+        "GeoProximityLocation": {
+          "AWSRegion": "us-east-1",
+          "Bias": 10
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.1"}]
+      }
+    }]
+  }'
+
+# Create geoproximity with coordinates
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "geoprox.example.com",
+        "Type": "A",
+        "SetIdentifier": "Custom-Location",
+        "GeoProximityLocation": {
+          "Coordinates": {
+            "Latitude": "40.7128",
+            "Longitude": "-74.0060"
+          },
+          "Bias": 0
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "192.0.2.2"}]
+      }
+    }]
+  }'
+```
+
+#### Multivalue Answer Routing
+```bash
+# Create multiple multivalue answer records with health checks
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "multivalue.example.com",
+          "Type": "A",
+          "SetIdentifier": "Server-1",
+          "MultiValueAnswer": true,
+          "TTL": 60,
+          "HealthCheckId": "health-check-1",
+          "ResourceRecords": [{"Value": "192.0.2.1"}]
+        }
+      },
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "multivalue.example.com",
+          "Type": "A",
+          "SetIdentifier": "Server-2",
+          "MultiValueAnswer": true,
+          "TTL": 60,
+          "HealthCheckId": "health-check-2",
+          "ResourceRecords": [{"Value": "192.0.2.2"}]
+        }
+      }
+    ]
+  }'
+```
+
+### Traffic Policies
+
+#### Create and Manage Traffic Policies
+```bash
+# Create traffic policy
+aws route53 create-traffic-policy \
+  --name MyTrafficPolicy \
+  --document file://traffic-policy.json
+
+# List all traffic policies
+aws route53 list-traffic-policies
+
+# Get traffic policy details
+aws route53 get-traffic-policy \
+  --id policy-id \
+  --version 1
+
+# Create traffic policy instance
+aws route53 create-traffic-policy-instance \
+  --hosted-zone-id Z1234567890ABC \
+  --name traffic.example.com \
+  --ttl 300 \
+  --traffic-policy-id policy-id \
+  --traffic-policy-version 1
+
+# Update traffic policy instance
+aws route53 update-traffic-policy-instance \
+  --id instance-id \
+  --ttl 60 \
+  --traffic-policy-id policy-id \
+  --traffic-policy-version 2
+
+# Delete traffic policy instance
+aws route53 delete-traffic-policy-instance --id instance-id
+
+# Delete traffic policy
+aws route53 delete-traffic-policy \
+  --id policy-id \
+  --version 1
+```
+
+### Domain Registration
+
+#### Check Domain Availability
+```bash
+# Check if domain is available for registration
+aws route53domains check-domain-availability --domain-name example.com
+
+# Check domain transferability
+aws route53domains check-domain-transferability --domain-name example.com
+```
+
+#### Register Domain
+```bash
+# Register a new domain
+aws route53domains register-domain \
+  --domain-name example.com \
+  --duration-in-years 1 \
+  --admin-contact file://contact-info.json \
+  --registrant-contact file://contact-info.json \
+  --tech-contact file://contact-info.json \
+  --privacy-protect-admin-contact \
+  --privacy-protect-registrant-contact \
+  --privacy-protect-tech-contact
+
+# List registered domains
+aws route53domains list-domains
+
+# Get domain details
+aws route53domains get-domain-detail --domain-name example.com
+```
+
+#### Update Domain Settings
+```bash
+# Enable auto-renewal
+aws route53domains enable-domain-auto-renew --domain-name example.com
+
+# Disable auto-renewal
+aws route53domains disable-domain-auto-renew --domain-name example.com
+
+# Enable transfer lock
+aws route53domains enable-domain-transfer-lock --domain-name example.com
+
+# Disable transfer lock
+aws route53domains disable-domain-transfer-lock --domain-name example.com
+
+# Update domain contact information
+aws route53domains update-domain-contact \
+  --domain-name example.com \
+  --admin-contact file://new-contact.json
+
+# Update domain nameservers
+aws route53domains update-domain-nameservers \
+  --domain-name example.com \
+  --nameservers Name=ns-1.awsdns-01.com Name=ns-2.awsdns-02.net
+```
+
+### Query Logging
+
+#### Configure Query Logging
+```bash
+# Create query logging configuration
+aws route53 create-query-logging-config \
+  --hosted-zone-id Z1234567890ABC \
+  --cloud-watch-logs-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/route53/example.com
+
+# List query logging configurations
+aws route53 list-query-logging-configs
+
+# List query logging configs for hosted zone
+aws route53 list-query-logging-configs \
+  --hosted-zone-id Z1234567890ABC
+
+# Get query logging config details
+aws route53 get-query-logging-config --id config-id
+
+# Delete query logging configuration
+aws route53 delete-query-logging-config --id config-id
+```
+
+### DNSSEC
+
+#### Enable and Manage DNSSEC
+```bash
+# Enable DNSSEC signing for hosted zone
+aws route53 enable-hosted-zone-dnssec \
+  --hosted-zone-id Z1234567890ABC
+
+# Get DNSSEC status
+aws route53 get-dnssec --hosted-zone-id Z1234567890ABC
+
+# Create key-signing key (KSK)
+aws route53 create-key-signing-key \
+  --caller-reference $(date +%s) \
+  --hosted-zone-id Z1234567890ABC \
+  --key-management-service-arn arn:aws:kms:us-east-1:123456789012:key/key-id \
+  --name ksk-example \
+  --status ACTIVE
+
+# Activate key-signing key
+aws route53 activate-key-signing-key \
+  --hosted-zone-id Z1234567890ABC \
+  --name ksk-example
+
+# Deactivate key-signing key
+aws route53 deactivate-key-signing-key \
+  --hosted-zone-id Z1234567890ABC \
+  --name ksk-example
+
+# Delete key-signing key
+aws route53 delete-key-signing-key \
+  --hosted-zone-id Z1234567890ABC \
+  --name ksk-example
+
+# Disable DNSSEC signing
+aws route53 disable-hosted-zone-dnssec \
+  --hosted-zone-id Z1234567890ABC
+```
+
+### Route 53 Resolver
+
+#### Manage Resolver Endpoints
+```bash
+# Create inbound resolver endpoint
+aws route53resolver create-resolver-endpoint \
+  --creator-request-id $(date +%s) \
+  --name InboundEndpoint \
+  --direction INBOUND \
+  --security-group-ids sg-12345678 \
+  --ip-addresses SubnetId=subnet-abc123,Ip=10.0.1.10 SubnetId=subnet-def456,Ip=10.0.2.10 \
+  --tags Key=Environment,Value=Production
+
+# Create outbound resolver endpoint
+aws route53resolver create-resolver-endpoint \
+  --creator-request-id $(date +%s) \
+  --name OutboundEndpoint \
+  --direction OUTBOUND \
+  --security-group-ids sg-12345678 \
+  --ip-addresses SubnetId=subnet-abc123 SubnetId=subnet-def456
+
+# List resolver endpoints
+aws route53resolver list-resolver-endpoints
+
+# Get resolver endpoint details
+aws route53resolver get-resolver-endpoint \
+  --resolver-endpoint-id rslvr-in-123456
+
+# Delete resolver endpoint
+aws route53resolver delete-resolver-endpoint \
+  --resolver-endpoint-id rslvr-in-123456
+```
+
+#### Manage Resolver Rules
+```bash
+# Create forwarding rule
+aws route53resolver create-resolver-rule \
+  --creator-request-id $(date +%s) \
+  --name ForwardToCorp \
+  --rule-type FORWARD \
+  --domain-name corp.example.com \
+  --resolver-endpoint-id rslvr-out-123456 \
+  --target-ips Ip=192.168.1.10,Port=53 Ip=192.168.1.11,Port=53 \
+  --tags Key=Environment,Value=Production
+
+# Create system rule (OVERRIDE)
+aws route53resolver create-resolver-rule \
+  --creator-request-id $(date +%s) \
+  --name SystemRule \
+  --rule-type SYSTEM \
+  --domain-name internal.example.com
+
+# List resolver rules
+aws route53resolver list-resolver-rules
+
+# Get resolver rule details
+aws route53resolver get-resolver-rule \
+  --resolver-rule-id rslvr-rr-123456
+
+# Associate resolver rule with VPC
+aws route53resolver associate-resolver-rule \
+  --resolver-rule-id rslvr-rr-123456 \
+  --vpc-id vpc-abc123 \
+  --name MyAssociation
+
+# List resolver rule associations
+aws route53resolver list-resolver-rule-associations
+
+# Disassociate resolver rule from VPC
+aws route53resolver disassociate-resolver-rule \
+  --resolver-rule-id rslvr-rr-123456 \
+  --vpc-id vpc-abc123
+
+# Delete resolver rule
+aws route53resolver delete-resolver-rule \
+  --resolver-rule-id rslvr-rr-123456
+```
+
+### Tags Management
+
+```bash
+# Add tags to hosted zone
+aws route53 change-tags-for-resource \
+  --resource-type hostedzone \
+  --resource-id Z1234567890ABC \
+  --add-tags Key=Environment,Value=Production Key=CostCenter,Value=Engineering
+
+# List tags for hosted zone
+aws route53 list-tags-for-resource \
+  --resource-type hostedzone \
+  --resource-id Z1234567890ABC
+
+# Remove tags from hosted zone
+aws route53 change-tags-for-resource \
+  --resource-type hostedzone \
+  --resource-id Z1234567890ABC \
+  --remove-tag-keys Environment CostCenter
+```
+
+### Testing and Verification
+
+```bash
+# Test DNS query using Route 53
+aws route53 test-dns-answer \
+  --hosted-zone-id Z1234567890ABC \
+  --record-name www.example.com \
+  --record-type A
+
+# Test DNS query from specific location
+aws route53 test-dns-answer \
+  --hosted-zone-id Z1234567890ABC \
+  --record-name geo.example.com \
+  --record-type A \
+  --resolver-ip 8.8.8.8 \
+  --edns0-client-subnet-ip 203.0.113.1 \
+  --edns0-client-subnet-mask 24
+
+# Get change status
+aws route53 get-change --id /change/C1234567890ABC
+```
 
 ## Hands-On Labs
 

@@ -12,7 +12,8 @@
 9. [Migration Strategies](#migration-strategies)
 10. [Cost Optimization](#cost-optimization)
 11. [Exam Tips and Common Scenarios](#exam-tips-and-common-scenarios)
-12. [Best Practices](#best-practices)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Best Practices](#best-practices)
 
 ---
 
@@ -752,6 +753,567 @@ Both Engines:
   - Global Database
   - Performance Insights
   - Fast Clone
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Creating Aurora Clusters
+
+#### Create Aurora MySQL Cluster
+```bash
+# Create Aurora MySQL 8.0 cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --database-name myappdb \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --backup-retention-period 7 \
+  --preferred-backup-window "03:00-04:00" \
+  --preferred-maintenance-window "mon:04:00-mon:05:00" \
+  --enabled-cloudwatch-logs-exports audit error general slowquery \
+  --tags Key=Environment,Value=Production Key=Application,Value=MyApp
+
+# Create Aurora MySQL cluster with encryption
+aws rds create-db-cluster \
+  --db-cluster-identifier my-encrypted-cluster \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --storage-encrypted \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234-ab12-cd34-ef56-abcdef123456
+
+# Create Aurora MySQL cluster with backtrack enabled
+aws rds create-db-cluster \
+  --db-cluster-identifier my-backtrack-cluster \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --backtrack-window 72 \
+  --enable-http-endpoint
+```
+
+#### Create Aurora PostgreSQL Cluster
+```bash
+# Create Aurora PostgreSQL 15 cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-aurora-postgres-cluster \
+  --engine aurora-postgresql \
+  --engine-version 15.4 \
+  --master-username postgres \
+  --master-user-password MySecurePassword123! \
+  --database-name myappdb \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --backup-retention-period 14 \
+  --storage-encrypted \
+  --enable-cloudwatch-logs-exports postgresql \
+  --db-cluster-parameter-group-name default.aurora-postgresql15
+
+# Create Aurora PostgreSQL cluster with Performance Insights
+aws rds create-db-cluster \
+  --db-cluster-identifier my-postgres-pi-cluster \
+  --engine aurora-postgresql \
+  --engine-version 15.4 \
+  --master-username postgres \
+  --master-user-password MySecurePassword123! \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --storage-encrypted
+```
+
+### Adding Cluster Instances
+
+#### Create Writer (Primary) Instance
+```bash
+# Create the primary writer instance
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --db-instance-class db.r6g.xlarge \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --publicly-accessible \
+  --db-parameter-group-name default.aurora-mysql8.0 \
+  --enable-performance-insights \
+  --performance-insights-retention-period 7 \
+  --monitoring-interval 60 \
+  --monitoring-role-arn arn:aws:iam::123456789012:role/rds-monitoring-role
+
+# Create primary instance with specific AZ
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-writer \
+  --db-instance-class db.r6g.2xlarge \
+  --engine aurora-postgresql \
+  --db-cluster-identifier my-aurora-postgres-cluster \
+  --availability-zone us-east-1a \
+  --enable-performance-insights \
+  --performance-insights-kms-key-id alias/aws/rds
+```
+
+#### Create Reader (Replica) Instances
+```bash
+# Create first reader replica
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-reader-1 \
+  --db-instance-class db.r6g.xlarge \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --availability-zone us-east-1b \
+  --enable-performance-insights \
+  --promotion-tier 1
+
+# Create second reader replica in different AZ
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-reader-2 \
+  --db-instance-class db.r6g.xlarge \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --availability-zone us-east-1c \
+  --enable-performance-insights \
+  --promotion-tier 2
+
+# Create reader with different instance class
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-reader-small \
+  --db-instance-class db.t4g.medium \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --promotion-tier 15
+
+# Create cross-region read replica cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-aurora-replica-eu \
+  --engine aurora-mysql \
+  --replication-source-identifier arn:aws:rds:us-east-1:123456789012:cluster:my-aurora-mysql-cluster \
+  --region eu-west-1
+```
+
+### Aurora Serverless
+
+#### Create Aurora Serverless v2 Cluster
+```bash
+# Create Aurora MySQL Serverless v2 cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-serverless-v2-cluster \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --database-name myappdb \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=16 \
+  --engine-mode provisioned
+
+# Add Serverless v2 instance to the cluster
+aws rds create-db-instance \
+  --db-instance-identifier my-serverless-v2-instance-1 \
+  --db-instance-class db.serverless \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-serverless-v2-cluster
+
+# Create Aurora PostgreSQL Serverless v2
+aws rds create-db-cluster \
+  --db-cluster-identifier my-postgres-serverless-v2 \
+  --engine aurora-postgresql \
+  --engine-version 15.4 \
+  --master-username postgres \
+  --master-user-password MySecurePassword123! \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=32
+
+# Modify Serverless v2 scaling configuration
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-serverless-v2-cluster \
+  --serverless-v2-scaling-configuration MinCapacity=1,MaxCapacity=8 \
+  --apply-immediately
+```
+
+#### Create Aurora Serverless v1 Cluster (Legacy)
+```bash
+# Create Aurora MySQL Serverless v1 cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-serverless-cluster \
+  --engine aurora-mysql \
+  --engine-version 5.7.mysql_aurora.2.11.2 \
+  --engine-mode serverless \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --database-name myappdb \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --scaling-configuration MinCapacity=2,MaxCapacity=16,AutoPause=true,SecondsUntilAutoPause=300
+
+# Create Serverless v1 with Data API enabled
+aws rds create-db-cluster \
+  --db-cluster-identifier my-serverless-data-api \
+  --engine aurora-mysql \
+  --engine-version 5.7.mysql_aurora.2.11.2 \
+  --engine-mode serverless \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --db-subnet-group-name my-db-subnet-group \
+  --scaling-configuration MinCapacity=1,MaxCapacity=4,AutoPause=true,SecondsUntilAutoPause=600 \
+  --enable-http-endpoint
+```
+
+### Cluster Endpoints
+
+#### Describe and Use Cluster Endpoints
+```bash
+# Get cluster endpoint information
+aws rds describe-db-clusters \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --query 'DBClusters[0].[Endpoint,ReaderEndpoint,Port]'
+
+# Create custom endpoint for specific instances
+aws rds create-db-cluster-endpoint \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --db-cluster-endpoint-identifier my-analytics-endpoint \
+  --endpoint-type READER \
+  --static-members my-aurora-reader-1 my-aurora-reader-2
+
+# Create custom endpoint excluding specific instances
+aws rds create-db-cluster-endpoint \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --db-cluster-endpoint-identifier my-oltp-endpoint \
+  --endpoint-type ANY \
+  --excluded-members my-aurora-reader-small
+
+# List all custom endpoints
+aws rds describe-db-cluster-endpoints \
+  --db-cluster-identifier my-aurora-mysql-cluster
+
+# Modify custom endpoint membership
+aws rds modify-db-cluster-endpoint \
+  --db-cluster-endpoint-identifier my-analytics-endpoint \
+  --static-members my-aurora-reader-2 my-aurora-reader-3
+
+# Delete custom endpoint
+aws rds delete-db-cluster-endpoint \
+  --db-cluster-endpoint-identifier my-analytics-endpoint
+```
+
+### Database Cloning
+
+#### Clone Aurora Cluster (Fast Clone)
+```bash
+# Clone an Aurora cluster for testing/development
+aws rds restore-db-cluster-to-point-in-time \
+  --db-cluster-identifier my-aurora-clone-dev \
+  --restore-type copy-on-write \
+  --source-db-cluster-identifier my-aurora-mysql-cluster \
+  --use-latest-restorable-time
+
+# Clone cluster to a specific point in time
+aws rds restore-db-cluster-to-point-in-time \
+  --db-cluster-identifier my-aurora-clone-before-update \
+  --restore-type copy-on-write \
+  --source-db-cluster-identifier my-aurora-mysql-cluster \
+  --restore-to-time 2024-01-15T10:30:00Z
+
+# Clone with different VPC/security groups
+aws rds restore-db-cluster-to-point-in-time \
+  --db-cluster-identifier my-aurora-clone-isolated \
+  --restore-type copy-on-write \
+  --source-db-cluster-identifier my-aurora-mysql-cluster \
+  --use-latest-restorable-time \
+  --db-subnet-group-name my-isolated-subnet-group \
+  --vpc-security-group-ids sg-9876543210fedcba0
+
+# Add instance to cloned cluster
+aws rds create-db-instance \
+  --db-instance-identifier my-aurora-clone-dev-instance-1 \
+  --db-instance-class db.t4g.medium \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-aurora-clone-dev
+```
+
+### Backtrack
+
+#### Use Backtrack (MySQL Only)
+```bash
+# Backtrack cluster to a specific time
+aws rds backtrack-db-cluster \
+  --db-cluster-identifier my-backtrack-cluster \
+  --backtrack-to "2024-01-15T14:30:00Z" \
+  --force
+
+# Backtrack to 2 hours ago
+BACKTRACK_TIME=$(date -u -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+aws rds backtrack-db-cluster \
+  --db-cluster-identifier my-backtrack-cluster \
+  --backtrack-to "$BACKTRACK_TIME"
+
+# Describe backtrack history
+aws rds describe-db-cluster-backtracks \
+  --db-cluster-identifier my-backtrack-cluster
+
+# Get latest backtrack status
+aws rds describe-db-cluster-backtracks \
+  --db-cluster-identifier my-backtrack-cluster \
+  --max-records 1
+
+# Modify backtrack window
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-backtrack-cluster \
+  --backtrack-window 48 \
+  --apply-immediately
+```
+
+### Aurora Global Database
+
+#### Create and Manage Global Database
+```bash
+# Create Global Database
+aws rds create-global-cluster \
+  --global-cluster-identifier my-global-database \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --database-name myappdb
+
+# Add primary cluster to global database
+aws rds create-db-cluster \
+  --db-cluster-identifier my-primary-cluster \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --master-username admin \
+  --master-user-password MySecurePassword123! \
+  --global-cluster-identifier my-global-database \
+  --db-subnet-group-name my-db-subnet-group \
+  --vpc-security-group-ids sg-0123456789abcdef0 \
+  --region us-east-1
+
+# Create primary instance
+aws rds create-db-instance \
+  --db-instance-identifier my-primary-instance-1 \
+  --db-instance-class db.r6g.xlarge \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-primary-cluster \
+  --region us-east-1
+
+# Add secondary region cluster
+aws rds create-db-cluster \
+  --db-cluster-identifier my-secondary-cluster-eu \
+  --engine aurora-mysql \
+  --engine-version 8.0.mysql_aurora.3.04.0 \
+  --global-cluster-identifier my-global-database \
+  --db-subnet-group-name my-db-subnet-group-eu \
+  --vpc-security-group-ids sg-fedcba9876543210 \
+  --region eu-west-1
+
+# Create secondary instance
+aws rds create-db-instance \
+  --db-instance-identifier my-secondary-instance-1 \
+  --db-instance-class db.r6g.xlarge \
+  --engine aurora-mysql \
+  --db-cluster-identifier my-secondary-cluster-eu \
+  --region eu-west-1
+
+# Remove cluster from global database
+aws rds remove-from-global-cluster \
+  --global-cluster-identifier my-global-database \
+  --db-cluster-identifier arn:aws:rds:eu-west-1:123456789012:cluster:my-secondary-cluster-eu
+
+# Promote secondary cluster to standalone
+aws rds failover-global-cluster \
+  --global-cluster-identifier my-global-database \
+  --target-db-cluster-identifier arn:aws:rds:eu-west-1:123456789012:cluster:my-secondary-cluster-eu
+
+# Delete global database
+aws rds delete-global-cluster \
+  --global-cluster-identifier my-global-database
+```
+
+### Database Activity Streams
+
+#### Enable Database Activity Streams
+```bash
+# Enable Activity Streams for Aurora PostgreSQL
+aws rds start-activity-stream \
+  --resource-arn arn:aws:rds:us-east-1:123456789012:cluster:my-aurora-postgres-cluster \
+  --mode async \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234-ab12-cd34-ef56-abcdef123456 \
+  --apply-immediately
+
+# Enable Activity Streams in sync mode (higher security)
+aws rds start-activity-stream \
+  --resource-arn arn:aws:rds:us-east-1:123456789012:cluster:my-aurora-postgres-cluster \
+  --mode sync \
+  --kms-key-id alias/my-das-key \
+  --apply-immediately
+
+# Describe Activity Stream status
+aws rds describe-db-clusters \
+  --db-cluster-identifier my-aurora-postgres-cluster \
+  --query 'DBClusters[0].[ActivityStreamStatus,ActivityStreamKinesisStreamName,ActivityStreamMode]'
+
+# Stop Activity Streams
+aws rds stop-activity-stream \
+  --resource-arn arn:aws:rds:us-east-1:123456789012:cluster:my-aurora-postgres-cluster \
+  --apply-immediately
+```
+
+### Performance Insights
+
+#### Configure Performance Insights
+```bash
+# Enable Performance Insights on existing instance
+aws rds modify-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --enable-performance-insights \
+  --performance-insights-retention-period 7 \
+  --performance-insights-kms-key-id alias/aws/rds \
+  --apply-immediately
+
+# Enable with longer retention (731 days = 2 years)
+aws rds modify-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --enable-performance-insights \
+  --performance-insights-retention-period 731 \
+  --performance-insights-kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234 \
+  --apply-immediately
+
+# Disable Performance Insights
+aws rds modify-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --no-enable-performance-insights \
+  --apply-immediately
+
+# Query Performance Insights metrics using CloudWatch
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/RDS \
+  --metric-name DatabaseConnections \
+  --dimensions Name=DBInstanceIdentifier,Value=my-aurora-instance-1 \
+  --start-time 2024-01-15T00:00:00Z \
+  --end-time 2024-01-15T23:59:59Z \
+  --period 3600 \
+  --statistics Average
+```
+
+### Cluster Management
+
+#### Modify Cluster Configuration
+```bash
+# Modify cluster backup retention
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --backup-retention-period 14 \
+  --apply-immediately
+
+# Enable deletion protection
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --deletion-protection \
+  --apply-immediately
+
+# Modify cluster parameter group
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --db-cluster-parameter-group-name my-custom-aurora-params \
+  --apply-immediately
+
+# Update master password
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --master-user-password NewSecurePassword456! \
+  --apply-immediately
+
+# Enable automatic minor version upgrades
+aws rds modify-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --auto-minor-version-upgrade \
+  --apply-immediately
+```
+
+#### Describe and Monitor Clusters
+```bash
+# Describe cluster details
+aws rds describe-db-clusters \
+  --db-cluster-identifier my-aurora-mysql-cluster
+
+# List all Aurora clusters
+aws rds describe-db-clusters \
+  --query 'DBClusters[?Engine==`aurora-mysql`].[DBClusterIdentifier,Status,Engine,EngineVersion]' \
+  --output table
+
+# Describe instance details
+aws rds describe-db-instances \
+  --db-instance-identifier my-aurora-instance-1
+
+# List all instances in a cluster
+aws rds describe-db-instances \
+  --filters Name=db-cluster-id,Values=my-aurora-mysql-cluster \
+  --query 'DBInstances[].[DBInstanceIdentifier,DBInstanceClass,AvailabilityZone,DBInstanceStatus]' \
+  --output table
+
+# Get cluster resource utilization
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/RDS \
+  --metric-name CPUUtilization \
+  --dimensions Name=DBClusterIdentifier,Value=my-aurora-mysql-cluster \
+  --start-time $(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ') \
+  --end-time $(date -u '+%Y-%m-%dT%H:%M:%SZ') \
+  --period 300 \
+  --statistics Average,Maximum
+```
+
+#### Delete Clusters and Instances
+```bash
+# Delete an instance (reader)
+aws rds delete-db-instance \
+  --db-instance-identifier my-aurora-reader-2 \
+  --skip-final-snapshot
+
+# Delete instance with final snapshot
+aws rds delete-db-instance \
+  --db-instance-identifier my-aurora-instance-1 \
+  --final-db-snapshot-identifier my-aurora-final-snapshot-20240115
+
+# Delete cluster (must delete all instances first)
+aws rds delete-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --skip-final-snapshot
+
+# Delete cluster with final snapshot
+aws rds delete-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --final-db-cluster-snapshot-identifier my-cluster-final-snapshot-20240115
+```
+
+### Monitoring and Logging
+
+#### CloudWatch Logs Configuration
+```bash
+# Enable CloudWatch Logs export for MySQL
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --cloudwatch-logs-export-configuration '{"LogTypesToEnable":["audit","error","general","slowquery"]}' \
+  --apply-immediately
+
+# Enable CloudWatch Logs for PostgreSQL
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-postgres-cluster \
+  --cloudwatch-logs-export-configuration '{"LogTypesToEnable":["postgresql"]}' \
+  --apply-immediately
+
+# Disable specific log type
+aws rds modify-db-cluster \
+  --db-cluster-identifier my-aurora-mysql-cluster \
+  --cloudwatch-logs-export-configuration '{"LogTypesToDisable":["general"]}' \
+  --apply-immediately
 ```
 
 ---

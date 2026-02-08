@@ -11,8 +11,9 @@
 8. [Auto Scaling and Load Balancing](#auto-scaling-and-load-balancing)
 9. [Best Practices and Architecture Patterns](#best-practices-and-architecture-patterns)
 10. [Troubleshooting Common Issues](#troubleshooting-common-issues)
-11. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
-12. [Practice Scenarios and Questions](#practice-scenarios-and-questions)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
+13. [Practice Scenarios and Questions](#practice-scenarios-and-questions)
 
 ---
 
@@ -794,6 +795,515 @@ Amazon Elastic Compute Cloud (EC2) is a web service that provides secure, resiza
 #### Reserved Instance Utilization
 - **Monitoring**: Track RI utilization and coverage
 - **Optimization**: Right-size RIs, consider Convertible RIs
+
+---
+
+## AWS CLI Commands Reference
+
+### Instance Management
+
+#### Launch an Instance
+```bash
+# Launch a basic EC2 instance
+aws ec2 run-instances \
+    --image-id ami-0abcdef1234567890 \
+    --instance-type t3.micro \
+    --key-name MyKeyPair \
+    --security-group-ids sg-0123456789abcdef0 \
+    --subnet-id subnet-0123456789abcdef0 \
+    --count 1 \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=MyInstance}]'
+
+# Launch instance with user data script
+aws ec2 run-instances \
+    --image-id ami-0abcdef1234567890 \
+    --instance-type t3.micro \
+    --key-name MyKeyPair \
+    --security-group-ids sg-0123456789abcdef0 \
+    --user-data file://user-data.sh
+
+# Launch instance with IAM role
+aws ec2 run-instances \
+    --image-id ami-0abcdef1234567890 \
+    --instance-type t3.micro \
+    --iam-instance-profile Name=MyInstanceProfile \
+    --key-name MyKeyPair
+```
+
+#### Describe Instances
+```bash
+# List all instances
+aws ec2 describe-instances
+
+# Filter instances by state
+aws ec2 describe-instances \
+    --filters "Name=instance-state-name,Values=running"
+
+# Get specific instance details
+aws ec2 describe-instances \
+    --instance-ids i-0123456789abcdef0
+
+# Filter by tag
+aws ec2 describe-instances \
+    --filters "Name=tag:Environment,Values=Production"
+
+# Output in table format
+aws ec2 describe-instances \
+    --query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType,PublicIpAddress]' \
+    --output table
+```
+
+#### Start, Stop, Reboot, and Terminate Instances
+```bash
+# Start instances
+aws ec2 start-instances --instance-ids i-0123456789abcdef0
+
+# Stop instances
+aws ec2 stop-instances --instance-ids i-0123456789abcdef0
+
+# Reboot instances
+aws ec2 reboot-instances --instance-ids i-0123456789abcdef0
+
+# Terminate instances
+aws ec2 terminate-instances --instance-ids i-0123456789abcdef0
+
+# Stop multiple instances
+aws ec2 stop-instances \
+    --instance-ids i-0123456789abcdef0 i-0fedcba9876543210
+```
+
+#### Modify Instance Attributes
+```bash
+# Change instance type (must be stopped)
+aws ec2 modify-instance-attribute \
+    --instance-id i-0123456789abcdef0 \
+    --instance-type "{\"Value\": \"t3.large\"}"
+
+# Modify user data
+aws ec2 modify-instance-attribute \
+    --instance-id i-0123456789abcdef0 \
+    --user-data file://new-user-data.sh
+
+# Enable detailed monitoring
+aws ec2 monitor-instances --instance-ids i-0123456789abcdef0
+
+# Disable detailed monitoring
+aws ec2 unmonitor-instances --instance-ids i-0123456789abcdef0
+
+# Change source/destination check
+aws ec2 modify-instance-attribute \
+    --instance-id i-0123456789abcdef0 \
+    --no-source-dest-check
+```
+
+### Security Groups
+
+#### Create and Manage Security Groups
+```bash
+# Create a security group
+aws ec2 create-security-group \
+    --group-name MySecurityGroup \
+    --description "My security group" \
+    --vpc-id vpc-0123456789abcdef0
+
+# Add inbound rule (SSH)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 0.0.0.0/0
+
+# Add inbound rule (HTTP)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 80 \
+    --cidr 0.0.0.0/0
+
+# Add rule allowing traffic from another security group
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 3306 \
+    --source-group sg-0fedcba9876543210
+
+# Remove inbound rule
+aws ec2 revoke-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 0.0.0.0/0
+
+# Delete security group
+aws ec2 delete-security-group --group-id sg-0123456789abcdef0
+
+# Describe security groups
+aws ec2 describe-security-groups \
+    --group-ids sg-0123456789abcdef0
+```
+
+### Key Pairs
+
+#### Manage Key Pairs
+```bash
+# Create a key pair
+aws ec2 create-key-pair \
+    --key-name MyKeyPair \
+    --query 'KeyMaterial' \
+    --output text > MyKeyPair.pem
+
+# Set proper permissions
+chmod 400 MyKeyPair.pem
+
+# Describe key pairs
+aws ec2 describe-key-pairs
+
+# Delete key pair
+aws ec2 delete-key-pair --key-name MyKeyPair
+
+# Import public key
+aws ec2 import-key-pair \
+    --key-name MyImportedKeyPair \
+    --public-key-material fileb://~/.ssh/id_rsa.pub
+```
+
+### EBS Volumes
+
+#### Create and Manage Volumes
+```bash
+# Create a volume
+aws ec2 create-volume \
+    --availability-zone us-east-1a \
+    --size 100 \
+    --volume-type gp3 \
+    --iops 3000 \
+    --throughput 125 \
+    --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=MyVolume}]'
+
+# Attach volume to instance
+aws ec2 attach-volume \
+    --volume-id vol-0123456789abcdef0 \
+    --instance-id i-0123456789abcdef0 \
+    --device /dev/sdf
+
+# Detach volume
+aws ec2 detach-volume --volume-id vol-0123456789abcdef0
+
+# Delete volume
+aws ec2 delete-volume --volume-id vol-0123456789abcdef0
+
+# Describe volumes
+aws ec2 describe-volumes
+
+# Describe specific volume
+aws ec2 describe-volumes --volume-ids vol-0123456789abcdef0
+
+# Modify volume (resize or change type)
+aws ec2 modify-volume \
+    --volume-id vol-0123456789abcdef0 \
+    --size 200 \
+    --volume-type gp3
+```
+
+#### EBS Snapshots
+```bash
+# Create snapshot
+aws ec2 create-snapshot \
+    --volume-id vol-0123456789abcdef0 \
+    --description "My snapshot" \
+    --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=MySnapshot}]'
+
+# Describe snapshots
+aws ec2 describe-snapshots --owner-ids self
+
+# Describe specific snapshot
+aws ec2 describe-snapshots --snapshot-ids snap-0123456789abcdef0
+
+# Delete snapshot
+aws ec2 delete-snapshot --snapshot-id snap-0123456789abcdef0
+
+# Copy snapshot to another region
+aws ec2 copy-snapshot \
+    --source-region us-east-1 \
+    --source-snapshot-id snap-0123456789abcdef0 \
+    --destination-region us-west-2 \
+    --description "Copied snapshot"
+
+# Create volume from snapshot
+aws ec2 create-volume \
+    --availability-zone us-east-1a \
+    --snapshot-id snap-0123456789abcdef0
+```
+
+### AMIs (Amazon Machine Images)
+
+#### Create and Manage AMIs
+```bash
+# Create AMI from instance
+aws ec2 create-image \
+    --instance-id i-0123456789abcdef0 \
+    --name "MyAMI" \
+    --description "My custom AMI" \
+    --no-reboot
+
+# Describe AMIs
+aws ec2 describe-images --owners self
+
+# Describe public AMIs (Amazon Linux 2)
+aws ec2 describe-images \
+    --owners amazon \
+    --filters "Name=name,Values=amzn2-ami-hvm-*" \
+              "Name=architecture,Values=x86_64" \
+              "Name=root-device-type,Values=ebs" \
+    --query 'sort_by(Images, &CreationDate)[-1].[ImageId,Name]' \
+    --output table
+
+# Deregister AMI
+aws ec2 deregister-image --image-id ami-0123456789abcdef0
+
+# Copy AMI to another region
+aws ec2 copy-image \
+    --source-region us-east-1 \
+    --source-image-id ami-0123456789abcdef0 \
+    --region us-west-2 \
+    --name "Copied AMI"
+
+# Modify AMI permissions (make public)
+aws ec2 modify-image-attribute \
+    --image-id ami-0123456789abcdef0 \
+    --launch-permission "Add=[{Group=all}]"
+
+# Share AMI with specific account
+aws ec2 modify-image-attribute \
+    --image-id ami-0123456789abcdef0 \
+    --launch-permission "Add=[{UserId=123456789012}]"
+```
+
+### Elastic IP Addresses
+
+#### Manage Elastic IPs
+```bash
+# Allocate Elastic IP
+aws ec2 allocate-address --domain vpc
+
+# Associate Elastic IP with instance
+aws ec2 associate-address \
+    --instance-id i-0123456789abcdef0 \
+    --allocation-id eipalloc-0123456789abcdef0
+
+# Disassociate Elastic IP
+aws ec2 disassociate-address \
+    --association-id eipassoc-0123456789abcdef0
+
+# Release Elastic IP
+aws ec2 release-address \
+    --allocation-id eipalloc-0123456789abcdef0
+
+# Describe Elastic IPs
+aws ec2 describe-addresses
+
+# Describe specific Elastic IP
+aws ec2 describe-addresses \
+    --allocation-ids eipalloc-0123456789abcdef0
+```
+
+### Placement Groups
+
+#### Create and Manage Placement Groups
+```bash
+# Create cluster placement group
+aws ec2 create-placement-group \
+    --group-name MyClusterGroup \
+    --strategy cluster
+
+# Create partition placement group
+aws ec2 create-placement-group \
+    --group-name MyPartitionGroup \
+    --strategy partition \
+    --partition-count 3
+
+# Create spread placement group
+aws ec2 create-placement-group \
+    --group-name MySpreadGroup \
+    --strategy spread
+
+# Describe placement groups
+aws ec2 describe-placement-groups
+
+# Delete placement group
+aws ec2 delete-placement-group --group-name MyClusterGroup
+
+# Launch instance in placement group
+aws ec2 run-instances \
+    --image-id ami-0abcdef1234567890 \
+    --instance-type c5.large \
+    --placement "GroupName=MyClusterGroup"
+```
+
+### Tags and Metadata
+
+#### Manage Tags
+```bash
+# Create tags
+aws ec2 create-tags \
+    --resources i-0123456789abcdef0 \
+    --tags Key=Environment,Value=Production Key=Owner,Value=TeamA
+
+# Describe tags
+aws ec2 describe-tags
+
+# Delete tags
+aws ec2 delete-tags \
+    --resources i-0123456789abcdef0 \
+    --tags Key=Environment
+
+# Filter resources by tag
+aws ec2 describe-instances \
+    --filters "Name=tag:Environment,Values=Production"
+```
+
+### Monitoring and Status
+
+#### Instance Status and Monitoring
+```bash
+# Describe instance status
+aws ec2 describe-instance-status
+
+# Describe specific instance status
+aws ec2 describe-instance-status \
+    --instance-ids i-0123456789abcdef0
+
+# Get console output
+aws ec2 get-console-output \
+    --instance-id i-0123456789abcdef0
+
+# Get password data (Windows)
+aws ec2 get-password-data \
+    --instance-id i-0123456789abcdef0
+```
+
+### Reserved Instances and Savings Plans
+
+#### Reserved Instances
+```bash
+# Describe Reserved Instances
+aws ec2 describe-reserved-instances
+
+# Describe Reserved Instance offerings
+aws ec2 describe-reserved-instances-offerings \
+    --instance-type t3.micro \
+    --product-description "Linux/UNIX" \
+    --instance-tenancy default
+
+# Purchase Reserved Instance
+aws ec2 purchase-reserved-instances-offering \
+    --reserved-instances-offering-id ri-offering-id \
+    --instance-count 1
+
+# Modify Reserved Instances
+aws ec2 modify-reserved-instances \
+    --reserved-instances-ids ri-id \
+    --target-configurations AvailabilityZone=us-east-1a,Platform=Linux/UNIX,InstanceCount=2
+```
+
+### Spot Instances
+
+#### Spot Instance Management
+```bash
+# Request Spot Instances
+aws ec2 request-spot-instances \
+    --spot-price "0.05" \
+    --instance-count 1 \
+    --type "one-time" \
+    --launch-specification file://specification.json
+
+# Describe Spot Instance requests
+aws ec2 describe-spot-instance-requests
+
+# Cancel Spot Instance requests
+aws ec2 cancel-spot-instance-requests \
+    --spot-instance-request-ids sir-0123456789abcdef0
+
+# Describe Spot price history
+aws ec2 describe-spot-price-history \
+    --instance-types t3.micro \
+    --product-descriptions "Linux/UNIX" \
+    --start-time 2024-01-01T00:00:00 \
+    --end-time 2024-01-02T00:00:00
+
+# Create Spot Fleet request
+aws ec2 request-spot-fleet \
+    --spot-fleet-request-config file://fleet-config.json
+```
+
+### Network Interfaces
+
+#### Elastic Network Interfaces (ENI)
+```bash
+# Create network interface
+aws ec2 create-network-interface \
+    --subnet-id subnet-0123456789abcdef0 \
+    --description "My network interface" \
+    --groups sg-0123456789abcdef0
+
+# Attach network interface
+aws ec2 attach-network-interface \
+    --network-interface-id eni-0123456789abcdef0 \
+    --instance-id i-0123456789abcdef0 \
+    --device-index 1
+
+# Detach network interface
+aws ec2 detach-network-interface \
+    --attachment-id eni-attach-0123456789abcdef0
+
+# Delete network interface
+aws ec2 delete-network-interface \
+    --network-interface-id eni-0123456789abcdef0
+
+# Describe network interfaces
+aws ec2 describe-network-interfaces
+
+# Modify network interface attribute
+aws ec2 modify-network-interface-attribute \
+    --network-interface-id eni-0123456789abcdef0 \
+    --groups sg-0123456789abcdef0 sg-0fedcba9876543210
+```
+
+### Instance Metadata and User Data
+
+#### Instance Metadata Service (IMDS)
+```bash
+# From within an EC2 instance, retrieve metadata using IMDSv2:
+
+# Get token (required for IMDSv2)
+TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+
+# Get instance ID
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-id
+
+# Get availability zone
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/availability-zone
+
+# Get IAM role credentials
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/role-name
+
+# Retrieve user data
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/user-data
+```
+
+#### Modify Instance Metadata Options
+```bash
+# Require IMDSv2
+aws ec2 modify-instance-metadata-options \
+    --instance-id i-0123456789abcdef0 \
+    --http-tokens required \
+    --http-put-response-hop-limit 1
+```
 
 ---
 

@@ -16,7 +16,8 @@
 13. [Best Practices](#best-practices)
 14. [Common Architectures](#common-architectures)
 15. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-16. [Practice Questions](#practice-questions)
+16. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+17. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1189,6 +1190,828 @@ def scale_kinesis_stream(event, context):
 - "No management/serverless delivery" → **Firehose**
 - "Multiple consumers" → **Enhanced Fan-Out**
 - "Ordering guarantee" → **Same partition key**
+
+---
+
+## AWS CLI Commands Reference
+
+### Kinesis Data Streams
+
+#### Create and Manage Streams
+
+```bash
+# Create a stream with specified shard count
+aws kinesis create-stream \
+    --stream-name my-data-stream \
+    --shard-count 3
+
+# Create stream with on-demand capacity mode
+aws kinesis create-stream \
+    --stream-name my-ondemand-stream \
+    --stream-mode-details StreamMode=ON_DEMAND
+
+# Create stream with provisioned capacity mode
+aws kinesis create-stream \
+    --stream-name my-provisioned-stream \
+    --stream-mode-details StreamMode=PROVISIONED \
+    --shard-count 5
+
+# Describe stream details
+aws kinesis describe-stream \
+    --stream-name my-data-stream
+
+# Describe stream summary (faster)
+aws kinesis describe-stream-summary \
+    --stream-name my-data-stream
+
+# List all streams
+aws kinesis list-streams
+
+# List streams with limit
+aws kinesis list-streams --limit 10
+
+# Delete stream
+aws kinesis delete-stream \
+    --stream-name my-data-stream
+
+# Delete stream and disable enforcement of minimum retention period
+aws kinesis delete-stream \
+    --stream-name my-data-stream \
+    --enforce-consumer-deletion
+```
+
+#### Update Stream Configuration
+
+```bash
+# Update shard count (scale up)
+aws kinesis update-shard-count \
+    --stream-name my-data-stream \
+    --target-shard-count 6 \
+    --scaling-type UNIFORM_SCALING
+
+# Update stream mode to on-demand
+aws kinesis update-stream-mode \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream \
+    --stream-mode-details StreamMode=ON_DEMAND
+
+# Increase retention period (1-365 days)
+aws kinesis increase-stream-retention-period \
+    --stream-name my-data-stream \
+    --retention-period-hours 168
+
+# Decrease retention period
+aws kinesis decrease-stream-retention-period \
+    --stream-name my-data-stream \
+    --retention-period-hours 24
+```
+
+---
+
+### Put Records (Producer Operations)
+
+#### Put Single Record
+
+```bash
+# Put a single record
+aws kinesis put-record \
+    --stream-name my-data-stream \
+    --partition-key user123 \
+    --data '{"temperature": 72, "humidity": 45}'
+
+# Put record with base64 encoded data
+echo -n '{"user":"john","action":"login"}' | base64 | xargs -I {} aws kinesis put-record \
+    --stream-name my-data-stream \
+    --partition-key user_john \
+    --data {}
+
+# Put record with explicit hash key
+aws kinesis put-record \
+    --stream-name my-data-stream \
+    --partition-key sensor001 \
+    --explicit-hash-key 12345678901234567890123456789012 \
+    --data '{"reading": 98.6}'
+
+# Put record with sequence number ordering
+aws kinesis put-record \
+    --stream-name my-data-stream \
+    --partition-key order123 \
+    --data '{"item":"laptop","price":999}' \
+    --sequence-number-for-ordering 49590338271490256608559692538361571095921575989136588898
+```
+
+#### Put Multiple Records (Batch)
+
+```bash
+# Put records in batch (up to 500 records or 5 MB)
+aws kinesis put-records \
+    --stream-name my-data-stream \
+    --records file://records.json
+
+cat > records.json << 'EOF'
+[
+  {
+    "Data": "eyJ1c2VyIjoiYWxpY2UiLCJhY3Rpb24iOiJsb2dpbiJ9",
+    "PartitionKey": "user_alice"
+  },
+  {
+    "Data": "eyJ1c2VyIjoiYm9iIiwiYWN0aW9uIjoicHVyY2hhc2UifQ==",
+    "PartitionKey": "user_bob"
+  },
+  {
+    "Data": "eyJ1c2VyIjoiY2hhcmxpZSIsImFjdGlvbiI6ImxvZ291dCJ9",
+    "PartitionKey": "user_charlie"
+  }
+]
+EOF
+
+# Put records with inline JSON
+aws kinesis put-records \
+    --stream-name my-data-stream \
+    --records \
+        Data='{"event":"click","user":"user1"}',PartitionKey=user1 \
+        Data='{"event":"view","user":"user2"}',PartitionKey=user2
+```
+
+---
+
+### Get Records (Consumer Operations)
+
+#### Get Shard Iterator
+
+```bash
+# List shards first
+aws kinesis list-shards \
+    --stream-name my-data-stream
+
+# Get shard iterator - start from beginning
+aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type TRIM_HORIZON
+
+# Get shard iterator - start from latest
+aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type LATEST
+
+# Get shard iterator - start at specific sequence number
+aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type AT_SEQUENCE_NUMBER \
+    --starting-sequence-number 49590338271490256608559692538361571095921575989136588898
+
+# Get shard iterator - start after specific sequence number
+aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type AFTER_SEQUENCE_NUMBER \
+    --starting-sequence-number 49590338271490256608559692538361571095921575989136588898
+
+# Get shard iterator - start at timestamp
+aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type AT_TIMESTAMP \
+    --timestamp 1612137600
+```
+
+#### Get Records from Stream
+
+```bash
+# Get records using shard iterator
+SHARD_ITERATOR=$(aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type TRIM_HORIZON \
+    --query 'ShardIterator' --output text)
+
+aws kinesis get-records \
+    --shard-iterator $SHARD_ITERATOR
+
+# Get records with limit
+aws kinesis get-records \
+    --shard-iterator $SHARD_ITERATOR \
+    --limit 100
+
+# Continuous polling example
+SHARD_ITERATOR=$(aws kinesis get-shard-iterator \
+    --stream-name my-data-stream \
+    --shard-id shardId-000000000000 \
+    --shard-iterator-type LATEST \
+    --query 'ShardIterator' --output text)
+
+while true; do
+    RESULT=$(aws kinesis get-records --shard-iterator $SHARD_ITERATOR)
+    echo "$RESULT" | jq -r '.Records[].Data' | base64 -d
+    SHARD_ITERATOR=$(echo "$RESULT" | jq -r '.NextShardIterator')
+    sleep 1
+done
+```
+
+---
+
+### Shard Management
+
+#### List and Describe Shards
+
+```bash
+# List all shards in a stream
+aws kinesis list-shards \
+    --stream-name my-data-stream
+
+# List shards starting from specific shard
+aws kinesis list-shards \
+    --stream-name my-data-stream \
+    --exclusive-start-shard-id shardId-000000000002
+
+# List shards with max results
+aws kinesis list-shards \
+    --stream-name my-data-stream \
+    --max-results 10
+
+# List shards at specific timestamp
+aws kinesis list-shards \
+    --stream-name my-data-stream \
+    --stream-creation-timestamp 1612137600
+
+# List shards using stream ARN
+aws kinesis list-shards \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream
+```
+
+#### Split Shards
+
+```bash
+# Split a shard to increase capacity
+# First, get the shard information
+aws kinesis describe-stream \
+    --stream-name my-data-stream
+
+# Split shard at the middle of hash key range
+aws kinesis split-shard \
+    --stream-name my-data-stream \
+    --shard-to-split shardId-000000000000 \
+    --new-starting-hash-key 170141183460469231731687303715884105728
+
+# Split shard with calculated hash key
+# For a shard with range 0 to 340282366920938463463374607431768211455
+# Split in the middle: 170141183460469231731687303715884105728
+aws kinesis split-shard \
+    --stream-name my-data-stream \
+    --shard-to-split shardId-000000000001 \
+    --new-starting-hash-key 85070591730234615865843651857942052864
+```
+
+#### Merge Shards
+
+```bash
+# Merge two adjacent shards to reduce capacity and costs
+aws kinesis merge-shards \
+    --stream-name my-data-stream \
+    --shard-to-merge shardId-000000000001 \
+    --adjacent-shard-to-merge shardId-000000000002
+
+# Example: Merge after splitting
+# List shards to identify adjacent shards
+aws kinesis list-shards --stream-name my-data-stream
+
+# Merge the shards
+aws kinesis merge-shards \
+    --stream-name my-data-stream \
+    --shard-to-merge shardId-000000000003 \
+    --adjacent-shard-to-merge shardId-000000000004
+```
+
+---
+
+### Enhanced Fan-Out Consumers
+
+#### Register Stream Consumer
+
+```bash
+# Register enhanced fan-out consumer
+aws kinesis register-stream-consumer \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream \
+    --consumer-name my-consumer-app
+
+# Describe stream consumer
+aws kinesis describe-stream-consumer \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream \
+    --consumer-name my-consumer-app
+
+# Describe consumer by ARN
+aws kinesis describe-stream-consumer \
+    --consumer-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream/consumer/my-consumer-app:1612137600
+
+# List stream consumers
+aws kinesis list-stream-consumers \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream
+
+# List consumers with pagination
+aws kinesis list-stream-consumers \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream \
+    --max-results 10
+```
+
+#### Deregister Stream Consumer
+
+```bash
+# Deregister consumer by name
+aws kinesis deregister-stream-consumer \
+    --stream-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream \
+    --consumer-name my-consumer-app
+
+# Deregister consumer by ARN
+aws kinesis deregister-stream-consumer \
+    --consumer-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream/consumer/my-consumer-app:1612137600
+```
+
+---
+
+### Stream Encryption
+
+#### Enable and Manage Encryption
+
+```bash
+# Enable encryption with AWS managed CMK
+aws kinesis start-stream-encryption \
+    --stream-name my-data-stream \
+    --encryption-type KMS \
+    --key-id alias/aws/kinesis
+
+# Enable encryption with customer managed CMK
+aws kinesis start-stream-encryption \
+    --stream-name my-data-stream \
+    --encryption-type KMS \
+    --key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Disable encryption
+aws kinesis stop-stream-encryption \
+    --stream-name my-data-stream \
+    --encryption-type KMS \
+    --key-id alias/aws/kinesis
+
+# Check encryption status
+aws kinesis describe-stream \
+    --stream-name my-data-stream \
+    --query 'StreamDescription.EncryptionType'
+```
+
+---
+
+### Tags and Resource Management
+
+#### Manage Stream Tags
+
+```bash
+# Add tags to stream
+aws kinesis add-tags-to-stream \
+    --stream-name my-data-stream \
+    --tags Environment=Production,Application=Analytics,CostCenter=Engineering
+
+# List stream tags
+aws kinesis list-tags-for-stream \
+    --stream-name my-data-stream
+
+# Remove tags from stream
+aws kinesis remove-tags-from-stream \
+    --stream-name my-data-stream \
+    --tag-keys Environment Application
+```
+
+---
+
+## Kinesis Data Firehose
+
+### Create Delivery Streams
+
+#### Create Firehose to S3
+
+```bash
+# Create Firehose delivery stream to S3
+aws firehose create-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream \
+    --delivery-stream-type DirectPut \
+    --s3-destination-configuration file://s3-config.json
+
+cat > s3-config.json << 'EOF'
+{
+  "RoleARN": "arn:aws:iam::123456789012:role/FirehoseDeliveryRole",
+  "BucketARN": "arn:aws:s3:::my-firehose-bucket",
+  "Prefix": "data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
+  "ErrorOutputPrefix": "errors/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}",
+  "BufferingHints": {
+    "SizeInMBs": 5,
+    "IntervalInSeconds": 300
+  },
+  "CompressionFormat": "GZIP",
+  "EncryptionConfiguration": {
+    "NoEncryptionConfig": "NoEncryption"
+  },
+  "CloudWatchLoggingOptions": {
+    "Enabled": true,
+    "LogGroupName": "/aws/kinesisfirehose/my-s3-delivery-stream",
+    "LogStreamName": "S3Delivery"
+  }
+}
+EOF
+```
+
+#### Create Firehose from Kinesis Stream
+
+```bash
+# Create Firehose with Kinesis Stream as source
+aws firehose create-delivery-stream \
+    --delivery-stream-name kinesis-to-s3-stream \
+    --delivery-stream-type KinesisStreamAsSource \
+    --kinesis-stream-source-configuration file://kinesis-source.json \
+    --extended-s3-destination-configuration file://extended-s3-config.json
+
+cat > kinesis-source.json << 'EOF'
+{
+  "KinesisStreamARN": "arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream",
+  "RoleARN": "arn:aws:iam::123456789012:role/FirehoseKinesisRole"
+}
+EOF
+```
+
+#### Create Firehose to Redshift
+
+```bash
+# Create Firehose delivery stream to Redshift
+aws firehose create-delivery-stream \
+    --delivery-stream-name redshift-delivery-stream \
+    --redshift-destination-configuration file://redshift-config.json
+
+cat > redshift-config.json << 'EOF'
+{
+  "RoleARN": "arn:aws:iam::123456789012:role/FirehoseDeliveryRole",
+  "ClusterJDBCURL": "jdbc:redshift://redshift-cluster.us-east-1.redshift.amazonaws.com:5439/dev",
+  "CopyCommand": {
+    "DataTableName": "events",
+    "CopyOptions": "JSON 'auto' GZIP"
+  },
+  "Username": "admin",
+  "Password": "MyPassword123!",
+  "S3Configuration": {
+    "RoleARN": "arn:aws:iam::123456789012:role/FirehoseDeliveryRole",
+    "BucketARN": "arn:aws:s3:::my-firehose-redshift-bucket",
+    "Prefix": "redshift-data/",
+    "BufferingHints": {
+      "SizeInMBs": 5,
+      "IntervalInSeconds": 300
+    },
+    "CompressionFormat": "GZIP"
+  }
+}
+EOF
+```
+
+#### Create Firehose to Elasticsearch/OpenSearch
+
+```bash
+# Create Firehose delivery stream to OpenSearch
+aws firehose create-delivery-stream \
+    --delivery-stream-name opensearch-delivery-stream \
+    --elasticsearch-destination-configuration file://opensearch-config.json
+
+cat > opensearch-config.json << 'EOF'
+{
+  "RoleARN": "arn:aws:iam::123456789012:role/FirehoseDeliveryRole",
+  "DomainARN": "arn:aws:es:us-east-1:123456789012:domain/my-domain",
+  "IndexName": "events",
+  "TypeName": "_doc",
+  "IndexRotationPeriod": "OneDay",
+  "BufferingHints": {
+    "IntervalInSeconds": 60,
+    "SizeInMBs": 5
+  },
+  "RetryOptions": {
+    "DurationInSeconds": 300
+  },
+  "S3BackupMode": "FailedDocumentsOnly",
+  "S3Configuration": {
+    "RoleARN": "arn:aws:iam::123456789012:role/FirehoseDeliveryRole",
+    "BucketARN": "arn:aws:s3:::my-firehose-backup-bucket",
+    "Prefix": "backup/",
+    "BufferingHints": {
+      "SizeInMBs": 5,
+      "IntervalInSeconds": 300
+    }
+  }
+}
+EOF
+```
+
+### Manage Delivery Streams
+
+```bash
+# Describe delivery stream
+aws firehose describe-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream
+
+# List delivery streams
+aws firehose list-delivery-streams
+
+# List delivery streams with limit
+aws firehose list-delivery-streams --limit 10
+
+# Update delivery stream
+aws firehose update-destination \
+    --delivery-stream-name my-s3-delivery-stream \
+    --current-delivery-stream-version-id 1 \
+    --destination-id destinationId-000000000001 \
+    --s3-destination-update file://s3-update.json
+
+cat > s3-update.json << 'EOF'
+{
+  "BufferingHints": {
+    "SizeInMBs": 10,
+    "IntervalInSeconds": 600
+  },
+  "CompressionFormat": "SNAPPY"
+}
+EOF
+
+# Delete delivery stream
+aws firehose delete-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream
+```
+
+### Put Records to Firehose
+
+```bash
+# Put single record
+aws firehose put-record \
+    --delivery-stream-name my-s3-delivery-stream \
+    --record '{"Data":"eyJ1c2VyIjoiam9obiIsImFjdGlvbiI6ImxvZ2luIn0="}'
+
+# Put record with inline data
+echo -n '{"user":"alice","event":"purchase"}' | base64 | \
+    xargs -I {} aws firehose put-record \
+    --delivery-stream-name my-s3-delivery-stream \
+    --record Data={}
+
+# Put records in batch
+aws firehose put-record-batch \
+    --delivery-stream-name my-s3-delivery-stream \
+    --records file://firehose-records.json
+
+cat > firehose-records.json << 'EOF'
+[
+  {"Data": "eyJ1c2VyIjoiYWxpY2UifQ=="},
+  {"Data": "eyJ1c2VyIjoiYm9iIn0="},
+  {"Data": "eyJ1c2VyIjoiY2hhcmxpZSJ9"}
+]
+EOF
+```
+
+### Firehose Tags
+
+```bash
+# Tag delivery stream
+aws firehose tag-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream \
+    --tags Key=Environment,Value=Production Key=Application,Value=Analytics
+
+# List tags
+aws firehose list-tags-for-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream
+
+# Untag delivery stream
+aws firehose untag-delivery-stream \
+    --delivery-stream-name my-s3-delivery-stream \
+    --tag-keys Environment
+```
+
+---
+
+## Kinesis Data Analytics
+
+### Create Analytics Applications
+
+#### Create SQL Application
+
+```bash
+# Create Kinesis Data Analytics SQL application
+aws kinesisanalyticsv2 create-application \
+    --application-name my-analytics-app \
+    --runtime-environment SQL-1_0 \
+    --service-execution-role arn:aws:iam::123456789012:role/KinesisAnalyticsRole \
+    --application-configuration file://analytics-config.json
+
+cat > analytics-config.json << 'EOF'
+{
+  "SqlApplicationConfiguration": {
+    "Inputs": [
+      {
+        "NamePrefix": "SOURCE_SQL_STREAM",
+        "KinesisStreamsInput": {
+          "ResourceARN": "arn:aws:kinesis:us-east-1:123456789012:stream/my-data-stream"
+        },
+        "InputSchema": {
+          "RecordFormat": {
+            "RecordFormatType": "JSON",
+            "MappingParameters": {
+              "JSONMappingParameters": {
+                "RecordRowPath": "$"
+              }
+            }
+          },
+          "RecordColumns": [
+            {
+              "Name": "user_id",
+              "Mapping": "$.user_id",
+              "SqlType": "VARCHAR(64)"
+            },
+            {
+              "Name": "event_time",
+              "Mapping": "$.event_time",
+              "SqlType": "TIMESTAMP"
+            },
+            {
+              "Name": "value",
+              "Mapping": "$.value",
+              "SqlType": "DOUBLE"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ApplicationCodeConfiguration": {
+    "CodeContent": {
+      "TextContent": "CREATE OR REPLACE STREAM \"DESTINATION_SQL_STREAM\" (user_id VARCHAR(64), event_count BIGINT); CREATE OR REPLACE PUMP \"STREAM_PUMP\" AS INSERT INTO \"DESTINATION_SQL_STREAM\" SELECT STREAM user_id, COUNT(*) AS event_count FROM \"SOURCE_SQL_STREAM_001\" GROUP BY user_id, STEP(\"SOURCE_SQL_STREAM_001\".ROWTIME BY INTERVAL '60' SECOND);"
+    },
+    "CodeContentType": "PLAINTEXT"
+  }
+}
+EOF
+```
+
+#### Create Flink Application
+
+```bash
+# Create Kinesis Data Analytics Flink application
+aws kinesisanalyticsv2 create-application \
+    --application-name my-flink-app \
+    --runtime-environment FLINK-1_15 \
+    --service-execution-role arn:aws:iam::123456789012:role/KinesisAnalyticsRole \
+    --application-configuration file://flink-config.json
+
+cat > flink-config.json << 'EOF'
+{
+  "FlinkApplicationConfiguration": {
+    "CheckpointConfiguration": {
+      "ConfigurationType": "CUSTOM",
+      "CheckpointingEnabled": true,
+      "CheckpointInterval": 60000,
+      "MinPauseBetweenCheckpoints": 5000
+    },
+    "MonitoringConfiguration": {
+      "ConfigurationType": "CUSTOM",
+      "MetricsLevel": "APPLICATION",
+      "LogLevel": "INFO"
+    },
+    "ParallelismConfiguration": {
+      "ConfigurationType": "CUSTOM",
+      "Parallelism": 2,
+      "ParallelismPerKPU": 1,
+      "AutoScalingEnabled": true
+    }
+  },
+  "ApplicationCodeConfiguration": {
+    "CodeContent": {
+      "S3ContentLocation": {
+        "BucketARN": "arn:aws:s3:::my-flink-code-bucket",
+        "FileKey": "flink-app.jar"
+      }
+    },
+    "CodeContentType": "ZIPFILE"
+  }
+}
+EOF
+```
+
+### Manage Analytics Applications
+
+```bash
+# Describe application
+aws kinesisanalyticsv2 describe-application \
+    --application-name my-analytics-app
+
+# List applications
+aws kinesisanalyticsv2 list-applications
+
+# Start application
+aws kinesisanalyticsv2 start-application \
+    --application-name my-analytics-app \
+    --run-configuration '{"SqlRunConfigurations":[]}'
+
+# Start Flink application
+aws kinesisanalyticsv2 start-application \
+    --application-name my-flink-app \
+    --run-configuration '{"FlinkRunConfiguration":{"AllowNonRestoredState":false}}'
+
+# Stop application
+aws kinesisanalyticsv2 stop-application \
+    --application-name my-analytics-app
+
+# Update application
+aws kinesisanalyticsv2 update-application \
+    --application-name my-analytics-app \
+    --current-application-version-id 1 \
+    --application-configuration-update file://app-update.json
+
+# Delete application
+aws kinesisanalyticsv2 delete-application \
+    --application-name my-analytics-app \
+    --create-timestamp "2026-02-08T12:00:00Z"
+```
+
+### Add Application Outputs
+
+```bash
+# Add output to Kinesis Stream
+aws kinesisanalyticsv2 add-application-output \
+    --application-name my-analytics-app \
+    --current-application-version-id 1 \
+    --output file://output-config.json
+
+cat > output-config.json << 'EOF'
+{
+  "Name": "DESTINATION_STREAM",
+  "KinesisStreamsOutput": {
+    "ResourceARN": "arn:aws:kinesis:us-east-1:123456789012:stream/output-stream"
+  },
+  "DestinationSchema": {
+    "RecordFormatType": "JSON"
+  }
+}
+EOF
+
+# Add Lambda output
+aws kinesisanalyticsv2 add-application-output \
+    --application-name my-analytics-app \
+    --current-application-version-id 1 \
+    --output file://lambda-output.json
+
+cat > lambda-output.json << 'EOF'
+{
+  "Name": "LAMBDA_OUTPUT",
+  "LambdaOutput": {
+    "ResourceARN": "arn:aws:lambda:us-east-1:123456789012:function:ProcessAnalyticsOutput"
+  },
+  "DestinationSchema": {
+    "RecordFormatType": "JSON"
+  }
+}
+EOF
+```
+
+### Application Snapshots
+
+```bash
+# Create application snapshot
+aws kinesisanalyticsv2 create-application-snapshot \
+    --application-name my-flink-app \
+    --snapshot-name my-snapshot-001
+
+# List snapshots
+aws kinesisanalyticsv2 list-application-snapshots \
+    --application-name my-flink-app
+
+# Describe snapshot
+aws kinesisanalyticsv2 describe-application-snapshot \
+    --application-name my-flink-app \
+    --snapshot-name my-snapshot-001
+
+# Delete snapshot
+aws kinesisanalyticsv2 delete-application-snapshot \
+    --application-name my-flink-app \
+    --snapshot-name my-snapshot-001 \
+    --snapshot-creation-timestamp "2026-02-08T12:00:00Z"
+```
+
+### Application Tags
+
+```bash
+# Tag application
+aws kinesisanalyticsv2 tag-resource \
+    --resource-arn arn:aws:kinesisanalytics:us-east-1:123456789012:application/my-analytics-app \
+    --tags Key=Environment,Value=Production,Key=Team,Value=DataEngineering
+
+# List tags
+aws kinesisanalyticsv2 list-tags-for-resource \
+    --resource-arn arn:aws:kinesisanalytics:us-east-1:123456789012:application/my-analytics-app
+
+# Untag application
+aws kinesisanalyticsv2 untag-resource \
+    --resource-arn arn:aws:kinesisanalytics:us-east-1:123456789012:application/my-analytics-app \
+    --tag-keys Environment
+```
 
 ---
 

@@ -15,7 +15,8 @@
 12. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
 13. [Best Practices](#best-practices)
 14. [Common Use Cases](#common-use-cases)
-15. [Exam Tips and Common Questions](#exam-tips-and-common-questions)
+15. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+16. [Exam Tips and Common Questions](#exam-tips-and-common-questions)
 
 ---
 
@@ -455,6 +456,380 @@ On-premises ────────┤                                ├──
 - **Benefits**: Consistent, low-latency connectivity
 - **Components**: Direct Connect, optimized routing
 - **Considerations**: Latency requirements, geographic proximity
+
+---
+
+## AWS CLI Commands Reference
+
+### Create Direct Connect Connection
+
+```bash
+# Create a dedicated connection
+aws directconnect create-connection \
+    --location EqDC2 \
+    --bandwidth 1Gbps \
+    --connection-name "MyDedicatedConnection" \
+    --tags Key=Environment,Value=Production
+
+# Create a connection with LAG
+aws directconnect create-connection \
+    --location EqDC2 \
+    --bandwidth 10Gbps \
+    --connection-name "MyLAGConnection" \
+    --lag-id dxlag-fgsu9erb
+```
+
+### Create and Manage LAGs (Link Aggregation Groups)
+
+```bash
+# Create a LAG
+aws directconnect create-lag \
+    --location EqDC2 \
+    --number-of-connections 4 \
+    --connections-bandwidth 10Gbps \
+    --lag-name "MyProductionLAG" \
+    --tags Key=Team,Value=Network
+
+# Associate connection with LAG
+aws directconnect associate-connection-with-lag \
+    --connection-id dxcon-fgk1jsa3 \
+    --lag-id dxlag-fgsu9erb
+
+# Describe LAGs
+aws directconnect describe-lags \
+    --lag-id dxlag-fgsu9erb
+
+# Update LAG
+aws directconnect update-lag \
+    --lag-id dxlag-fgsu9erb \
+    --lag-name "UpdatedProductionLAG" \
+    --minimum-links 2
+
+# Delete LAG
+aws directconnect delete-lag \
+    --lag-id dxlag-fgsu9erb
+```
+
+### Create Virtual Interfaces (VIFs)
+
+#### Private Virtual Interface
+
+```bash
+# Create private VIF for VPC access
+aws directconnect create-private-virtual-interface \
+    --connection-id dxcon-fgk1jsa3 \
+    --new-private-virtual-interface \
+        virtualInterfaceName=PrivateVIF-Prod,\
+        vlan=101,\
+        asn=65000,\
+        mtu=1500,\
+        authKey=myBGPkey123,\
+        amazonAddress=192.168.1.1/30,\
+        customerAddress=192.168.1.2/30,\
+        addressFamily=ipv4,\
+        virtualGatewayId=vgw-12345678,\
+        tags=[{Key=Environment,Value=Production}]
+
+# Create private VIF with Direct Connect Gateway
+aws directconnect create-private-virtual-interface \
+    --connection-id dxcon-fgk1jsa3 \
+    --new-private-virtual-interface \
+        virtualInterfaceName=PrivateVIF-MultiRegion,\
+        vlan=102,\
+        asn=65001,\
+        mtu=9001,\
+        authKey=myBGPkey456,\
+        amazonAddress=192.168.2.1/30,\
+        customerAddress=192.168.2.2/30,\
+        addressFamily=ipv4,\
+        directConnectGatewayId=abcd1234-dcba-5678-be23-cdef9876ab45
+```
+
+#### Public Virtual Interface
+
+```bash
+# Create public VIF for AWS public services
+aws directconnect create-public-virtual-interface \
+    --connection-id dxcon-fgk1jsa3 \
+    --new-public-virtual-interface \
+        virtualInterfaceName=PublicVIF-S3,\
+        vlan=201,\
+        asn=65002,\
+        authKey=myPublicBGPkey,\
+        amazonAddress=203.0.113.1/30,\
+        customerAddress=203.0.113.2/30,\
+        addressFamily=ipv4,\
+        routeFilterPrefixes=[{cidr=203.0.113.0/24}],\
+        tags=[{Key=Service,Value=S3-Access}]
+```
+
+#### Transit Virtual Interface
+
+```bash
+# Create transit VIF for Transit Gateway
+aws directconnect create-transit-virtual-interface \
+    --connection-id dxcon-fgk1jsa3 \
+    --new-transit-virtual-interface \
+        virtualInterfaceName=TransitVIF-TGW,\
+        vlan=301,\
+        asn=64512,\
+        mtu=8500,\
+        authKey=myTransitBGPkey,\
+        amazonAddress=192.168.3.1/30,\
+        customerAddress=192.168.3.2/30,\
+        addressFamily=ipv4,\
+        directConnectGatewayId=wxyz5678-dcba-1234-be23-abcd9876ef12,\
+        tags=[{Key=Type,Value=Transit}]
+```
+
+### Create Hosted Connections
+
+```bash
+# Create hosted connection (by AWS Direct Connect Partner)
+aws directconnect allocate-hosted-connection \
+    --connection-id dxcon-partner123 \
+    --owner-account 123456789012 \
+    --bandwidth 500Mbps \
+    --connection-name "CustomerHostedConnection" \
+    --vlan 401 \
+    --tags Key=Customer,Value=AcmeCorp
+
+# Describe hosted connections
+aws directconnect describe-hosted-connections \
+    --connection-id dxcon-fgk1jsa3
+
+# Accept hosted connection (customer side)
+aws directconnect confirm-connection \
+    --connection-id dxcon-hosted456
+```
+
+### Create Hosted Virtual Interfaces
+
+```bash
+# Allocate private hosted VIF (partner creates for customer)
+aws directconnect allocate-private-virtual-interface \
+    --connection-id dxcon-hosted456 \
+    --owner-account 123456789012 \
+    --new-private-virtual-interface-allocation \
+        virtualInterfaceName=HostedPrivateVIF,\
+        vlan=501,\
+        asn=65100,\
+        mtu=1500,\
+        authKey=hostedBGPkey,\
+        amazonAddress=192.168.10.1/30,\
+        customerAddress=192.168.10.2/30,\
+        addressFamily=ipv4,\
+        tags=[{Key=Type,Value=Hosted}]
+
+# Allocate public hosted VIF
+aws directconnect allocate-public-virtual-interface \
+    --connection-id dxcon-hosted456 \
+    --owner-account 123456789012 \
+    --new-public-virtual-interface-allocation \
+        virtualInterfaceName=HostedPublicVIF,\
+        vlan=601,\
+        asn=65200,\
+        authKey=publicHostedBGPkey,\
+        amazonAddress=198.51.100.1/30,\
+        customerAddress=198.51.100.2/30,\
+        addressFamily=ipv4,\
+        routeFilterPrefixes=[{cidr=198.51.100.0/24}]
+
+# Allocate transit hosted VIF
+aws directconnect allocate-transit-virtual-interface \
+    --connection-id dxcon-hosted456 \
+    --owner-account 123456789012 \
+    --new-transit-virtual-interface-allocation \
+        virtualInterfaceName=HostedTransitVIF,\
+        vlan=701,\
+        asn=64513,\
+        mtu=8500,\
+        authKey=transitHostedBGPkey,\
+        amazonAddress=192.168.20.1/30,\
+        customerAddress=192.168.20.2/30,\
+        addressFamily=ipv4
+
+# Confirm hosted VIF (customer accepts)
+aws directconnect confirm-private-virtual-interface \
+    --virtual-interface-id dxvif-fgh4jkl2 \
+    --virtual-gateway-id vgw-12345678
+```
+
+### BGP Peering Configuration
+
+```bash
+# Describe virtual interface BGP peers
+aws directconnect describe-virtual-interfaces \
+    --virtual-interface-id dxvif-fgh4jkl2 \
+    --query 'virtualInterfaces[0].bgpPeers'
+
+# Update BGP ASN for VIF
+aws directconnect update-virtual-interface-attributes \
+    --virtual-interface-id dxvif-fgh4jkl2 \
+    --asn 65300
+
+# Get BGP peer status
+aws directconnect describe-virtual-interfaces \
+    --virtual-interface-id dxvif-fgh4jkl2 \
+    --query 'virtualInterfaces[0].bgpPeers[*].[bgpPeerState,asn,bgpStatus]' \
+    --output table
+```
+
+### MACSec Encryption
+
+```bash
+# Enable MACSec on connection
+aws directconnect update-connection \
+    --connection-id dxcon-fgk1jsa3 \
+    --encryption-mode must-encrypt
+
+# Associate MACSec key
+aws directconnect associate-mac-sec-key \
+    --connection-id dxcon-fgk1jsa3 \
+    --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:dx-macsec-key-abc123 \
+    --ckn 0123456789abcdef0123456789abcdef
+
+# Describe connection encryption
+aws directconnect describe-connections \
+    --connection-id dxcon-fgk1jsa3 \
+    --query 'connections[0].[encryptionMode,macSecKeys]'
+
+# Disassociate MACSec key
+aws directconnect disassociate-mac-sec-key \
+    --connection-id dxcon-fgk1jsa3 \
+    --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:dx-macsec-key-abc123
+```
+
+### Virtual Interface Acceptance
+
+```bash
+# Confirm private VIF (attach to VGW)
+aws directconnect confirm-private-virtual-interface \
+    --virtual-interface-id dxvif-fgh4jkl2 \
+    --virtual-gateway-id vgw-12345678
+
+# Confirm transit VIF (attach to Direct Connect Gateway)
+aws directconnect confirm-transit-virtual-interface \
+    --virtual-interface-id dxvif-abc1def2 \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45
+
+# Confirm public VIF
+aws directconnect confirm-public-virtual-interface \
+    --virtual-interface-id dxvif-pub3lic4
+```
+
+### Direct Connect Gateway Management
+
+```bash
+# Create Direct Connect Gateway
+aws directconnect create-direct-connect-gateway \
+    --direct-connect-gateway-name MyDCGateway \
+    --amazon-side-asn 64512
+
+# Associate VGW with Direct Connect Gateway
+aws directconnect create-direct-connect-gateway-association \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45 \
+    --gateway-id vgw-12345678
+
+# Associate VGW with allowed prefixes
+aws directconnect create-direct-connect-gateway-association \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45 \
+    --gateway-id vgw-87654321 \
+    --add-allowed-prefixes-to-direct-connect-gateway cidr=10.0.0.0/16 cidr=172.16.0.0/16
+
+# Associate Transit Gateway
+aws directconnect create-direct-connect-gateway-association \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45 \
+    --gateway-id tgw-12345678 \
+    --add-allowed-prefixes-to-direct-connect-gateway cidr=10.0.0.0/8
+
+# List gateway associations
+aws directconnect describe-direct-connect-gateway-associations \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45
+
+# Disassociate gateway
+aws directconnect delete-direct-connect-gateway-association \
+    --association-id arn:aws:directconnect:us-east-1:123456789012:association/abcd1234-dcba-5678-be23-cdef9876ab45
+
+# Delete Direct Connect Gateway
+aws directconnect delete-direct-connect-gateway \
+    --direct-connect-gateway-id abcd1234-dcba-5678-be23-cdef9876ab45
+```
+
+### Tags Management
+
+```bash
+# Tag a connection
+aws directconnect tag-resource \
+    --resource-arn arn:aws:directconnect:us-east-1:123456789012:connection/dxcon-fgk1jsa3 \
+    --tags Key=Environment,Value=Production Key=CostCenter,Value=IT-Network
+
+# Tag a virtual interface
+aws directconnect tag-resource \
+    --resource-arn arn:aws:directconnect:us-east-1:123456789012:dxvif/dxvif-fgh4jkl2 \
+    --tags Key=Application,Value=ERP Key=Backup,Value=Yes
+
+# List tags
+aws directconnect describe-tags \
+    --resource-arns arn:aws:directconnect:us-east-1:123456789012:connection/dxcon-fgk1jsa3
+
+# Untag resource
+aws directconnect untag-resource \
+    --resource-arn arn:aws:directconnect:us-east-1:123456789012:connection/dxcon-fgk1jsa3 \
+    --tag-keys Environment CostCenter
+```
+
+### Monitoring and Describing Resources
+
+```bash
+# Describe all connections
+aws directconnect describe-connections
+
+# Describe specific connection
+aws directconnect describe-connections \
+    --connection-id dxcon-fgk1jsa3
+
+# Describe all virtual interfaces
+aws directconnect describe-virtual-interfaces
+
+# Describe specific VIF
+aws directconnect describe-virtual-interfaces \
+    --virtual-interface-id dxvif-fgh4jkl2
+
+# List Direct Connect locations
+aws directconnect describe-locations
+
+# Describe location details
+aws directconnect describe-locations \
+    --query 'locations[?locationCode==`EqDC2`]'
+
+# Get connection state
+aws directconnect describe-connections \
+    --connection-id dxcon-fgk1jsa3 \
+    --query 'connections[0].connectionState'
+
+# List virtual interface types
+aws directconnect describe-virtual-interfaces \
+    --query 'virtualInterfaces[*].[virtualInterfaceId,virtualInterfaceType,virtualInterfaceState]' \
+    --output table
+```
+
+### Delete Resources
+
+```bash
+# Delete virtual interface
+aws directconnect delete-virtual-interface \
+    --virtual-interface-id dxvif-fgh4jkl2
+
+# Delete connection (must delete all VIFs first)
+aws directconnect delete-connection \
+    --connection-id dxcon-fgk1jsa3
+
+# Force delete connection
+aws directconnect delete-connection \
+    --connection-id dxcon-fgk1jsa3 \
+    --force
+```
 
 ---
 

@@ -297,6 +297,705 @@ Exam Tip: If asked how to avoid new costs for config storage -> Use Standard Par
 | Governance & change approvals | Change Manager |
 
 ---
+## 20.1. AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing AWS Systems Manager resources and operations.
+
+### Prerequisites
+
+```bash
+# Install or update AWS CLI
+# macOS/Linux
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+
+# Configure AWS CLI
+aws configure
+# Enter: AWS Access Key ID, Secret Access Key, Default region, Output format (json)
+```
+
+### Parameter Store Operations
+
+```bash
+# Put a standard parameter (String)
+aws ssm put-parameter \
+  --name "/myapp/dev/api-endpoint" \
+  --type "String" \
+  --value "https://api.example.com" \
+  --description "API endpoint for development environment"
+
+# Put a secure string parameter (encrypted)
+aws ssm put-parameter \
+  --name "/myapp/prod/db-password" \
+  --type "SecureString" \
+  --value "SuperSecurePassword123!" \
+  --description "Production database password" \
+  --key-id "alias/aws/ssm"
+
+# Put parameter with custom KMS key
+aws ssm put-parameter \
+  --name "/myapp/prod/api-key" \
+  --type "SecureString" \
+  --value "sk-1234567890abcdef" \
+  --key-id "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012" \
+  --tags Key=Environment,Value=Production Key=Team,Value=Backend
+
+# Put StringList parameter
+aws ssm put-parameter \
+  --name "/myapp/allowed-ips" \
+  --type "StringList" \
+  --value "192.168.1.1,192.168.1.2,192.168.1.3" \
+  --description "Allowed IP addresses"
+
+# Update existing parameter (overwrite)
+aws ssm put-parameter \
+  --name "/myapp/prod/db-password" \
+  --type "SecureString" \
+  --value "NewSecurePassword456!" \
+  --overwrite
+
+# Get parameter value
+aws ssm get-parameter \
+  --name "/myapp/dev/api-endpoint"
+
+# Get parameter with decryption (for SecureString)
+aws ssm get-parameter \
+  --name "/myapp/prod/db-password" \
+  --with-decryption
+
+# Get multiple parameters
+aws ssm get-parameters \
+  --names "/myapp/dev/api-endpoint" "/myapp/dev/db-host" "/myapp/dev/db-port"
+
+# Get multiple parameters with decryption
+aws ssm get-parameters \
+  --names "/myapp/prod/db-password" "/myapp/prod/api-key" \
+  --with-decryption
+
+# Get parameters by path (hierarchical)
+aws ssm get-parameters-by-path \
+  --path "/myapp/prod" \
+  --recursive
+
+# Get parameters by path with decryption
+aws ssm get-parameters-by-path \
+  --path "/myapp/prod" \
+  --recursive \
+  --with-decryption
+
+# Get parameter history
+aws ssm get-parameter-history \
+  --name "/myapp/prod/db-password"
+
+# Delete parameter
+aws ssm delete-parameter \
+  --name "/myapp/dev/api-endpoint"
+
+# Delete multiple parameters
+aws ssm delete-parameters \
+  --names "/myapp/dev/api-endpoint" "/myapp/dev/db-host"
+
+# List all parameters
+aws ssm describe-parameters
+
+# List parameters with specific filters
+aws ssm describe-parameters \
+  --filters "Key=Name,Values=/myapp/prod"
+
+# List parameters with tags
+aws ssm describe-parameters \
+  --parameter-filters "Key=tag:Environment,Values=Production"
+
+# Add tags to parameter
+aws ssm add-tags-to-resource \
+  --resource-type "Parameter" \
+  --resource-id "/myapp/prod/api-key" \
+  --tags Key=CostCenter,Value=Engineering Key=Compliance,Value=Required
+
+# List tags for parameter
+aws ssm list-tags-for-resource \
+  --resource-type "Parameter" \
+  --resource-id "/myapp/prod/api-key"
+
+# Remove tags from parameter
+aws ssm remove-tags-from-resource \
+  --resource-type "Parameter" \
+  --resource-id "/myapp/prod/api-key" \
+  --tag-keys CostCenter
+
+# Label parameter version
+aws ssm label-parameter-version \
+  --name "/myapp/prod/db-password" \
+  --parameter-version 3 \
+  --labels "stable" "production"
+
+# Get parameter by label
+aws ssm get-parameter \
+  --name "/myapp/prod/db-password:stable" \
+  --with-decryption
+```
+
+### Session Manager Operations
+
+```bash
+# Start interactive session with instance
+aws ssm start-session \
+  --target i-0123456789abcdef0
+
+# Start session with custom document
+aws ssm start-session \
+  --target i-0123456789abcdef0 \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["3306"],"localPortNumber":["13306"]}'
+
+# Start SSH session (port forwarding for SSH)
+aws ssm start-session \
+  --target i-0123456789abcdef0 \
+  --document-name AWS-StartSSHSession
+
+# List active sessions
+aws ssm describe-sessions \
+  --state Active
+
+# List all sessions (active and history)
+aws ssm describe-sessions \
+  --state History
+
+# Terminate session
+aws ssm terminate-session \
+  --session-id "john.doe-0123456789abcdef0"
+
+# Get session details
+aws ssm describe-sessions \
+  --filters "key=SessionId,value=john.doe-0123456789abcdef0"
+
+# Configure session preferences
+aws ssm create-document \
+  --name SessionManagerPreferences \
+  --document-type Session \
+  --content '{
+    "schemaVersion": "1.0",
+    "description": "Session Manager preferences",
+    "sessionType": "Standard_Stream",
+    "inputs": {
+      "s3BucketName": "my-session-logs-bucket",
+      "s3KeyPrefix": "session-logs/",
+      "s3EncryptionEnabled": true,
+      "cloudWatchLogGroupName": "/aws/ssm/session-logs",
+      "cloudWatchEncryptionEnabled": true,
+      "kmsKeyId": "alias/my-kms-key",
+      "runAsEnabled": false,
+      "idleSessionTimeout": "20"
+    }
+  }'
+```
+
+### Run Command Operations
+
+```bash
+# Run shell script on Linux instance
+aws ssm send-command \
+  --instance-ids "i-0123456789abcdef0" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["echo Hello World","uptime","df -h"]' \
+  --comment "System diagnostics"
+
+# Run PowerShell script on Windows instance
+aws ssm send-command \
+  --instance-ids "i-0123456789abcdef1" \
+  --document-name "AWS-RunPowerShellScript" \
+  --parameters 'commands=["Get-Service","Get-Process | Select -First 10"]'
+
+# Run command on multiple instances by tag
+aws ssm send-command \
+  --targets "Key=tag:Environment,Values=Production" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["sudo yum update -y","sudo systemctl restart httpd"]' \
+  --comment "Update and restart web servers"
+
+# Run command with output to S3
+aws ssm send-command \
+  --instance-ids "i-0123456789abcdef0" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["ps aux","netstat -tulpn"]' \
+  --output-s3-bucket-name "my-ssm-output-bucket" \
+  --output-s3-key-prefix "run-command-output/"
+
+# Run command with CloudWatch output
+aws ssm send-command \
+  --instance-ids "i-0123456789abcdef0" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["tail -100 /var/log/messages"]' \
+  --cloud-watch-output-config '{"CloudWatchLogGroupName":"/aws/ssm/run-command","CloudWatchOutputEnabled":true}'
+
+# Run command with timeout and concurrency control
+aws ssm send-command \
+  --targets "Key=tag:Role,Values=WebServer" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["sudo service nginx restart"]' \
+  --timeout-seconds 600 \
+  --max-concurrency "5" \
+  --max-errors "1"
+
+# List command invocations
+aws ssm list-commands
+
+# Get command status
+aws ssm list-command-invocations \
+  --command-id "12345678-1234-1234-1234-123456789012"
+
+# Get command output
+aws ssm get-command-invocation \
+  --command-id "12345678-1234-1234-1234-123456789012" \
+  --instance-id "i-0123456789abcdef0"
+
+# Cancel command
+aws ssm cancel-command \
+  --command-id "12345678-1234-1234-1234-123456789012"
+
+# Install CloudWatch agent via Run Command
+aws ssm send-command \
+  --targets "Key=tag:MonitoringGroup,Values=WebServers" \
+  --document-name "AWS-ConfigureAWSPackage" \
+  --parameters '{"action":["Install"],"name":["AmazonCloudWatchAgent"]}'
+```
+
+### Patch Manager Operations
+
+```bash
+# Create custom patch baseline (Linux)
+aws ssm create-patch-baseline \
+  --name "CustomLinuxBaseline" \
+  --operating-system "AMAZON_LINUX_2" \
+  --approval-rules 'PatchRules=[{PatchFilterGroup={PatchFilters=[{Key=CLASSIFICATION,Values=[Security,Bugfix]},{Key=SEVERITY,Values=[Critical,Important]}]},ApprovalAfterDays=7}]' \
+  --description "Custom baseline for Amazon Linux 2"
+
+# Create patch baseline (Windows)
+aws ssm create-patch-baseline \
+  --name "CustomWindowsBaseline" \
+  --operating-system "WINDOWS" \
+  --approval-rules 'PatchRules=[{PatchFilterGroup={PatchFilters=[{Key=CLASSIFICATION,Values=[SecurityUpdates,CriticalUpdates]},{Key=MSRC_SEVERITY,Values=[Critical,Important]}]},ApprovalAfterDays=3}]' \
+  --description "Custom Windows security baseline"
+
+# Get default patch baseline
+aws ssm get-default-patch-baseline
+
+# Register patch baseline for patch group
+aws ssm register-patch-baseline-for-patch-group \
+  --baseline-id "pb-0123456789abcdef0" \
+  --patch-group "Production-WebServers"
+
+# Scan for available patches
+aws ssm send-command \
+  --targets "Key=tag:PatchGroup,Values=Production-WebServers" \
+  --document-name "AWS-RunPatchBaseline" \
+  --parameters '{"Operation":["Scan"]}'
+
+# Install patches
+aws ssm send-command \
+  --targets "Key=tag:PatchGroup,Values=Production-WebServers" \
+  --document-name "AWS-RunPatchBaseline" \
+  --parameters '{"Operation":["Install"]}'
+
+# Get patch compliance summary
+aws ssm describe-instance-patch-states \
+  --instance-ids i-0123456789abcdef0
+
+# List patch baselines
+aws ssm describe-patch-baselines
+
+# Get patch baseline details
+aws ssm get-patch-baseline \
+  --baseline-id "pb-0123456789abcdef0"
+
+# Update patch baseline
+aws ssm update-patch-baseline \
+  --baseline-id "pb-0123456789abcdef0" \
+  --approval-rules 'PatchRules=[{PatchFilterGroup={PatchFilters=[{Key=CLASSIFICATION,Values=[Security]},{Key=SEVERITY,Values=[Critical]}]},ApprovalAfterDays=0}]'
+
+# Deregister patch baseline
+aws ssm deregister-patch-baseline-for-patch-group \
+  --baseline-id "pb-0123456789abcdef0" \
+  --patch-group "Production-WebServers"
+
+# Delete patch baseline
+aws ssm delete-patch-baseline \
+  --baseline-id "pb-0123456789abcdef0"
+
+# Get patch compliance for instance
+aws ssm describe-instance-patches \
+  --instance-id "i-0123456789abcdef0"
+
+# Describe patch group state
+aws ssm describe-patch-group-state \
+  --patch-group "Production-WebServers"
+```
+
+### State Manager Operations
+
+```bash
+# Create State Manager association (run script periodically)
+aws ssm create-association \
+  --name "AWS-RunShellScript" \
+  --targets "Key=tag:Environment,Values=Production" \
+  --parameters '{"commands":["sudo yum update -y","sudo systemctl status httpd"]}' \
+  --schedule-expression "cron(0 2 ? * SUN *)" \
+  --association-name "WeeklySystemUpdate"
+
+# Create association to install CloudWatch agent
+aws ssm create-association \
+  --name "AWS-ConfigureAWSPackage" \
+  --targets "Key=instanceids,Values=*" \
+  --parameters '{"action":["Install"],"name":["AmazonCloudWatchAgent"]}' \
+  --schedule-expression "rate(30 days)" \
+  --association-name "InstallCloudWatchAgent"
+
+# Create association with output location
+aws ssm create-association \
+  --name "AWS-RunShellScript" \
+  --targets "Key=tag:Role,Values=Database" \
+  --parameters '{"commands":["df -h","free -m"]}' \
+  --schedule-expression "rate(1 hour)" \
+  --output-location '{"S3Location":{"OutputS3BucketName":"my-ssm-output","OutputS3KeyPrefix":"state-manager/"}}' \
+  --association-name "HourlyDiskCheck"
+
+# List associations
+aws ssm list-associations
+
+# Describe association
+aws ssm describe-association \
+  --association-id "12345678-1234-1234-1234-123456789012"
+
+# Get association status
+aws ssm describe-association-execution-targets \
+  --association-id "12345678-1234-1234-1234-123456789012" \
+  --execution-id "12345678-1234-1234-1234-123456789012"
+
+# Update association
+aws ssm update-association \
+  --association-id "12345678-1234-1234-1234-123456789012" \
+  --schedule-expression "cron(0 3 ? * SUN *)" \
+  --parameters '{"commands":["sudo yum update -y"]}'
+
+# Delete association
+aws ssm delete-association \
+  --association-id "12345678-1234-1234-1234-123456789012"
+```
+
+### Maintenance Windows Operations
+
+```bash
+# Create maintenance window
+aws ssm create-maintenance-window \
+  --name "ProductionPatchWindow" \
+  --description "Monthly patching for production servers" \
+  --schedule "cron(0 2 ? * SUN#1 *)" \
+  --duration 4 \
+  --cutoff 1 \
+  --allow-unassociated-targets \
+  --tags Key=Environment,Value=Production
+
+# Register target with maintenance window
+aws ssm register-target-with-maintenance-window \
+  --window-id "mw-0123456789abcdef0" \
+  --target-type "INSTANCE" \
+  --targets "Key=tag:PatchGroup,Values=Production-WebServers" \
+  --owner-information "Production Web Servers"
+
+# Register task with maintenance window (Run Command)
+aws ssm register-task-with-maintenance-window \
+  --window-id "mw-0123456789abcdef0" \
+  --target-id "12345678-1234-1234-1234-123456789012" \
+  --task-arn "AWS-RunPatchBaseline" \
+  --task-type "RUN_COMMAND" \
+  --priority 1 \
+  --max-concurrency "10" \
+  --max-errors "5" \
+  --task-invocation-parameters 'RunCommand={Parameters={Operation=[Install]}}'
+
+# Register Lambda task with maintenance window
+aws ssm register-task-with-maintenance-window \
+  --window-id "mw-0123456789abcdef0" \
+  --task-arn "arn:aws:lambda:us-east-1:123456789012:function:MyMaintenanceFunction" \
+  --task-type "LAMBDA" \
+  --priority 1 \
+  --max-concurrency "1" \
+  --max-errors "1"
+
+# List maintenance windows
+aws ssm describe-maintenance-windows
+
+# Get maintenance window details
+aws ssm get-maintenance-window \
+  --window-id "mw-0123456789abcdef0"
+
+# List maintenance window executions
+aws ssm describe-maintenance-window-executions \
+  --window-id "mw-0123456789abcdef0"
+
+# Update maintenance window
+aws ssm update-maintenance-window \
+  --window-id "mw-0123456789abcdef0" \
+  --schedule "cron(0 3 ? * SUN#1 *)" \
+  --duration 6
+
+# Delete maintenance window
+aws ssm delete-maintenance-window \
+  --window-id "mw-0123456789abcdef0"
+```
+
+### Inventory Operations
+
+```bash
+# Get inventory for instance
+aws ssm get-inventory \
+  --filters "Key=AWS:InstanceInformation.InstanceId,Values=i-0123456789abcdef0"
+
+# List inventory entries
+aws ssm list-inventory-entries \
+  --instance-id "i-0123456789abcdef0" \
+  --type-name "AWS:Application"
+
+# Get inventory schema
+aws ssm get-inventory-schema
+
+# Put inventory (custom inventory)
+aws ssm put-inventory \
+  --instance-id "i-0123456789abcdef0" \
+  --items '[{
+    "TypeName": "Custom:MyApplication",
+    "SchemaVersion": "1.0",
+    "CaptureTime": "2026-02-08T10:00:00Z",
+    "Content": [{
+      "Name": "MyApp",
+      "Version": "1.2.3",
+      "Status": "Running"
+    }]
+  }]'
+
+# Create resource data sync
+aws ssm create-resource-data-sync \
+  --sync-name "MyInventorySync" \
+  --s3-destination "BucketName=my-inventory-bucket,Prefix=inventory/,SyncFormat=JsonSerDe,Region=us-east-1"
+
+# List resource data syncs
+aws ssm list-resource-data-sync
+
+# Delete resource data sync
+aws ssm delete-resource-data-sync \
+  --sync-name "MyInventorySync"
+```
+
+### Documents Management
+
+```bash
+# List SSM documents
+aws ssm list-documents
+
+# List documents by owner
+aws ssm list-documents \
+  --filters "Key=Owner,Values=Self"
+
+# Describe document
+aws ssm describe-document \
+  --name "AWS-RunShellScript"
+
+# Get document content
+aws ssm get-document \
+  --name "AWS-RunShellScript"
+
+# Create custom document
+aws ssm create-document \
+  --name "MyCustomRunbook" \
+  --document-type "Command" \
+  --content file://my-runbook.json \
+  --tags Key=Purpose,Value=Automation
+
+# Update document
+aws ssm update-document \
+  --name "MyCustomRunbook" \
+  --content file://my-runbook-v2.json \
+  --document-version '$LATEST'
+
+# Delete document
+aws ssm delete-document \
+  --name "MyCustomRunbook"
+
+# Share document with account
+aws ssm modify-document-permission \
+  --name "MyCustomRunbook" \
+  --permission-type "Share" \
+  --account-ids-to-add "123456789012"
+
+# Make document public
+aws ssm modify-document-permission \
+  --name "MyCustomRunbook" \
+  --permission-type "Share" \
+  --account-ids-to-add "all"
+```
+
+### OpsCenter Operations
+
+```bash
+# Create OpsItem
+aws ssm create-ops-item \
+  --title "High CPU usage on production instances" \
+  --description "CPU utilization exceeded 90% threshold" \
+  --priority 2 \
+  --source "CloudWatch" \
+  --operational-data '{
+    "CloudWatchAlarm": {
+      "Value": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPU",
+      "Type": "SearchableString"
+    }
+  }' \
+  --notifications '[{
+    "Arn": "arn:aws:sns:us-east-1:123456789012:ops-notifications"
+  }]' \
+  --tags Key=Environment,Value=Production
+
+# List OpsItems
+aws ssm describe-ops-items
+
+# List OpsItems with filters
+aws ssm describe-ops-items \
+  --ops-item-filters "Key=Status,Values=Open,Operator=Equal"
+
+# Get OpsItem details
+aws ssm get-ops-item \
+  --ops-item-id "oi-0123456789abcdef0"
+
+# Update OpsItem status
+aws ssm update-ops-item \
+  --ops-item-id "oi-0123456789abcdef0" \
+  --status "InProgress"
+
+# Add related item to OpsItem
+aws ssm create-ops-item-related-item \
+  --ops-item-id "oi-0123456789abcdef0" \
+  --association-type "RelatesTo" \
+  --resource-type "AWS::SSM::Document" \
+  --resource-uri "arn:aws:ssm:us-east-1:123456789012:document/MyRunbook"
+```
+
+### Compliance Operations
+
+```bash
+# Get compliance summary
+aws ssm list-resource-compliance-summaries
+
+# Get compliance summary by type
+aws ssm list-compliance-summaries
+
+# Get instance compliance
+aws ssm list-compliance-items \
+  --resource-ids "i-0123456789abcdef0" \
+  --resource-types "ManagedInstance"
+
+# Put custom compliance item
+aws ssm put-compliance-items \
+  --resource-id "i-0123456789abcdef0" \
+  --resource-type "ManagedInstance" \
+  --compliance-type "Custom:AntiVirus" \
+  --execution-summary "ExecutionTime=2026-02-08T10:00:00Z,ExecutionId=12345" \
+  --items '[{
+    "Id": "av-scan-1",
+    "Title": "Antivirus scan completed",
+    "Severity": "INFORMATIONAL",
+    "Status": "COMPLIANT"
+  }]'
+
+# Get compliance details for patch
+aws ssm describe-instance-patches \
+  --instance-id "i-0123456789abcdef0" \
+  --filters "Key=State,Values=Missing"
+```
+
+### Managed Instances Operations
+
+```bash
+# List managed instances
+aws ssm describe-instance-information
+
+# List managed instances with filters
+aws ssm describe-instance-information \
+  --filters "Key=tag:Environment,Values=Production"
+
+# Get instance details
+aws ssm describe-instance-information \
+  --instance-information-filter-list "key=InstanceIds,valueSet=i-0123456789abcdef0"
+
+# Create hybrid activation (for on-premises)
+aws ssm create-activation \
+  --default-instance-name "OnPremServer" \
+  --iam-role "SSMServiceRole" \
+  --registration-limit 10 \
+  --expiration-date "2026-12-31T23:59:59" \
+  --tags Key=Location,Value=DataCenter1
+
+# Delete activation
+aws ssm delete-activation \
+  --activation-id "12345678-1234-1234-1234-123456789012"
+
+# Deregister managed instance
+aws ssm deregister-managed-instance \
+  --instance-id "mi-0123456789abcdef0"
+```
+
+### Automation Runbook Operations
+
+```bash
+# Start automation execution
+aws ssm start-automation-execution \
+  --document-name "AWS-RestartEC2Instance" \
+  --parameters "InstanceId=i-0123456789abcdef0"
+
+# Start automation with multiple parameters
+aws ssm start-automation-execution \
+  --document-name "AWS-CreateImage" \
+  --parameters "InstanceId=i-0123456789abcdef0,NoReboot=true,ImageName=MyAMI-2026-02-08"
+
+# List automation executions
+aws ssm describe-automation-executions
+
+# Get automation execution details
+aws ssm get-automation-execution \
+  --automation-execution-id "12345678-1234-1234-1234-123456789012"
+
+# Stop automation execution
+aws ssm stop-automation-execution \
+  --automation-execution-id "12345678-1234-1234-1234-123456789012"
+
+# Start automation with targets (multiple instances)
+aws ssm start-automation-execution \
+  --document-name "AWS-RestartEC2Instance" \
+  --targets "Key=tag:RestartGroup,Values=WebServers" \
+  --max-concurrency "5" \
+  --max-errors "1"
+```
+
+### Service Settings Operations
+
+```bash
+# Get service setting
+aws ssm get-service-setting \
+  --setting-id "arn:aws:ssm:us-east-1:123456789012:servicesetting/ssm/parameter-store/high-throughput-enabled"
+
+# Update service setting
+aws ssm update-service-setting \
+  --setting-id "arn:aws:ssm:us-east-1:123456789012:servicesetting/ssm/parameter-store/high-throughput-enabled" \
+  --setting-value "true"
+
+# Reset service setting
+aws ssm reset-service-setting \
+  --setting-id "arn:aws:ssm:us-east-1:123456789012:servicesetting/ssm/parameter-store/high-throughput-enabled"
+```
+
+---
 ## 21. Common Exam Scenarios & Solutions
 1. Scenario: Need secure remote access to EC2 in private subnets without opening ports. Solution: Session Manager with proper IAM; optionally port forwarding.
 2. Scenario: Standardize patching across 500 Linux instances with reports. Solution: Patch Manager + Patch Baseline + Patch Group tags + Maintenance Window + Explorer.

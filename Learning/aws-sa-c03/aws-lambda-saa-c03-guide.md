@@ -14,8 +14,9 @@
 11. [Lambda vs Other Compute Services](#lambda-vs-other-compute-services)
 12. [Best Practices](#best-practices)
 13. [Common Patterns and Use Cases](#common-patterns-and-use-cases)
-14. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-15. [Practice Questions](#practice-questions)
+14. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+15. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
+16. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1413,6 +1414,520 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error(f"Failed to process {key}: {str(e)}")
             handle_processing_error(bucket, key, str(e))
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Function Management
+
+#### Create and Deploy Functions
+```bash
+# Create a Lambda function from a zip file
+aws lambda create-function \
+    --function-name my-function \
+    --runtime python3.11 \
+    --role arn:aws:iam::123456789012:role/lambda-execution-role \
+    --handler lambda_function.lambda_handler \
+    --zip-file fileb://function.zip \
+    --description "My Lambda function" \
+    --timeout 30 \
+    --memory-size 256
+
+# Create function with environment variables
+aws lambda create-function \
+    --function-name my-function \
+    --runtime python3.11 \
+    --role arn:aws:iam::123456789012:role/lambda-execution-role \
+    --handler index.handler \
+    --zip-file fileb://function.zip \
+    --environment Variables={KEY1=value1,KEY2=value2}
+
+# Create function in VPC
+aws lambda create-function \
+    --function-name my-function \
+    --runtime python3.11 \
+    --role arn:aws:iam::123456789012:role/lambda-execution-role \
+    --handler index.handler \
+    --zip-file fileb://function.zip \
+    --vpc-config SubnetIds=subnet-123,subnet-456,SecurityGroupIds=sg-123
+
+# Create function with layers
+aws lambda create-function \
+    --function-name my-function \
+    --runtime python3.11 \
+    --role arn:aws:iam::123456789012:role/lambda-execution-role \
+    --handler index.handler \
+    --zip-file fileb://function.zip \
+    --layers arn:aws:lambda:us-east-1:123456789012:layer:my-layer:1
+```
+
+#### List and Describe Functions
+```bash
+# List all Lambda functions
+aws lambda list-functions
+
+# List with specific runtime filter
+aws lambda list-functions \
+    --query 'Functions[?Runtime==`python3.11`].[FunctionName,Runtime,MemorySize]' \
+    --output table
+
+# Get function configuration
+aws lambda get-function-configuration \
+    --function-name my-function
+
+# Get function code location and configuration
+aws lambda get-function \
+    --function-name my-function
+
+# Get specific function version
+aws lambda get-function \
+    --function-name my-function \
+    --qualifier 5
+```
+
+#### Update Functions
+```bash
+# Update function code
+aws lambda update-function-code \
+    --function-name my-function \
+    --zip-file fileb://new-function.zip
+
+# Update from S3
+aws lambda update-function-code \
+    --function-name my-function \
+    --s3-bucket my-bucket \
+    --s3-key lambda/function.zip
+
+# Update function configuration
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --timeout 60 \
+    --memory-size 512
+
+# Update environment variables
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --environment Variables={KEY1=newvalue1,KEY2=newvalue2}
+
+# Update runtime
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --runtime python3.12
+
+# Update VPC configuration
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --vpc-config SubnetIds=subnet-789,subnet-012,SecurityGroupIds=sg-456
+
+# Remove from VPC
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --vpc-config SubnetIds=[],SecurityGroupIds=[]
+```
+
+#### Delete Functions
+```bash
+# Delete a function
+aws lambda delete-function \
+    --function-name my-function
+
+# Delete specific version
+aws lambda delete-function \
+    --function-name my-function \
+    --qualifier 3
+```
+
+### Function Invocation
+
+```bash
+# Synchronous invocation
+aws lambda invoke \
+    --function-name my-function \
+    --payload '{"key":"value"}' \
+    --cli-binary-format raw-in-base64-out \
+    response.json
+
+# View response
+cat response.json
+
+# Asynchronous invocation
+aws lambda invoke \
+    --function-name my-function \
+    --invocation-type Event \
+    --payload '{"key":"value"}' \
+    --cli-binary-format raw-in-base64-out \
+    response.json
+
+# Dry run (validate parameters without executing)
+aws lambda invoke \
+    --function-name my-function \
+    --invocation-type DryRun \
+    --payload '{"key":"value"}' \
+    --cli-binary-format raw-in-base64-out \
+    response.json
+
+# Invoke specific version or alias
+aws lambda invoke \
+    --function-name my-function \
+    --qualifier prod \
+    --payload '{"key":"value"}' \
+    --cli-binary-format raw-in-base64-out \
+    response.json
+
+# Invoke with log tail
+aws lambda invoke \
+    --function-name my-function \
+    --payload '{"key":"value"}' \
+    --cli-binary-format raw-in-base64-out \
+    --log-type Tail \
+    response.json
+```
+
+### Versions and Aliases
+
+#### Versions
+```bash
+# Publish a new version
+aws lambda publish-version \
+    --function-name my-function \
+    --description "Production release v1.0"
+
+# List versions
+aws lambda list-versions-by-function \
+    --function-name my-function
+
+# Get specific version configuration
+aws lambda get-function-configuration \
+    --function-name my-function \
+    --qualifier 5
+```
+
+#### Aliases
+```bash
+# Create an alias
+aws lambda create-alias \
+    --function-name my-function \
+    --name prod \
+    --function-version 5 \
+    --description "Production environment"
+
+# Create alias with traffic shifting (weighted alias)
+aws lambda create-alias \
+    --function-name my-function \
+    --name canary \
+    --function-version 5 \
+    --routing-config AdditionalVersionWeights={"6"=0.1}
+
+# Update alias
+aws lambda update-alias \
+    --function-name my-function \
+    --name prod \
+    --function-version 6
+
+# Update alias with traffic shifting
+aws lambda update-alias \
+    --function-name my-function \
+    --name prod \
+    --function-version 6 \
+    --routing-config AdditionalVersionWeights={"7"=0.2}
+
+# List aliases
+aws lambda list-aliases \
+    --function-name my-function
+
+# Get alias details
+aws lambda get-alias \
+    --function-name my-function \
+    --name prod
+
+# Delete alias
+aws lambda delete-alias \
+    --function-name my-function \
+    --name staging
+```
+
+### Event Source Mappings
+
+```bash
+# Create event source mapping for SQS
+aws lambda create-event-source-mapping \
+    --function-name my-function \
+    --event-source-arn arn:aws:sqs:us-east-1:123456789012:my-queue \
+    --batch-size 10 \
+    --maximum-batching-window-in-seconds 5
+
+# Create event source mapping for DynamoDB Stream
+aws lambda create-event-source-mapping \
+    --function-name my-function \
+    --event-source-arn arn:aws:dynamodb:us-east-1:123456789012:table/my-table/stream/2024-01-01T00:00:00.000 \
+    --starting-position LATEST \
+    --batch-size 100
+
+# Create event source mapping for Kinesis
+aws lambda create-event-source-mapping \
+    --function-name my-function \
+    --event-source-arn arn:aws:kinesis:us-east-1:123456789012:stream/my-stream \
+    --starting-position TRIM_HORIZON \
+    --batch-size 100 \
+    --parallelization-factor 2
+
+# List event source mappings
+aws lambda list-event-source-mappings \
+    --function-name my-function
+
+# Get event source mapping
+aws lambda get-event-source-mapping \
+    --uuid 12345678-1234-1234-1234-123456789012
+
+# Update event source mapping
+aws lambda update-event-source-mapping \
+    --uuid 12345678-1234-1234-1234-123456789012 \
+    --batch-size 20 \
+    --enabled
+
+# Disable event source mapping
+aws lambda update-event-source-mapping \
+    --uuid 12345678-1234-1234-1234-123456789012 \
+    --no-enabled
+
+# Delete event source mapping
+aws lambda delete-event-source-mapping \
+    --uuid 12345678-1234-1234-1234-123456789012
+```
+
+### Layers
+
+```bash
+# Publish a layer
+aws lambda publish-layer-version \
+    --layer-name my-layer \
+    --description "Common utilities" \
+    --zip-file fileb://layer.zip \
+    --compatible-runtimes python3.11 python3.12
+
+# Publish layer from S3
+aws lambda publish-layer-version \
+    --layer-name my-layer \
+    --content S3Bucket=my-bucket,S3Key=layers/my-layer.zip \
+    --compatible-runtimes python3.11
+
+# List layers
+aws lambda list-layers
+
+# List layer versions
+aws lambda list-layer-versions \
+    --layer-name my-layer
+
+# Get layer version
+aws lambda get-layer-version \
+    --layer-name my-layer \
+    --version-number 1
+
+# Delete layer version
+aws lambda delete-layer-version \
+    --layer-name my-layer \
+    --version-number 1
+
+# Add layer to function
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --layers arn:aws:lambda:us-east-1:123456789012:layer:my-layer:1 \
+             arn:aws:lambda:us-east-1:123456789012:layer:another-layer:2
+```
+
+### Permissions and Policies
+
+#### Function Policies (Resource-based)
+```bash
+# Add permission for S3 to invoke function
+aws lambda add-permission \
+    --function-name my-function \
+    --statement-id s3-invoke-permission \
+    --action lambda:InvokeFunction \
+    --principal s3.amazonaws.com \
+    --source-arn arn:aws:s3:::my-bucket \
+    --source-account 123456789012
+
+# Add permission for API Gateway
+aws lambda add-permission \
+    --function-name my-function \
+    --statement-id apigateway-invoke \
+    --action lambda:InvokeFunction \
+    --principal apigateway.amazonaws.com \
+    --source-arn "arn:aws:execute-api:us-east-1:123456789012:api-id/*"
+
+# Add permission for CloudWatch Events/EventBridge
+aws lambda add-permission \
+    --function-name my-function \
+    --statement-id events-invoke \
+    --action lambda:InvokeFunction \
+    --principal events.amazonaws.com \
+    --source-arn arn:aws:events:us-east-1:123456789012:rule/my-rule
+
+# Get function policy
+aws lambda get-policy \
+    --function-name my-function
+
+# Remove permission
+aws lambda remove-permission \
+    --function-name my-function \
+    --statement-id s3-invoke-permission
+```
+
+### Concurrency Settings
+
+```bash
+# Set reserved concurrency
+aws lambda put-function-concurrency \
+    --function-name my-function \
+    --reserved-concurrent-executions 100
+
+# Remove reserved concurrency
+aws lambda delete-function-concurrency \
+    --function-name my-function
+
+# Get account-level concurrency settings
+aws lambda get-account-settings
+
+# Put provisioned concurrency on alias
+aws lambda put-provisioned-concurrency-config \
+    --function-name my-function \
+    --qualifier prod \
+    --provisioned-concurrent-executions 50
+
+# Get provisioned concurrency config
+aws lambda get-provisioned-concurrency-config \
+    --function-name my-function \
+    --qualifier prod
+
+# List provisioned concurrency configs
+aws lambda list-provisioned-concurrency-configs \
+    --function-name my-function
+
+# Delete provisioned concurrency config
+aws lambda delete-provisioned-concurrency-config \
+    --function-name my-function \
+    --qualifier prod
+```
+
+### Function Configuration
+
+#### Dead Letter Queues
+```bash
+# Configure dead letter queue (SQS)
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --dead-letter-config TargetArn=arn:aws:sqs:us-east-1:123456789012:dlq
+
+# Configure dead letter queue (SNS)
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --dead-letter-config TargetArn=arn:aws:sns:us-east-1:123456789012:dlq-topic
+
+# Remove dead letter queue
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --dead-letter-config TargetArn=""
+```
+
+#### Tracing
+```bash
+# Enable X-Ray tracing
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --tracing-config Mode=Active
+
+# Disable X-Ray tracing
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --tracing-config Mode=PassThrough
+```
+
+#### File System Configuration (EFS)
+```bash
+# Add EFS file system
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --file-system-configs Arn=arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-1234,LocalMountPath=/mnt/efs
+
+# Remove EFS file system
+aws lambda update-function-configuration \
+    --function-name my-function \
+    --file-system-configs []
+```
+
+### Tags
+
+```bash
+# Add tags to function
+aws lambda tag-resource \
+    --resource arn:aws:lambda:us-east-1:123456789012:function:my-function \
+    --tags Environment=Production,Owner=TeamA,CostCenter=Engineering
+
+# List tags
+aws lambda list-tags \
+    --resource arn:aws:lambda:us-east-1:123456789012:function:my-function
+
+# Remove tags
+aws lambda untag-resource \
+    --resource arn:aws:lambda:us-east-1:123456789012:function:my-function \
+    --tag-keys Environment Owner
+```
+
+### Code Signing
+
+```bash
+# Create code signing config
+aws lambda create-code-signing-config \
+    --description "Production code signing" \
+    --allowed-publishers SigningProfileVersionArns=arn:aws:signer:us-east-1:123456789012:/signing-profiles/MyProfile/abc123 \
+    --code-signing-policies UntrustedArtifactOnDeployment=Enforce
+
+# Update function to use code signing
+aws lambda update-function-code-signing-config \
+    --function-name my-function \
+    --code-signing-config-arn arn:aws:lambda:us-east-1:123456789012:code-signing-config:csc-1234
+
+# Get code signing config
+aws lambda get-function-code-signing-config \
+    --function-name my-function
+
+# List code signing configs
+aws lambda list-code-signing-configs
+
+# Delete code signing config from function
+aws lambda delete-function-code-signing-config \
+    --function-name my-function
+```
+
+### Monitoring and Logs
+
+```bash
+# List CloudWatch log streams for function
+aws logs describe-log-streams \
+    --log-group-name /aws/lambda/my-function \
+    --order-by LastEventTime \
+    --descending
+
+# Get recent logs
+aws logs tail /aws/lambda/my-function --follow
+
+# Filter logs
+aws logs filter-log-events \
+    --log-group-name /aws/lambda/my-function \
+    --filter-pattern "ERROR"
+
+# Get CloudWatch metrics
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/Lambda \
+    --metric-name Invocations \
+    --dimensions Name=FunctionName,Value=my-function \
+    --start-time 2024-01-01T00:00:00Z \
+    --end-time 2024-01-02T00:00:00Z \
+    --period 3600 \
+    --statistics Sum
 ```
 
 ---

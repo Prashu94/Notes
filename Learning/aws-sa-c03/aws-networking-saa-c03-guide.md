@@ -20,7 +20,8 @@
 17. [Route 53](#route-53)
 18. [AWS Global Accelerator](#aws-global-accelerator)
 19. [Network Security](#network-security)
-20. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
+20. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+21. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
 
 ## Overview
 
@@ -1160,6 +1161,805 @@ account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes w
 - **Regular Audits**: Review security group rules
 - **Monitoring**: Comprehensive network monitoring
 - **Automation**: Automated security response
+
+---
+
+## AWS CLI Commands Reference
+
+### VPC Endpoints
+
+#### Create and Manage VPC Endpoints
+```bash
+# Create Gateway Endpoint for S3
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --service-name com.amazonaws.us-east-1.s3 \
+    --route-table-ids rtb-12345678 rtb-87654321 \
+    --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=S3-Gateway-Endpoint},{Key=Environment,Value=Production}]'
+
+# Create Gateway Endpoint for DynamoDB
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --service-name com.amazonaws.us-east-1.dynamodb \
+    --route-table-ids rtb-12345678 \
+    --policy-document file://dynamodb-endpoint-policy.json
+
+# Create Interface Endpoint for EC2
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.us-east-1.ec2 \
+    --subnet-ids subnet-abc123 subnet-def456 \
+    --security-group-ids sg-0123456789abcdef0 \
+    --private-dns-enabled \
+    --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=EC2-Interface-Endpoint}]'
+
+# Create Interface Endpoint for Systems Manager
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.us-east-1.ssm \
+    --subnet-ids subnet-abc123 subnet-def456 \
+    --security-group-ids sg-0123456789abcdef0 \
+    --private-dns-enabled
+
+# Create Interface Endpoint for Secrets Manager
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.us-east-1.secretsmanager \
+    --subnet-ids subnet-abc123 subnet-def456 \
+    --security-group-ids sg-0123456789abcdef0 \
+    --private-dns-enabled
+```
+
+#### List and Describe VPC Endpoints
+```bash
+# List all VPC endpoints
+aws ec2 describe-vpc-endpoints
+
+# Describe specific VPC endpoint
+aws ec2 describe-vpc-endpoints \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+
+# List VPC endpoints for a specific VPC
+aws ec2 describe-vpc-endpoints \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'VpcEndpoints[*].[VpcEndpointId,ServiceName,State]' \
+    --output table
+
+# List all Interface endpoints
+aws ec2 describe-vpc-endpoints \
+    --filters "Name=vpc-endpoint-type,Values=Interface" \
+    --query 'VpcEndpoints[*].[VpcEndpointId,ServiceName,VpcId]' \
+    --output table
+
+# List available VPC endpoint services
+aws ec2 describe-vpc-endpoint-services
+
+# List VPC endpoint services with filter
+aws ec2 describe-vpc-endpoint-services \
+    --filters "Name=service-type,Values=Interface" \
+    --query 'ServiceNames' \
+    --output table
+```
+
+#### Modify VPC Endpoints
+```bash
+# Modify VPC endpoint to add route tables (Gateway endpoint)
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-route-table-ids rtb-99999999
+
+# Modify VPC endpoint to remove route tables
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --remove-route-table-ids rtb-88888888
+
+# Modify Interface endpoint to add subnets
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-subnet-ids subnet-xyz789
+
+# Modify Interface endpoint security groups
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-security-group-ids sg-newgroup123 \
+    --remove-security-group-ids sg-oldgroup456
+
+# Enable private DNS for Interface endpoint
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --private-dns-enabled
+
+# Update endpoint policy
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --policy-document file://updated-endpoint-policy.json
+```
+
+#### Delete VPC Endpoints
+```bash
+# Delete VPC endpoint
+aws ec2 delete-vpc-endpoints \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+
+# Delete multiple VPC endpoints
+aws ec2 delete-vpc-endpoints \
+    --vpc-endpoint-ids vpce-0123456789abcdef0 vpce-abcdef0123456789
+```
+
+### AWS PrivateLink
+
+#### Create and Manage Endpoint Services
+```bash
+# Create VPC endpoint service configuration
+aws ec2 create-vpc-endpoint-service-configuration \
+    --network-load-balancer-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+    --acceptance-required \
+    --tag-specifications 'ResourceType=vpc-endpoint-service,Tags=[{Key=Name,Value=MyPrivateLinkService}]'
+
+# Create endpoint service without acceptance required
+aws ec2 create-vpc-endpoint-service-configuration \
+    --network-load-balancer-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+    --no-acceptance-required
+
+# Describe VPC endpoint service configurations
+aws ec2 describe-vpc-endpoint-service-configurations
+
+# Describe specific endpoint service
+aws ec2 describe-vpc-endpoint-service-configurations \
+    --service-ids vpce-svc-0123456789abcdef0
+
+# Modify endpoint service configuration
+aws ec2 modify-vpc-endpoint-service-configuration \
+    --service-id vpce-svc-0123456789abcdef0 \
+    --acceptance-required
+
+# Add allowed principals to endpoint service
+aws ec2 modify-vpc-endpoint-service-permissions \
+    --service-id vpce-svc-0123456789abcdef0 \
+    --add-allowed-principals arn:aws:iam::123456789012:root
+
+# Remove allowed principals
+aws ec2 modify-vpc-endpoint-service-permissions \
+    --service-id vpce-svc-0123456789abcdef0 \
+    --remove-allowed-principals arn:aws:iam::123456789012:root
+
+# List endpoint service permissions
+aws ec2 describe-vpc-endpoint-service-permissions \
+    --service-id vpce-svc-0123456789abcdef0
+```
+
+#### Manage Endpoint Connections
+```bash
+# List endpoint connections
+aws ec2 describe-vpc-endpoint-connections \
+    --filters "Name=service-id,Values=vpce-svc-0123456789abcdef0"
+
+# Accept endpoint connection request
+aws ec2 accept-vpc-endpoint-connections \
+    --service-id vpce-svc-0123456789abcdef0 \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+
+# Reject endpoint connection request
+aws ec2 reject-vpc-endpoint-connections \
+    --service-id vpce-svc-0123456789abcdef0 \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+
+# Delete VPC endpoint service configuration
+aws ec2 delete-vpc-endpoint-service-configurations \
+    --service-ids vpce-svc-0123456789abcdef0
+```
+
+### VPC Peering
+
+#### Create and Manage VPC Peering Connections
+```bash
+# Create VPC peering connection (same account)
+aws ec2 create-vpc-peering-connection \
+    --vpc-id vpc-0123456789abcdef0 \
+    --peer-vpc-id vpc-abcdef0123456789 \
+    --tag-specifications 'ResourceType=vpc-peering-connection,Tags=[{Key=Name,Value=VPC-A-to-VPC-B}]'
+
+# Create VPC peering connection (cross-account)
+aws ec2 create-vpc-peering-connection \
+    --vpc-id vpc-0123456789abcdef0 \
+    --peer-vpc-id vpc-abcdef0123456789 \
+    --peer-owner-id 123456789012 \
+    --peer-region us-west-2 \
+    --tag-specifications 'ResourceType=vpc-peering-connection,Tags=[{Key=Name,Value=Cross-Account-Peering}]'
+
+# Accept VPC peering connection
+aws ec2 accept-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+
+# Reject VPC peering connection
+aws ec2 reject-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+
+# Describe VPC peering connections
+aws ec2 describe-vpc-peering-connections
+
+# Describe specific peering connection
+aws ec2 describe-vpc-peering-connections \
+    --vpc-peering-connection-ids pcx-0123456789abcdef0
+
+# List peering connections for a VPC
+aws ec2 describe-vpc-peering-connections \
+    --filters "Name=requester-vpc-info.vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'VpcPeeringConnections[*].[VpcPeeringConnectionId,Status.Code,AccepterVpcInfo.VpcId]' \
+    --output table
+
+# Delete VPC peering connection
+aws ec2 delete-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+```
+
+#### Modify VPC Peering Options
+```bash
+# Modify peering connection options (requester side)
+aws ec2 modify-vpc-peering-connection-options \
+    --vpc-peering-connection-id pcx-0123456789abcdef0 \
+    --requester-peering-connection-options '{"AllowDnsResolutionFromRemoteVpc":true}'
+
+# Modify peering connection options (accepter side)
+aws ec2 modify-vpc-peering-connection-options \
+    --vpc-peering-connection-id pcx-0123456789abcdef0 \
+    --accepter-peering-connection-options '{"AllowDnsResolutionFromRemoteVpc":true}'
+
+# Enable both DNS resolution and allow egress from local Classic link
+aws ec2 modify-vpc-peering-connection-options \
+    --vpc-peering-connection-id pcx-0123456789abcdef0 \
+    --requester-peering-connection-options '{"AllowDnsResolutionFromRemoteVpc":true,"AllowEgressFromLocalClassicLinkToRemoteVpc":true}'
+```
+
+### Network Firewall
+
+#### Create and Manage Network Firewall
+```bash
+# Create firewall policy
+aws network-firewall create-firewall-policy \
+    --firewall-policy-name MyFirewallPolicy \
+    --firewall-policy '{"StatelessDefaultActions": ["aws:forward_to_sfe"], "StatelessFragmentDefaultActions": ["aws:forward_to_sfe"]}' \
+    --tags Key=Environment,Value=Production
+
+# Create firewall
+aws network-firewall create-firewall \
+    --firewall-name MyNetworkFirewall \
+    --firewall-policy-arn arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/MyFirewallPolicy \
+    --vpc-id vpc-0123456789abcdef0 \
+    --subnet-mappings SubnetId=subnet-abc123 SubnetId=subnet-def456 \
+    --tags Key=Name,Value=ProductionFirewall
+
+# Describe firewalls
+aws network-firewall describe-firewall \
+    --firewall-name MyNetworkFirewall
+
+# List firewalls
+aws network-firewall list-firewalls
+
+# Update firewall policy
+aws network-firewall update-firewall-policy \
+    --firewall-policy-name MyFirewallPolicy \
+    --firewall-policy-arn arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/MyFirewallPolicy \
+    --firewall-policy file://updated-policy.json
+
+# Associate firewall policy with firewall
+aws network-firewall associate-firewall-policy \
+    --firewall-name MyNetworkFirewall \
+    --firewall-policy-arn arn:aws:network-firewall:us-east-1:123456789012:firewall-policy/NewPolicy
+
+# Delete firewall
+aws network-firewall delete-firewall \
+    --firewall-name MyNetworkFirewall
+
+# Delete firewall policy
+aws network-firewall delete-firewall-policy \
+    --firewall-policy-name MyFirewallPolicy
+```
+
+#### Create Rule Groups
+```bash
+# Create stateless rule group
+aws network-firewall create-rule-group \
+    --rule-group-name AllowHTTPSStateless \
+    --type STATELESS \
+    --rule-group file://stateless-rules.json \
+    --capacity 100 \
+    --tags Key=Type,Value=Stateless
+
+# Create stateful rule group
+aws network-firewall create-rule-group \
+    --rule-group-name BlockMaliciousDomains \
+    --type STATEFUL \
+    --rule-group file://stateful-rules.json \
+    --capacity 1000 \
+    --tags Key=Type,Value=Stateful
+
+# Describe rule group
+aws network-firewall describe-rule-group \
+    --rule-group-name AllowHTTPSStateless \
+    --type STATELESS
+
+# List rule groups
+aws network-firewall list-rule-groups
+
+# Update rule group
+aws network-firewall update-rule-group \
+    --rule-group-name AllowHTTPSStateless \
+    --type STATELESS \
+    --rule-group file://updated-rules.json
+
+# Delete rule group
+aws network-firewall delete-rule-group \
+    --rule-group-name AllowHTTPSStateless \
+    --type STATELESS
+```
+
+### IPAM (IP Address Manager)
+
+#### Create and Manage IPAM
+```bash
+# Create IPAM
+aws ec2 create-ipam \
+    --description "Organization-wide IP address management" \
+    --operating-regions RegionName=us-east-1 RegionName=us-west-2 RegionName=eu-west-1 \
+    --tag-specifications 'ResourceType=ipam,Tags=[{Key=Name,Value=Corporate-IPAM}]'
+
+# Describe IPAMs
+aws ec2 describe-ipams
+
+# Describe specific IPAM
+aws ec2 describe-ipams \
+    --ipam-ids ipam-0123456789abcdef0
+
+# Create IPAM scope
+aws ec2 create-ipam-scope \
+    --ipam-id ipam-0123456789abcdef0 \
+    --description "Private scope for internal networks" \
+    --tag-specifications 'ResourceType=ipam-scope,Tags=[{Key=Name,Value=PrivateScope}]'
+
+# Create IPAM pool (top level)
+aws ec2 create-ipam-pool \
+    --ipam-scope-id ipam-scope-0123456789abcdef0 \
+    --description "Top-level pool for 10.0.0.0/8" \
+    --address-family ipv4 \
+    --locale us-east-1 \
+    --tag-specifications 'ResourceType=ipam-pool,Tags=[{Key=Name,Value=TopLevelPool}]'
+
+# Provision CIDR to IPAM pool
+aws ec2 provision-ipam-pool-cidr \
+    --ipam-pool-id ipam-pool-0123456789abcdef0 \
+    --cidr 10.0.0.0/8
+
+# Create regional IPAM pool (child pool)
+aws ec2 create-ipam-pool \
+    --ipam-scope-id ipam-scope-0123456789abcdef0 \
+    --description "US East regional pool" \
+    --address-family ipv4 \
+    --source-ipam-pool-id ipam-pool-0123456789abcdef0 \
+    --locale us-east-1 \
+    --allocation-min-netmask-length 24 \
+    --allocation-max-netmask-length 16 \
+    --allocation-default-netmask-length 20
+
+# Allocate CIDR from IPAM pool
+aws ec2 allocate-ipam-pool-cidr \
+    --ipam-pool-id ipam-pool-child123456789 \
+    --netmask-length 20
+
+# List IPAM pools
+aws ec2 describe-ipam-pools \
+    --filters "Name=ipam-scope-id,Values=ipam-scope-0123456789abcdef0"
+
+# Get IPAM pool allocations
+aws ec2 get-ipam-pool-allocations \
+    --ipam-pool-id ipam-pool-0123456789abcdef0
+
+# Get IPAM pool CIDRs
+aws ec2 get-ipam-pool-cidrs \
+    --ipam-pool-id ipam-pool-0123456789abcdef0
+
+# Delete IPAM pool
+aws ec2 delete-ipam-pool \
+    --ipam-pool-id ipam-pool-0123456789abcdef0
+
+# Delete IPAM
+aws ec2 delete-ipam \
+    --ipam-id ipam-0123456789abcdef0
+```
+
+### Reachability Analyzer
+
+#### Analyze Network Paths
+```bash
+# Create network insights path (EC2 to EC2)
+aws ec2 create-network-insights-path \
+    --source i-0123456789abcdef0 \
+    --destination i-abcdef0123456789 \
+    --protocol tcp \
+    --destination-port 443 \
+    --tag-specifications 'ResourceType=network-insights-path,Tags=[{Key=Name,Value=WebServer-To-Database}]'
+
+# Create network insights path (with VPC endpoints)
+aws ec2 create-network-insights-path \
+    --source i-0123456789abcdef0 \
+    --destination vpce-0123456789abcdef0 \
+    --protocol tcp \
+    --tag-specifications 'ResourceType=network-insights-path,Tags=[{Key=Name,Value=Instance-To-S3-Endpoint}]'
+
+# Start network insights analysis
+aws ec2 start-network-insights-analysis \
+    --network-insights-path-id nip-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=network-insights-analysis,Tags=[{Key=Date,Value=2026-02-08}]'
+
+# Describe network insights paths
+aws ec2 describe-network-insights-paths
+
+# Describe specific path
+aws ec2 describe-network-insights-paths \
+    --network-insights-path-ids nip-0123456789abcdef0
+
+# Describe network insights analyses
+aws ec2 describe-network-insights-analyses \
+    --network-insights-path-id nip-0123456789abcdef0
+
+# Get analysis results
+aws ec2 describe-network-insights-analyses \
+    --network-insights-analysis-ids nia-0123456789abcdef0 \
+    --query 'NetworkInsightsAnalyses[0].{Status:Status,NetworkPathFound:NetworkPathFound,Explanations:Explanations}'
+
+# Delete network insights analysis
+aws ec2 delete-network-insights-analysis \
+    --network-insights-analysis-id nia-0123456789abcdef0
+
+# Delete network insights path
+aws ec2 delete-network-insights-path \
+    --network-insights-path-id nip-0123456789abcdef0
+```
+
+### Network Access Analyzer
+
+#### Create and Manage Network Access Scopes
+```bash
+# Create network insights access scope
+aws ec2 create-network-insights-access-scope \
+    --match-paths-source '{"ResourceStatement":{"Resources":["vpc-0123456789abcdef0"]}}' \
+    --match-paths-destination '{"ResourceStatement":{"Resources":["*"]}}' \
+    --tag-specifications 'ResourceType=network-insights-access-scope,Tags=[{Key=Name,Value=VPC-Internet-Access}]'
+
+# Describe network insights access scopes
+aws ec2 describe-network-insights-access-scopes
+
+# Get network insights access scope content
+aws ec2 get-network-insights-access-scope-content \
+    --network-insights-access-scope-id nis-0123456789abcdef0
+
+# Start network insights access scope analysis
+aws ec2 start-network-insights-access-scope-analysis \
+    --network-insights-access-scope-id nis-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=network-insights-access-scope-analysis,Tags=[{Key=Analysis,Value=Quarterly-Review}]'
+
+# Describe network insights access scope analyses
+aws ec2 describe-network-insights-access-scope-analyses \
+    --network-insights-access-scope-id nis-0123456789abcdef0
+
+# Get access scope analysis findings
+aws ec2 get-network-insights-access-scope-analysis-findings \
+    --network-insights-access-scope-analysis-id nisa-0123456789abcdef0
+
+# Delete network insights access scope analysis
+aws ec2 delete-network-insights-access-scope-analysis \
+    --network-insights-access-scope-analysis-id nisa-0123456789abcdef0
+
+# Delete network insights access scope
+aws ec2 delete-network-insights-access-scope \
+    --network-insights-access-scope-id nis-0123456789abcdef0
+```
+
+### VPC Lattice
+
+#### Create and Manage Service Network
+```bash
+# Create service network
+aws vpc-lattice create-service-network \
+    --name my-service-network \
+    --auth-type AWS_IAM \
+    --tags Key=Environment,Value=Production
+
+# Create service
+aws vpc-lattice create-service \
+    --name my-application-service \
+    --auth-type AWS_IAM \
+    --tags Key=Application,Value=WebApp
+
+# Associate service with service network
+aws vpc-lattice create-service-network-service-association \
+    --service-network-identifier sn-0123456789abcdef0 \
+    --service-identifier svc-0123456789abcdef0 \
+    --tags Key=Association,Value=WebApp-Network
+
+# Create VPC association with service network
+aws vpc-lattice create-service-network-vpc-association \
+    --service-network-identifier sn-0123456789abcdef0 \
+    --vpc-identifier vpc-0123456789abcdef0 \
+    --security-group-ids sg-0123456789abcdef0 \
+    --tags Key=VPC,Value=Production
+
+# Create target group
+aws vpc-lattice create-target-group \
+    --name my-targets \
+    --type IP \
+    --config '{"Port":80,"Protocol":"HTTP","VpcIdentifier":"vpc-0123456789abcdef0"}' \
+    --tags Key=TargetType,Value=WebServers
+
+# Register targets
+aws vpc-lattice register-targets \
+    --target-group-identifier tg-0123456789abcdef0 \
+    --targets Id=10.0.1.100,Port=80 Id=10.0.1.101,Port=80
+
+# Create listener
+aws vpc-lattice create-listener \
+    --service-identifier svc-0123456789abcdef0 \
+    --name default-listener \
+    --protocol HTTPS \
+    --port 443 \
+    --default-action '{"Forward":{"TargetGroups":[{"TargetGroupIdentifier":"tg-0123456789abcdef0","Weight":100}]}}'
+
+# List service networks
+aws vpc-lattice list-service-networks
+
+# List services
+aws vpc-lattice list-services
+
+# Describe service network
+aws vpc-lattice get-service-network \
+    --service-network-identifier sn-0123456789abcdef0
+
+# Describe service
+aws vpc-lattice get-service \
+    --service-identifier svc-0123456789abcdef0
+
+# Delete listener
+aws vpc-lattice delete-listener \
+    --service-identifier svc-0123456789abcdef0 \
+    --listener-identifier listener-0123456789abcdef0
+
+# Deregister targets
+aws vpc-lattice deregister-targets \
+    --target-group-identifier tg-0123456789abcdef0 \
+    --targets Id=10.0.1.100
+
+# Delete target group
+aws vpc-lattice delete-target-group \
+    --target-group-identifier tg-0123456789abcdef0
+
+# Delete service network VPC association
+aws vpc-lattice delete-service-network-vpc-association \
+    --service-network-vpc-association-identifier snva-0123456789abcdef0
+
+# Delete service network service association
+aws vpc-lattice delete-service-network-service-association \
+    --service-network-service-association-identifier snsa-0123456789abcdef0
+
+# Delete service
+aws vpc-lattice delete-service \
+    --service-identifier svc-0123456789abcdef0
+
+# Delete service network
+aws vpc-lattice delete-service-network \
+    --service-network-identifier sn-0123456789abcdef0
+```
+
+#### Manage Access Policies
+```bash
+# Put service network policy
+aws vpc-lattice put-service-network-access-policy \
+    --service-network-identifier sn-0123456789abcdef0 \
+    --policy file://service-network-policy.json
+
+# Get service network policy
+aws vpc-lattice get-service-network-access-policy \
+    --service-network-identifier sn-0123456789abcdef0
+
+# Put service policy
+aws vpc-lattice put-service-access-policy \
+    --service-identifier svc-0123456789abcdef0 \
+    --policy file://service-policy.json
+
+# Get service policy
+aws vpc-lattice get-service-access-policy \
+    --service-identifier svc-0123456789abcdef0
+
+# Delete service network policy
+aws vpc-lattice delete-service-network-access-policy \
+    --service-network-identifier sn-0123456789abcdef0
+
+# Delete service policy
+aws vpc-lattice delete-service-access-policy \
+    --service-identifier svc-0123456789abcdef0
+```
+
+### Common Networking Queries
+
+#### VPC and Subnet Information
+```bash
+# List all VPCs with their CIDR blocks
+aws ec2 describe-vpcs \
+    --query 'Vpcs[*].[VpcId,CidrBlock,IsDefault,Tags[?Key==`Name`].Value|[0]]' \
+    --output table
+
+# Find VPCs with specific CIDR
+aws ec2 describe-vpcs \
+    --filters "Name=cidr,Values=10.0.0.0/16"
+
+# List all subnets in a VPC
+aws ec2 describe-subnets \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'Subnets[*].[SubnetId,CidrBlock,AvailabilityZone,MapPublicIpOnLaunch,Tags[?Key==`Name`].Value|[0]]' \
+    --output table
+
+# Find available IP addresses in subnet
+aws ec2 describe-subnets \
+    --subnet-ids subnet-abc123 \
+    --query 'Subnets[0].AvailableIpAddressCount'
+
+# List route tables for VPC
+aws ec2 describe-route-tables \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'RouteTables[*].[RouteTableId,Associations[0].SubnetId,Routes[0].DestinationCidrBlock]' \
+    --output table
+```
+
+#### Security Group Analysis
+```bash
+# List all security groups in VPC
+aws ec2 describe-security-groups \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'SecurityGroups[*].[GroupId,GroupName,Description]' \
+    --output table
+
+# Find security groups with specific rule
+aws ec2 describe-security-groups \
+    --filters "Name=ip-permission.from-port,Values=22" \
+    --query 'SecurityGroups[*].[GroupId,GroupName]' \
+    --output table
+
+# List all ingress rules for security group
+aws ec2 describe-security-groups \
+    --group-ids sg-0123456789abcdef0 \
+    --query 'SecurityGroups[0].IpPermissions'
+
+# Find unused security groups
+for sg in $(aws ec2 describe-security-groups --query 'SecurityGroups[*].GroupId' --output text); do
+  instances=$(aws ec2 describe-instances --filters "Name=instance.group-id,Values=$sg" --query 'Reservations[*].Instances[*].InstanceId' --output text)
+  enis=$(aws ec2 describe-network-interfaces --filters "Name=group-id,Values=$sg" --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text)
+  if [ -z "$instances" ] && [ -z "$enis" ]; then
+    echo "Unused SG: $sg"
+  fi
+done
+```
+
+#### Network Interface Information
+```bash
+# List all network interfaces
+aws ec2 describe-network-interfaces
+
+# Find network interfaces in subnet
+aws ec2 describe-network-interfaces \
+    --filters "Name=subnet-id,Values=subnet-abc123" \
+    --query 'NetworkInterfaces[*].[NetworkInterfaceId,PrivateIpAddress,Status,Attachment.InstanceId]' \
+    --output table
+
+# Get network interface details
+aws ec2 describe-network-interfaces \
+    --network-interface-ids eni-0123456789abcdef0
+
+# List elastic IP addresses
+aws ec2 describe-addresses \
+    --query 'Addresses[*].[PublicIp,InstanceId,AllocationId,AssociationId]' \
+    --output table
+
+# Find unattached elastic IPs
+aws ec2 describe-addresses \
+    --filters "Name=instance-id,Values=" \
+    --query 'Addresses[*].[PublicIp,AllocationId]' \
+    --output table
+```
+
+#### Connectivity Troubleshooting
+```bash
+# Check NAT Gateway status
+aws ec2 describe-nat-gateways \
+    --filter "Name=vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'NatGateways[*].[NatGatewayId,State,SubnetId,NatGatewayAddresses[0].PublicIp]' \
+    --output table
+
+# Check Internet Gateway attachments
+aws ec2 describe-internet-gateways \
+    --filters "Name=attachment.vpc-id,Values=vpc-0123456789abcdef0" \
+    --query 'InternetGateways[*].[InternetGatewayId,Attachments[0].State]' \
+    --output table
+
+# Verify VPC DNS settings
+aws ec2 describe-vpc-attribute \
+    --vpc-id vpc-0123456789abcdef0 \
+    --attribute enableDnsSupport
+
+aws ec2 describe-vpc-attribute \
+    --vpc-id vpc-0123456789abcdef0 \
+    --attribute enableDnsHostnames
+
+# Check VPC flow logs
+aws ec2 describe-flow-logs \
+    --filter "Name=resource-id,Values=vpc-0123456789abcdef0" \
+    --query 'FlowLogs[*].[FlowLogId,FlowLogStatus,LogDestinationType,LogGroupName]' \
+    --output table
+
+# Test reachability to instance
+aws ec2 describe-instance-status \
+    --instance-ids i-0123456789abcdef0 \
+    --include-all-instances \
+    --query 'InstanceStatuses[0].{Instance:InstanceId,State:InstanceState.Name,Status:InstanceStatus.Status,Reachability:SystemStatus.Status}'
+```
+
+#### Transit Gateway Queries
+```bash
+# List Transit Gateways
+aws ec2 describe-transit-gateways \
+    --query 'TransitGateways[*].[TransitGatewayId,State,OwnerId,Tags[?Key==`Name`].Value|[0]]' \
+    --output table
+
+# List Transit Gateway attachments
+aws ec2 describe-transit-gateway-attachments \
+    --filters "Name=transit-gateway-id,Values=tgw-0123456789abcdef0" \
+    --query 'TransitGatewayAttachments[*].[TransitGatewayAttachmentId,ResourceType,ResourceId,State]' \
+    --output table
+
+# List Transit Gateway route tables
+aws ec2 describe-transit-gateway-route-tables \
+    --filters "Name=transit-gateway-id,Values=tgw-0123456789abcdef0"
+
+# Search Transit Gateway routes
+aws ec2 search-transit-gateway-routes \
+    --transit-gateway-route-table-id tgw-rtb-0123456789abcdef0 \
+    --filters "Name=type,Values=static"
+```
+
+#### Advanced Filtering and Reporting
+```bash
+# Generate VPC inventory report
+echo "VPC_ID,CIDR,Subnets,IGW,NAT_Gateways,Peering_Connections"
+for vpc in $(aws ec2 describe-vpcs --query 'Vpcs[*].VpcId' --output text); do
+  cidr=$(aws ec2 describe-vpcs --vpc-ids $vpc --query 'Vpcs[0].CidrBlock' --output text)
+  subnets=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc" --query 'length(Subnets)')
+  igw=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc" --query 'length(InternetGateways)')
+  nat=$(aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$vpc" "Name=state,Values=available" --query 'length(NatGateways)')
+  pcx=$(aws ec2 describe-vpc-peering-connections --filters "Name=requester-vpc-info.vpc-id,Values=$vpc" --query 'length(VpcPeeringConnections)')
+  echo "$vpc,$cidr,$subnets,$igw,$nat,$pcx"
+done
+
+# Find all resources in a specific subnet
+echo "Finding all resources in subnet-abc123..."
+echo "\nEC2 Instances:"
+aws ec2 describe-instances --filters "Name=subnet-id,Values=subnet-abc123" --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name]' --output table
+echo "\nNetwork Interfaces:"
+aws ec2 describe-network-interfaces --filters "Name=subnet-id,Values=subnet-abc123" --query 'NetworkInterfaces[*].[NetworkInterfaceId,Description,Status]' --output table
+echo "\nNAT Gateways:"
+aws ec2 describe-nat-gateways --filter "Name=subnet-id,Values=subnet-abc123" --query 'NatGateways[*].[NatGatewayId,State]' --output table
+
+# Cost analysis - List expensive resources
+echo "Network resources cost analysis:"
+echo "\nNAT Gateways (\$0.045/hour + data):"
+aws ec2 describe-nat-gateways --filter "Name=state,Values=available" --query 'NatGateways[*].[NatGatewayId,SubnetId,CreateTime]' --output table
+echo "\nTransit Gateways (\$0.05/attachment/hour + data):"
+aws ec2 describe-transit-gateways --query 'TransitGateways[*].[TransitGatewayId,State,CreationTime]' --output table
+echo "\nVPC Endpoints (varies by type):"
+aws ec2 describe-vpc-endpoints --query 'VpcEndpoints[*].[VpcEndpointId,ServiceName,VpcEndpointType,State]' --output table
+```
+
+---
 
 ## Monitoring and Troubleshooting
 

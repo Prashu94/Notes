@@ -14,7 +14,8 @@
 11. [CloudFront Use Cases](#cloudfront-use-cases)
 12. [CloudFront vs Other Services](#cloudfront-vs-other-services)
 13. [Common Exam Scenarios](#common-exam-scenarios)
-14. [Best Practices](#best-practices)
+14. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+15. [Best Practices](#best-practices)
 
 ## Introduction to CloudFront
 
@@ -692,6 +693,706 @@ Configuration:
 - Health checks and failover criteria
 - Route 53 health checks for DNS-level failover
 - CloudFront provides additional layer of availability
+
+## AWS CLI Commands Reference
+
+### Create CloudFront Distribution
+
+```bash
+# Create distribution with S3 origin using distribution config file
+aws cloudfront create-distribution \
+  --distribution-config file://distribution-config.json
+
+# Example distribution-config.json for S3 origin
+cat > distribution-config.json <<'EOF'
+{
+  "CallerReference": "my-distribution-2026-02-08",
+  "Comment": "Production S3 Distribution",
+  "Enabled": true,
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "S3-my-bucket",
+        "DomainName": "my-bucket.s3.amazonaws.com",
+        "S3OriginConfig": {
+          "OriginAccessIdentity": "origin-access-identity/cloudfront/E1234567890ABC"
+        },
+        "ConnectionAttempts": 3,
+        "ConnectionTimeout": 10
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-my-bucket",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "Compress": true,
+    "MinTTL": 0,
+    "DefaultTTL": 86400,
+    "MaxTTL": 31536000,
+    "ForwardedValues": {
+      "QueryString": false,
+      "Cookies": {
+        "Forward": "none"
+      }
+    },
+    "TrustedSigners": {
+      "Enabled": false,
+      "Quantity": 0
+    }
+  },
+  "DefaultRootObject": "index.html",
+  "PriceClass": "PriceClass_100"
+}
+EOF
+
+# Create distribution with custom origin (ALB/EC2)
+cat > custom-origin-config.json <<'EOF'
+{
+  "CallerReference": "alb-distribution-2026-02-08",
+  "Comment": "ALB Origin Distribution",
+  "Enabled": true,
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "ALB-origin",
+        "DomainName": "my-alb-123456.us-east-1.elb.amazonaws.com",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "https-only",
+          "OriginSslProtocols": {
+            "Quantity": 3,
+            "Items": ["TLSv1.2", "TLSv1.1", "TLSv1"]
+          },
+          "OriginReadTimeout": 30,
+          "OriginKeepaliveTimeout": 5
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "ALB-origin",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 7,
+      "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "MinTTL": 0,
+    "DefaultTTL": 0,
+    "MaxTTL": 0,
+    "ForwardedValues": {
+      "QueryString": true,
+      "Headers": {
+        "Quantity": 3,
+        "Items": ["Host", "Authorization", "CloudFront-Forwarded-Proto"]
+      },
+      "Cookies": {
+        "Forward": "all"
+      }
+    }
+  },
+  "PriceClass": "PriceClass_All"
+}
+EOF
+
+aws cloudfront create-distribution \
+  --distribution-config file://custom-origin-config.json
+```
+
+### Update CloudFront Distribution
+
+```bash
+# Get current distribution config
+aws cloudfront get-distribution-config \
+  --id E1234567890ABC \
+  --output json > current-config.json
+
+# Extract ETag for update
+ETAG=$(aws cloudfront get-distribution-config \
+  --id E1234567890ABC \
+  --query 'ETag' \
+  --output text)
+
+# Edit the configuration (modify current-config.json)
+# Then update the distribution
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config file://current-config.json \
+  --if-match $ETAG
+
+# Enable/disable distribution
+aws cloudfront get-distribution-config \
+  --id E1234567890ABC > config.json
+
+# Modify Enabled field in config.json to true/false
+jq '.DistributionConfig.Enabled = false' config.json > updated-config.json
+
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config file://updated-config.json \
+  --if-match $(aws cloudfront get-distribution-config --id E1234567890ABC --query 'ETag' --output text)
+```
+
+### Create Cache Invalidation
+
+```bash
+# Invalidate all objects
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --paths "/*"
+
+# Invalidate specific paths
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --paths "/images/*" "/css/*" "/js/app.js"
+
+# Invalidate with caller reference
+aws cloudfront create-invalidation \
+  --distribution-id E1234567890ABC \
+  --invalidation-batch "{\"Paths\":{\"Quantity\":2,\"Items\":[\"/index.html\",\"/about.html\"]},\"CallerReference\":\"invalidation-$(date +%s)\"}"
+
+# Check invalidation status
+aws cloudfront get-invalidation \
+  --distribution-id E1234567890ABC \
+  --id I1234567890ABC
+
+# List invalidations
+aws cloudfront list-invalidations \
+  --distribution-id E1234567890ABC
+```
+
+### Origin Groups and Failover
+
+```bash
+# Create distribution with origin group for failover
+cat > origin-group-config.json <<'EOF'
+{
+  "CallerReference": "origin-group-2026-02-08",
+  "Comment": "Distribution with Origin Failover",
+  "Enabled": true,
+  "Origins": {
+    "Quantity": 2,
+    "Items": [
+      {
+        "Id": "primary-origin",
+        "DomainName": "primary.example.com",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "https-only"
+        }
+      },
+      {
+        "Id": "secondary-origin",
+        "DomainName": "secondary.example.com",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "https-only"
+        }
+      }
+    ]
+  },
+  "OriginGroups": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "origin-group-1",
+        "FailoverCriteria": {
+          "StatusCodes": {
+            "Quantity": 4,
+            "Items": [500, 502, 503, 504]
+          }
+        },
+        "Members": {
+          "Quantity": 2,
+          "Items": [
+            {"OriginId": "primary-origin"},
+            {"OriginId": "secondary-origin"}
+          ]
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "origin-group-1",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "MinTTL": 0,
+    "ForwardedValues": {
+      "QueryString": false,
+      "Cookies": {"Forward": "none"}
+    }
+  },
+  "PriceClass": "PriceClass_All"
+}
+EOF
+
+aws cloudfront create-distribution \
+  --distribution-config file://origin-group-config.json
+```
+
+### Cache Behaviors
+
+```bash
+# Add custom cache behavior for API paths
+# First get current config
+aws cloudfront get-distribution-config \
+  --id E1234567890ABC > current-dist-config.json
+
+# Extract the DistributionConfig and add CacheBehaviors
+# Example: Add behavior for /api/* path pattern
+cat > cache-behavior.json <<'EOF'
+{
+  "PathPattern": "/api/*",
+  "TargetOriginId": "ALB-origin",
+  "ViewerProtocolPolicy": "https-only",
+  "AllowedMethods": {
+    "Quantity": 7,
+    "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+    "CachedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"]
+    }
+  },
+  "MinTTL": 0,
+  "DefaultTTL": 0,
+  "MaxTTL": 0,
+  "ForwardedValues": {
+    "QueryString": true,
+    "Headers": {
+      "Quantity": 1,
+      "Items": ["*"]
+    },
+    "Cookies": {
+      "Forward": "all"
+    }
+  }
+}
+EOF
+
+# Manually add this to CacheBehaviors in distribution config and update
+```
+
+### Field-Level Encryption
+
+```bash
+# Create field-level encryption profile
+aws cloudfront create-field-level-encryption-profile \
+  --field-level-encryption-profile-config file://fle-profile-config.json
+
+# Example fle-profile-config.json
+cat > fle-profile-config.json <<'EOF'
+{
+  "Name": "CreditCardEncryption",
+  "CallerReference": "fle-profile-2026-02-08",
+  "Comment": "Encrypt credit card fields",
+  "EncryptionEntities": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "PublicKeyId": "K1234567890ABC",
+        "ProviderId": "MyProvider",
+        "FieldPatterns": {
+          "Quantity": 2,
+          "Items": ["cardNumber", "cvv"]
+        }
+      }
+    ]
+  }
+}
+EOF
+
+# Create field-level encryption config
+aws cloudfront create-field-level-encryption-config \
+  --field-level-encryption-config file://fle-config.json
+```
+
+### Lambda@Edge Functions
+
+```bash
+# Create Lambda function for Lambda@Edge
+aws lambda create-function \
+  --function-name cloudfront-viewer-request \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::123456789012:role/lambda-edge-role \
+  --handler index.handler \
+  --zip-file fileb://function.zip \
+  --region us-east-1
+
+# Publish Lambda version (required for Lambda@Edge)
+VERSION=$(aws lambda publish-version \
+  --function-name cloudfront-viewer-request \
+  --region us-east-1 \
+  --query 'Version' \
+  --output text)
+
+echo "Published version: $VERSION"
+
+# Get Lambda function ARN with version
+LAMBDA_ARN="arn:aws:lambda:us-east-1:123456789012:function:cloudfront-viewer-request:$VERSION"
+
+# Add Lambda@Edge association to distribution (update distribution config)
+# Add this to DefaultCacheBehavior or CacheBehaviors:
+# "LambdaFunctionAssociations": {
+#   "Quantity": 1,
+#   "Items": [
+#     {
+#       "LambdaFunctionARN": "arn:aws:lambda:us-east-1:123456789012:function:cloudfront-viewer-request:1",
+#       "EventType": "viewer-request",
+#       "IncludeBody": false
+#     }
+#   ]
+# }
+
+# List Lambda@Edge replicas
+aws lambda list-functions \
+  --function-version ALL \
+  --region us-east-1 \
+  --query 'Functions[?starts_with(FunctionName, `us-east-1.cloudfront-viewer-request`)]'
+```
+
+### CloudFront Functions
+
+```bash
+# Create CloudFront Function
+aws cloudfront create-function \
+  --name my-viewer-request-function \
+  --function-config Comment="Add security headers",Runtime=cloudfront-js-1.0 \
+  --function-code fileb://function.js
+
+# Example function.js
+cat > function.js <<'EOF'
+function handler(event) {
+    var response = event.response;
+    var headers = response.headers;
+    
+    // Add security headers
+    headers['strict-transport-security'] = { value: 'max-age=31536000; includeSubdomains; preload'};
+    headers['x-content-type-options'] = { value: 'nosniff'};
+    headers['x-frame-options'] = {value: 'DENY'};
+    headers['x-xss-protection'] = {value: '1; mode=block'};
+    
+    return response;
+}
+EOF
+
+# Publish function
+aws cloudfront publish-function \
+  --name my-viewer-request-function \
+  --if-match ETAGVALUE
+
+# Test function
+aws cloudfront test-function \
+  --name my-viewer-request-function \
+  --if-match ETAGVALUE \
+  --event-object fileb://test-event.json
+
+# Describe function
+aws cloudfront describe-function \
+  --name my-viewer-request-function
+
+# Associate function with distribution (add to distribution config)
+# "FunctionAssociations": {
+#   "Quantity": 1,
+#   "Items": [
+#     {
+#       "FunctionARN": "arn:aws:cloudfront::123456789012:function/my-viewer-request-function",
+#       "EventType": "viewer-request"
+#     }
+#   ]
+# }
+```
+
+### Access Logs Configuration
+
+```bash
+# Enable access logs (update distribution config)
+cat > logging-config.json <<'EOF'
+{
+  "Enabled": true,
+  "IncludeCookies": false,
+  "Bucket": "my-cloudfront-logs.s3.amazonaws.com",
+  "Prefix": "cloudfront/production/"
+}
+EOF
+
+# Add Logging section to distribution config and update
+aws cloudfront get-distribution-config --id E1234567890ABC > config.json
+
+# Edit config.json to add Logging configuration
+# Then update distribution
+ETAG=$(aws cloudfront get-distribution-config --id E1234567890ABC --query 'ETag' --output text)
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config file://config.json \
+  --if-match $ETAG
+```
+
+### Real-Time Logs
+
+```bash
+# Create real-time log config
+aws cloudfront create-realtime-log-config \
+  --name production-realtime-logs \
+  --end-points file://endpoints.json \
+  --fields timestamp c-ip cs-uri-stem sc-status cs-method cs-protocol cs-host cs-bytes time-taken x-edge-location x-edge-request-id \
+  --sampling-rate 100
+
+# Example endpoints.json for Kinesis Data Stream
+cat > endpoints.json <<'EOF'
+[
+  {
+    "StreamType": "Kinesis",
+    "KinesisStreamConfig": {
+      "RoleARN": "arn:aws:iam::123456789012:role/CloudFrontRealtimeLogRole",
+      "StreamARN": "arn:aws:kinesis:us-east-1:123456789012:stream/cloudfront-logs"
+    }
+  }
+]
+EOF
+
+# Get real-time log config
+aws cloudfront get-realtime-log-config \
+  --name production-realtime-logs
+
+# Update real-time log config
+aws cloudfront update-realtime-log-config \
+  --name production-realtime-logs \
+  --sampling-rate 50 \
+  --end-points file://endpoints.json \
+  --fields timestamp c-ip sc-status
+
+# Delete real-time log config
+aws cloudfront delete-realtime-log-config \
+  --name production-realtime-logs
+```
+
+### Origin Request Policies
+
+```bash
+# Create origin request policy
+aws cloudfront create-origin-request-policy \
+  --origin-request-policy-config file://origin-request-policy.json
+
+# Example origin-request-policy.json
+cat > origin-request-policy.json <<'EOF'
+{
+  "Name": "CustomOriginRequestPolicy",
+  "Comment": "Forward all headers except Host",
+  "HeadersConfig": {
+    "HeaderBehavior": "allExcept",
+    "Headers": {
+      "Quantity": 1,
+      "Items": ["Host"]
+    }
+  },
+  "CookiesConfig": {
+    "CookieBehavior": "all"
+  },
+  "QueryStringsConfig": {
+    "QueryStringBehavior": "all"
+  }
+}
+EOF
+
+# List origin request policies
+aws cloudfront list-origin-request-policies
+
+# Get origin request policy
+aws cloudfront get-origin-request-policy \
+  --id 12345678-1234-1234-1234-123456789012
+
+# Delete origin request policy
+aws cloudfront delete-origin-request-policy \
+  --id 12345678-1234-1234-1234-123456789012 \
+  --if-match ETAGVALUE
+```
+
+### Cache Policies
+
+```bash
+# Create cache policy
+aws cloudfront create-cache-policy \
+  --cache-policy-config file://cache-policy.json
+
+# Example cache-policy.json
+cat > cache-policy.json <<'EOF'
+{
+  "Name": "CustomCachePolicy",
+  "Comment": "Cache policy for API responses",
+  "DefaultTTL": 86400,
+  "MaxTTL": 31536000,
+  "MinTTL": 1,
+  "ParametersInCacheKeyAndForwardedToOrigin": {
+    "EnableAcceptEncodingGzip": true,
+    "EnableAcceptEncodingBrotli": true,
+    "HeadersConfig": {
+      "HeaderBehavior": "whitelist",
+      "Headers": {
+        "Quantity": 2,
+        "Items": ["Authorization", "CloudFront-Viewer-Country"]
+      }
+    },
+    "CookiesConfig": {
+      "CookieBehavior": "none"
+    },
+    "QueryStringsConfig": {
+      "QueryStringBehavior": "whitelist",
+      "QueryStrings": {
+        "Quantity": 2,
+        "Items": ["id", "category"]
+      }
+    }
+  }
+}
+EOF
+
+# List cache policies
+aws cloudfront list-cache-policies
+
+# Get cache policy
+aws cloudfront get-cache-policy \
+  --id 12345678-1234-1234-1234-123456789012
+
+# Update cache policy
+ETAG=$(aws cloudfront get-cache-policy --id 12345678-1234-1234-1234-123456789012 --query 'ETag' --output text)
+aws cloudfront update-cache-policy \
+  --id 12345678-1234-1234-1234-123456789012 \
+  --cache-policy-config file://cache-policy.json \
+  --if-match $ETAG
+
+# Delete cache policy
+aws cloudfront delete-cache-policy \
+  --id 12345678-1234-1234-1234-123456789012 \
+  --if-match $ETAG
+```
+
+### List and Describe Distributions
+
+```bash
+# List all distributions
+aws cloudfront list-distributions
+
+# List distributions with formatted output
+aws cloudfront list-distributions \
+  --query 'DistributionList.Items[*].[Id,DomainName,Status,Enabled]' \
+  --output table
+
+# Get distribution details
+aws cloudfront get-distribution \
+  --id E1234567890ABC
+
+# Get distribution configuration
+aws cloudfront get-distribution-config \
+  --id E1234567890ABC
+```
+
+### Origin Access Control (OAC)
+
+```bash
+# Create Origin Access Control
+aws cloudfront create-origin-access-control \
+  --origin-access-control-config file://oac-config.json
+
+# Example oac-config.json
+cat > oac-config.json <<'EOF'
+{
+  "Name": "my-s3-oac",
+  "Description": "OAC for S3 bucket access",
+  "SigningProtocol": "sigv4",
+  "SigningBehavior": "always",
+  "OriginAccessControlOriginType": "s3"
+}
+EOF
+
+# List Origin Access Controls
+aws cloudfront list-origin-access-controls
+
+# Get Origin Access Control
+aws cloudfront get-origin-access-control \
+  --id E1234567890ABC
+```
+
+### Delete Distribution
+
+```bash
+# Disable distribution first
+aws cloudfront get-distribution-config --id E1234567890ABC > config.json
+jq '.DistributionConfig.Enabled = false' config.json > disabled-config.json
+
+ETAG=$(aws cloudfront get-distribution-config --id E1234567890ABC --query 'ETag' --output text)
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config file://disabled-config.json \
+  --if-match $ETAG
+
+# Wait for distribution to be disabled
+aws cloudfront wait distribution-deployed --id E1234567890ABC
+
+# Delete distribution
+ETAG=$(aws cloudfront get-distribution --id E1234567890ABC --query 'ETag' --output text)
+aws cloudfront delete-distribution \
+  --id E1234567890ABC \
+  --if-match $ETAG
+```
+
+### Monitoring with CloudWatch
+
+```bash
+# Get CloudFront metrics via CloudWatch
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/CloudFront \
+  --metric-name Requests \
+  --dimensions Name=DistributionId,Value=E1234567890ABC \
+  --start-time 2026-02-07T00:00:00Z \
+  --end-time 2026-02-08T00:00:00Z \
+  --period 3600 \
+  --statistics Sum
+
+# Get error rate
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/CloudFront \
+  --metric-name ErrorRate \
+  --dimensions Name=DistributionId,Value=E1234567890ABC \
+  --start-time 2026-02-07T00:00:00Z \
+  --end-time 2026-02-08T00:00:00Z \
+  --period 300 \
+  --statistics Average
+
+# Get bytes downloaded
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/CloudFront \
+  --metric-name BytesDownloaded \
+  --dimensions Name=DistributionId,Value=E1234567890ABC \
+  --start-time 2026-02-07T00:00:00Z \
+  --end-time 2026-02-08T00:00:00Z \
+  --period 3600 \
+  --statistics Sum
+```
+
+---
 
 ## Best Practices
 

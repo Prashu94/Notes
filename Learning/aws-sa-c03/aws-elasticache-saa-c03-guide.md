@@ -16,8 +16,9 @@
 13. [Cost Optimization](#cost-optimization)
 14. [Best Practices](#best-practices)
 15. [Common Use Cases](#common-use-cases)
-16. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-17. [Practice Questions](#practice-questions)
+16. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+17. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
+18. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1188,6 +1189,533 @@ views = cache.hgetall('pageviews:2024-01-15')
 - "Automatic failover" → **Redis Multi-AZ**
 - "Session storage (HA)" → **Redis**
 - "Simple key-value" → **Memcached**
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing Amazon ElastiCache clusters, replication groups, and related resources.
+
+### Prerequisites
+
+```bash
+# Install or update AWS CLI
+# macOS/Linux
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+
+# Configure AWS CLI
+aws configure
+# Enter: AWS Access Key ID, Secret Access Key, Default region, Output format (json)
+```
+
+### Create Redis Clusters
+
+```bash
+# Create a Redis cluster (single node, no replication)
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --engine redis \
+  --cache-node-type cache.t3.micro \
+  --num-cache-nodes 1 \
+  --engine-version 7.0 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+
+# Create Redis cluster with specific parameter group
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-redis-custom \
+  --engine redis \
+  --cache-node-type cache.r6g.large \
+  --num-cache-nodes 1 \
+  --engine-version 7.0 \
+  --cache-parameter-group-name my-redis-params \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --notification-topic-arn arn:aws:sns:us-east-1:123456789012:elasticache-events
+
+# Create Redis cluster with encryption
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-redis-encrypted \
+  --engine redis \
+  --cache-node-type cache.t3.small \
+  --num-cache-nodes 1 \
+  --engine-version 7.0 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --at-rest-encryption-enabled \
+  --transit-encryption-enabled \
+  --auth-token "MySecureRedisPassword123!"
+```
+
+### Create Memcached Clusters
+
+```bash
+# Create a Memcached cluster
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-memcached-cluster \
+  --engine memcached \
+  --cache-node-type cache.t3.micro \
+  --num-cache-nodes 2 \
+  --az-mode cross-az \
+  --engine-version 1.6.17 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0
+
+# Create Memcached cluster with Auto Discovery
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-memcached-autodiscovery \
+  --engine memcached \
+  --cache-node-type cache.r6g.large \
+  --num-cache-nodes 3 \
+  --az-mode cross-az \
+  --preferred-availability-zones us-east-1a us-east-1b us-east-1c \
+  --engine-version 1.6.17 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --tags Key=Environment,Value=Production
+```
+
+### Replication Groups (Redis)
+
+```bash
+# Create Redis replication group with cluster mode disabled
+aws elasticache create-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --replication-group-description "Production Redis with replication" \
+  --engine redis \
+  --cache-node-type cache.r6g.large \
+  --num-cache-clusters 3 \
+  --automatic-failover-enabled \
+  --multi-az-enabled \
+  --engine-version 7.0 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --preferred-cache-cluster-a-zs us-east-1a us-east-1b us-east-1c \
+  --snapshot-retention-limit 7 \
+  --snapshot-window "03:00-05:00" \
+  --preferred-maintenance-window "sun:05:00-sun:07:00"
+
+# Create Redis replication group with cluster mode enabled (sharding)
+aws elasticache create-replication-group \
+  --replication-group-id my-redis-sharded \
+  --replication-group-description "Redis cluster mode enabled" \
+  --engine redis \
+  --cache-node-type cache.r6g.xlarge \
+  --num-node-groups 3 \
+  --replicas-per-node-group 2 \
+  --automatic-failover-enabled \
+  --multi-az-enabled \
+  --engine-version 7.0 \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --cache-parameter-group-name default.redis7.cluster.on
+
+# Create replication group with encryption and Auth Token
+aws elasticache create-replication-group \
+  --replication-group-id my-redis-secure \
+  --replication-group-description "Secure Redis with encryption" \
+  --engine redis \
+  --cache-node-type cache.t3.medium \
+  --num-cache-clusters 2 \
+  --automatic-failover-enabled \
+  --engine-version 7.0 \
+  --at-rest-encryption-enabled \
+  --transit-encryption-enabled \
+  --auth-token "MyVerySecurePassword123!@#" \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0 \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Describe replication groups
+aws elasticache describe-replication-groups
+
+# Describe specific replication group
+aws elasticache describe-replication-groups \
+  --replication-group-id my-redis-repgroup
+```
+
+### Parameter Groups
+
+```bash
+# Create Redis parameter group
+aws elasticache create-cache-parameter-group \
+  --cache-parameter-group-name my-redis-params \
+  --cache-parameter-group-family redis7 \
+  --description "Custom Redis 7 parameters"
+
+# Create Memcached parameter group
+aws elasticache create-cache-parameter-group \
+  --cache-parameter-group-name my-memcached-params \
+  --cache-parameter-group-family memcached1.6 \
+  --description "Custom Memcached parameters"
+
+# Modify parameter group
+aws elasticache modify-cache-parameter-group \
+  --cache-parameter-group-name my-redis-params \
+  --parameter-name-values \
+    "ParameterName=maxmemory-policy,ParameterValue=allkeys-lru" \
+    "ParameterName=timeout,ParameterValue=300" \
+    "ParameterName=tcp-keepalive,ParameterValue=300"
+
+# Describe parameter groups
+aws elasticache describe-cache-parameter-groups
+
+# Describe parameters in a parameter group
+aws elasticache describe-cache-parameters \
+  --cache-parameter-group-name my-redis-params
+
+# Describe engine default parameters
+aws elasticache describe-engine-default-parameters \
+  --cache-parameter-group-family redis7
+
+# Reset parameter group to defaults
+aws elasticache reset-cache-parameter-group \
+  --cache-parameter-group-name my-redis-params \
+  --reset-all-parameters
+
+# Delete parameter group
+aws elasticache delete-cache-parameter-group \
+  --cache-parameter-group-name my-redis-params
+```
+
+### Subnet Groups
+
+```bash
+# Create cache subnet group
+aws elasticache create-cache-subnet-group \
+  --cache-subnet-group-name my-subnet-group \
+  --cache-subnet-group-description "Subnet group for ElastiCache" \
+  --subnet-ids subnet-0123456789abcdef0 subnet-0123456789abcdef1 subnet-0123456789abcdef2
+
+# Describe subnet groups
+aws elasticache describe-cache-subnet-groups
+
+# Describe specific subnet group
+aws elasticache describe-cache-subnet-groups \
+  --cache-subnet-group-name my-subnet-group
+
+# Modify subnet group
+aws elasticache modify-cache-subnet-group \
+  --cache-subnet-group-name my-subnet-group \
+  --cache-subnet-group-description "Updated description" \
+  --subnet-ids subnet-0123456789abcdef0 subnet-0123456789abcdef1 subnet-0123456789abcdef2 subnet-0123456789abcdef3
+
+# Delete subnet group
+aws elasticache delete-cache-subnet-group \
+  --cache-subnet-group-name my-subnet-group
+```
+
+### Snapshots (Backup and Restore)
+
+```bash
+# Create manual snapshot of a Redis cluster
+aws elasticache create-snapshot \
+  --snapshot-name my-redis-backup-2026-02-08 \
+  --cache-cluster-id my-redis-cluster
+
+# Create snapshot of a replication group
+aws elasticache create-snapshot \
+  --snapshot-name my-repgroup-backup \
+  --replication-group-id my-redis-repgroup
+
+# List all snapshots
+aws elasticache describe-snapshots
+
+# List snapshots for specific cluster
+aws elasticache describe-snapshots \
+  --cache-cluster-id my-redis-cluster
+
+# List snapshots for specific replication group
+aws elasticache describe-snapshots \
+  --replication-group-id my-redis-repgroup
+
+# Copy snapshot to another region
+aws elasticache copy-snapshot \
+  --source-snapshot-name my-redis-backup-2026-02-08 \
+  --target-snapshot-name my-redis-backup-copy \
+  --target-bucket my-s3-bucket-us-west-2 \
+  --region us-west-2
+
+# Restore from snapshot (create new cluster)
+aws elasticache create-cache-cluster \
+  --cache-cluster-id my-restored-redis \
+  --snapshot-name my-redis-backup-2026-02-08 \
+  --cache-node-type cache.r6g.large \
+  --engine redis \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0
+
+# Restore replication group from snapshot
+aws elasticache create-replication-group \
+  --replication-group-id my-restored-repgroup \
+  --replication-group-description "Restored from snapshot" \
+  --snapshot-name my-repgroup-backup \
+  --cache-node-type cache.r6g.large \
+  --engine redis \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0
+
+# Delete snapshot
+aws elasticache delete-snapshot \
+  --snapshot-name my-redis-backup-2026-02-08
+
+# Export snapshot to S3
+aws elasticache copy-snapshot \
+  --source-snapshot-name my-redis-backup \
+  --target-snapshot-name my-redis-export \
+  --target-bucket my-elasticache-backups
+```
+
+### Modify Clusters
+
+```bash
+# Modify cache cluster (scale up node type)
+aws elasticache modify-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --cache-node-type cache.r6g.xlarge \
+  --apply-immediately
+
+# Modify cache cluster (change parameter group)
+aws elasticache modify-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --cache-parameter-group-name my-redis-params \
+  --apply-immediately
+
+# Modify cache cluster (add notification topic)
+aws elasticache modify-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --notification-topic-arn arn:aws:sns:us-east-1:123456789012:elasticache-events \
+  --notification-topic-status active
+
+# Modify replication group
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --replication-group-description "Updated description" \
+  --snapshot-retention-limit 14 \
+  --snapshot-window "02:00-04:00" \
+  --apply-immediately
+
+# Modify replication group (change node type)
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --cache-node-type cache.r6g.2xlarge \
+  --apply-immediately
+
+# Enable encryption in-transit for replication group (requires Redis 6+)
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --transit-encryption-enabled \
+  --transit-encryption-mode preferred \
+  --apply-immediately
+```
+
+### Scaling Operations
+
+```bash
+# Scale Memcached cluster (add nodes)
+aws elasticache modify-cache-cluster \
+  --cache-cluster-id my-memcached-cluster \
+  --num-cache-nodes 4 \
+  --apply-immediately
+
+# Add replica to Redis replication group
+aws elasticache increase-replica-count \
+  --replication-group-id my-redis-repgroup \
+  --new-replica-count 3 \
+  --apply-immediately
+
+# Remove replica from Redis replication group
+aws elasticache decrease-replica-count \
+  --replication-group-id my-redis-repgroup \
+  --new-replica-count 1 \
+  --apply-immediately
+
+# Scale Redis cluster mode enabled (add shards)
+aws elasticache increase-node-groups-in-global-replication-group \
+  --global-replication-group-id my-global-redis \
+  --node-group-count 5 \
+  --apply-immediately
+
+# Modify number of shards in Redis cluster mode
+aws elasticache modify-replication-group-shard-configuration \
+  --replication-group-id my-redis-sharded \
+  --node-group-count 5 \
+  --apply-immediately
+
+# Remove shards from Redis cluster mode
+aws elasticache modify-replication-group-shard-configuration \
+  --replication-group-id my-redis-sharded \
+  --node-group-count 2 \
+  --apply-immediately
+```
+
+### Security Groups
+
+```bash
+# Modify security groups for cache cluster
+aws elasticache modify-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --security-group-ids sg-0123456789abcdef0 sg-0123456789abcdef1 \
+  --apply-immediately
+
+# Modify security groups for replication group
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --security-group-ids sg-0123456789abcdef0 sg-0123456789abcdef1 \
+  --apply-immediately
+
+# Authorize cache security group ingress (EC2-Classic only)
+aws elasticache authorize-cache-security-group-ingress \
+  --cache-security-group-name my-cache-sg \
+  --ec2-security-group-name my-ec2-sg \
+  --ec2-security-group-owner-id 123456789012
+```
+
+### Auth Tokens (Redis)
+
+```bash
+# Create replication group with auth token
+aws elasticache create-replication-group \
+  --replication-group-id my-redis-auth \
+  --replication-group-description "Redis with AUTH" \
+  --engine redis \
+  --cache-node-type cache.t3.medium \
+  --num-cache-clusters 2 \
+  --engine-version 7.0 \
+  --transit-encryption-enabled \
+  --auth-token "MySecurePassword123!@#" \
+  --cache-subnet-group-name my-subnet-group \
+  --security-group-ids sg-0123456789abcdef0
+
+# Modify auth token (rotate password)
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-auth \
+  --auth-token "NewSecurePassword456!@#" \
+  --auth-token-update-strategy ROTATE \
+  --apply-immediately
+
+# Set auth token (Redis 6.0+)
+aws elasticache modify-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --auth-token "MyNewAuthToken789!" \
+  --auth-token-update-strategy SET \
+  --apply-immediately
+```
+
+### Cluster Information and Monitoring
+
+```bash
+# Describe all cache clusters
+aws elasticache describe-cache-clusters
+
+# Describe specific cache cluster with details
+aws elasticache describe-cache-clusters \
+  --cache-cluster-id my-redis-cluster \
+  --show-cache-node-info
+
+# List cache cluster endpoints
+aws elasticache describe-cache-clusters \
+  --cache-cluster-id my-redis-cluster \
+  --show-cache-node-info \
+  --query 'CacheClusters[0].CacheNodes[*].[CacheNodeId,Endpoint.Address,Endpoint.Port]' \
+  --output table
+
+# Get replication group endpoint
+aws elasticache describe-replication-groups \
+  --replication-group-id my-redis-repgroup \
+  --query 'ReplicationGroups[0].[PrimaryEndpoint.Address,PrimaryEndpoint.Port,ReaderEndpoint.Address,ReaderEndpoint.Port]' \
+  --output table
+
+# List all events
+aws elasticache describe-events \
+  --duration 60
+
+# List events for specific cluster
+aws elasticache describe-events \
+  --source-identifier my-redis-cluster \
+  --source-type cache-cluster \
+  --duration 1440
+
+# Test failover (Redis replication group)
+aws elasticache test-failover \
+  --replication-group-id my-redis-repgroup \
+  --node-group-id 0001
+```
+
+### Delete Resources
+
+```bash
+# Delete cache cluster
+aws elasticache delete-cache-cluster \
+  --cache-cluster-id my-redis-cluster
+
+# Delete cache cluster with final snapshot
+aws elasticache delete-cache-cluster \
+  --cache-cluster-id my-redis-cluster \
+  --final-snapshot-identifier my-final-snapshot-2026-02-08
+
+# Delete replication group
+aws elasticache delete-replication-group \
+  --replication-group-id my-redis-repgroup
+
+# Delete replication group with final snapshot
+aws elasticache delete-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --final-snapshot-identifier my-repgroup-final-snapshot
+
+# Delete replication group and all read replicas
+aws elasticache delete-replication-group \
+  --replication-group-id my-redis-repgroup \
+  --retain-primary-cluster false
+```
+
+### Tags Management
+
+```bash
+# Add tags to replication group
+aws elasticache add-tags-to-resource \
+  --resource-name arn:aws:elasticache:us-east-1:123456789012:replicationgroup:my-redis-repgroup \
+  --tags Key=Environment,Value=Production Key=Team,Value=Backend Key=CostCenter,Value=Engineering
+
+# List tags for resource
+aws elasticache list-tags-for-resource \
+  --resource-name arn:aws:elasticache:us-east-1:123456789012:replicationgroup:my-redis-repgroup
+
+# Remove tags from resource
+aws elasticache remove-tags-from-resource \
+  --resource-name arn:aws:elasticache:us-east-1:123456789012:replicationgroup:my-redis-repgroup \
+  --tag-keys Environment Team
+```
+
+### Global Datastore (Redis)
+
+```bash
+# Create global replication group
+aws elasticache create-global-replication-group \
+  --global-replication-group-id-suffix my-global-redis \
+  --primary-replication-group-id my-redis-repgroup \
+  --global-replication-group-description "Global Redis for multi-region"
+
+# Add region to global replication group
+aws elasticache increase-node-groups-in-global-replication-group \
+  --global-replication-group-id my-global-redis \
+  --node-group-count 3 \
+  --apply-immediately
+
+# Describe global replication groups
+aws elasticache describe-global-replication-groups
+
+# Delete global replication group
+aws elasticache delete-global-replication-group \
+  --global-replication-group-id my-global-redis \
+  --retain-primary-replication-group false
+```
 
 ---
 

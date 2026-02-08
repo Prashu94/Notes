@@ -12,7 +12,8 @@
 9. [Best Practices](#best-practices)
 10. [Common Exam Scenarios](#common-exam-scenarios)
 11. [Hands-On Labs](#hands-on-labs)
-12. [Exam Tips and Key Points](#exam-tips-and-key-points)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Exam Tips and Key Points](#exam-tips-and-key-points)
 
 ---
 
@@ -840,6 +841,692 @@ def lambda_handler(event, context):
     }
   ]
 }
+```
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing Amazon EFS resources. These commands are essential for automation, scripting, and operational tasks.
+
+### Prerequisites
+
+Ensure you have the AWS CLI installed and configured:
+
+```bash
+# Install AWS CLI (if not already installed)
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Configure AWS CLI
+aws configure
+
+# Verify installation
+aws --version
+```
+
+### Create File Systems
+
+#### Create a Basic EFS File System
+
+```bash
+# Create a file system with default settings
+aws efs create-file-system \
+  --creation-token my-efs-token-001 \
+  --performance-mode generalPurpose \
+  --throughput-mode bursting \
+  --encrypted \
+  --tags Key=Name,Value=MyEFSFileSystem Key=Environment,Value=Production
+
+# Create a file system with One Zone storage class
+aws efs create-file-system \
+  --creation-token my-onezone-efs-001 \
+  --performance-mode generalPurpose \
+  --throughput-mode bursting \
+  --encrypted \
+  --availability-zone-name us-east-1a \
+  --tags Key=Name,Value=MyOneZoneEFS Key=StorageClass,Value=OneZone
+
+# Create a file system with provisioned throughput
+aws efs create-file-system \
+  --creation-token my-provisioned-efs-001 \
+  --performance-mode generalPurpose \
+  --throughput-mode provisioned \
+  --provisioned-throughput-in-mibps 256 \
+  --encrypted \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --tags Key=Name,Value=MyProvisionedEFS
+
+# Create a file system with Max I/O performance mode
+aws efs create-file-system \
+  --creation-token my-maxio-efs-001 \
+  --performance-mode maxIO \
+  --throughput-mode bursting \
+  --encrypted \
+  --tags Key=Name,Value=MyMaxIOEFS Key=Purpose,Value=HighConcurrency
+```
+
+#### List and Describe File Systems
+
+```bash
+# List all file systems
+aws efs describe-file-systems
+
+# Describe a specific file system
+aws efs describe-file-systems \
+  --file-system-id fs-12345678
+
+# List file systems with specific tags
+aws efs describe-file-systems \
+  --query "FileSystems[?Tags[?Key=='Environment' && Value=='Production']]"
+
+# Get file system ID by creation token
+aws efs describe-file-systems \
+  --creation-token my-efs-token-001 \
+  --query "FileSystems[0].FileSystemId" \
+  --output text
+```
+
+### Mount Targets
+
+#### Create Mount Targets
+
+```bash
+# Create a mount target in a specific subnet
+aws efs create-mount-target \
+  --file-system-id fs-12345678 \
+  --subnet-id subnet-12345678 \
+  --security-groups sg-12345678
+
+# Create mount targets in multiple availability zones
+for subnet in subnet-11111111 subnet-22222222 subnet-33333333; do
+  aws efs create-mount-target \
+    --file-system-id fs-12345678 \
+    --subnet-id $subnet \
+    --security-groups sg-12345678
+done
+
+# Create a mount target with a specific IP address
+aws efs create-mount-target \
+  --file-system-id fs-12345678 \
+  --subnet-id subnet-12345678 \
+  --ip-address 10.0.1.100 \
+  --security-groups sg-12345678
+```
+
+#### List and Describe Mount Targets
+
+```bash
+# List all mount targets for a file system
+aws efs describe-mount-targets \
+  --file-system-id fs-12345678
+
+# Describe a specific mount target
+aws efs describe-mount-targets \
+  --mount-target-id fsmt-12345678
+
+# Get mount target DNS names
+aws efs describe-mount-targets \
+  --file-system-id fs-12345678 \
+  --query "MountTargets[*].{AZ:AvailabilityZoneName,IP:IpAddress,DNS:MountTargetId}" \
+  --output table
+
+# Check mount target availability
+aws efs describe-mount-targets \
+  --file-system-id fs-12345678 \
+  --query "MountTargets[*].{ID:MountTargetId,State:LifeCycleState}" \
+  --output table
+```
+
+#### Delete Mount Targets
+
+```bash
+# Delete a specific mount target
+aws efs delete-mount-target \
+  --mount-target-id fsmt-12345678
+
+# Delete all mount targets for a file system
+for mt_id in $(aws efs describe-mount-targets \
+  --file-system-id fs-12345678 \
+  --query "MountTargets[*].MountTargetId" \
+  --output text); do
+  aws efs delete-mount-target --mount-target-id $mt_id
+  echo "Deleted mount target: $mt_id"
+done
+```
+
+### Access Points
+
+#### Create Access Points
+
+```bash
+# Create a basic access point
+aws efs create-access-point \
+  --file-system-id fs-12345678 \
+  --posix-user Uid=1000,Gid=1000 \
+  --root-directory Path=/data,CreationInfo={OwnerUid=1000,OwnerGid=1000,Permissions=755} \
+  --tags Key=Name,Value=MyAccessPoint
+
+# Create an access point for a specific application
+aws efs create-access-point \
+  --file-system-id fs-12345678 \
+  --posix-user Uid=33,Gid=33,SecondaryGids=100,101 \
+  --root-directory Path=/web/app1,CreationInfo={OwnerUid=33,OwnerGid=33,Permissions=750} \
+  --tags Key=Name,Value=WebApp1 Key=Application,Value=Apache
+
+# Create an access point with client token for idempotency
+aws efs create-access-point \
+  --client-token my-unique-token-001 \
+  --file-system-id fs-12345678 \
+  --posix-user Uid=1001,Gid=1001 \
+  --root-directory Path=/users/john,CreationInfo={OwnerUid=1001,OwnerGid=1001,Permissions=700} \
+  --tags Key=Name,Value=UserJohn Key=Type,Value=UserDirectory
+```
+
+#### List and Describe Access Points
+
+```bash
+# List all access points
+aws efs describe-access-points
+
+# List access points for a specific file system
+aws efs describe-access-points \
+  --file-system-id fs-12345678
+
+# Describe a specific access point
+aws efs describe-access-points \
+  --access-point-id fsap-12345678
+
+# Get access point details in table format
+aws efs describe-access-points \
+  --file-system-id fs-12345678 \
+  --query "AccessPoints[*].{ID:AccessPointId,Path:RootDirectory.Path,State:LifeCycleState}" \
+  --output table
+```
+
+#### Delete Access Points
+
+```bash
+# Delete a specific access point
+aws efs delete-access-point \
+  --access-point-id fsap-12345678
+
+# Delete all access points for a file system
+for ap_id in $(aws efs describe-access-points \
+  --file-system-id fs-12345678 \
+  --query "AccessPoints[*].AccessPointId" \
+  --output text); do
+  aws efs delete-access-point --access-point-id $ap_id
+  echo "Deleted access point: $ap_id"
+done
+```
+
+### Lifecycle Management
+
+#### Configure Lifecycle Policies
+
+```bash
+# Enable transition to Infrequent Access after 30 days
+aws efs put-lifecycle-configuration \
+  --file-system-id fs-12345678 \
+  --lifecycle-policies TransitionToIA=AFTER_30_DAYS
+
+# Enable transition to IA after 7 days
+aws efs put-lifecycle-configuration \
+  --file-system-id fs-12345678 \
+  --lifecycle-policies TransitionToIA=AFTER_7_DAYS
+
+# Enable transition to IA and transition back to Standard
+aws efs put-lifecycle-configuration \
+  --file-system-id fs-12345678 \
+  --lifecycle-policies TransitionToIA=AFTER_30_DAYS,TransitionToPrimaryStorageClass=AFTER_1_ACCESS
+
+# Disable lifecycle management (remove all policies)
+aws efs put-lifecycle-configuration \
+  --file-system-id fs-12345678 \
+  --lifecycle-policies
+```
+
+#### View Lifecycle Configuration
+
+```bash
+# Get lifecycle configuration for a file system
+aws efs describe-lifecycle-configuration \
+  --file-system-id fs-12345678
+
+# Check all file systems with lifecycle policies
+for fs_id in $(aws efs describe-file-systems \
+  --query "FileSystems[*].FileSystemId" \
+  --output text); do
+  echo "File System: $fs_id"
+  aws efs describe-lifecycle-configuration --file-system-id $fs_id
+  echo "---"
+done
+```
+
+### Backup Policy
+
+#### Configure Backup Policies
+
+```bash
+# Enable automatic backups
+aws efs put-backup-policy \
+  --file-system-id fs-12345678 \
+  --backup-policy Status=ENABLED
+
+# Disable automatic backups
+aws efs put-backup-policy \
+  --file-system-id fs-12345678 \
+  --backup-policy Status=DISABLED
+```
+
+#### View Backup Policy
+
+```bash
+# Get backup policy for a file system
+aws efs describe-backup-policy \
+  --file-system-id fs-12345678
+
+# Check backup status for all file systems
+for fs_id in $(aws efs describe-file-systems \
+  --query "FileSystems[*].FileSystemId" \
+  --output text); do
+  echo "File System: $fs_id"
+  aws efs describe-backup-policy --file-system-id $fs_id
+done
+```
+
+### Performance Configuration
+
+#### Update Performance Mode
+
+```bash
+# Note: Performance mode cannot be changed after creation
+# You must create a new file system and migrate data
+
+# Check current performance mode
+aws efs describe-file-systems \
+  --file-system-id fs-12345678 \
+  --query "FileSystems[0].PerformanceMode" \
+  --output text
+```
+
+#### Update Throughput Mode
+
+```bash
+# Change from bursting to provisioned throughput
+aws efs update-file-system \
+  --file-system-id fs-12345678 \
+  --throughput-mode provisioned \
+  --provisioned-throughput-in-mibps 256
+
+# Change from provisioned to bursting throughput
+aws efs update-file-system \
+  --file-system-id fs-12345678 \
+  --throughput-mode bursting
+
+# Increase provisioned throughput
+aws efs update-file-system \
+  --file-system-id fs-12345678 \
+  --provisioned-throughput-in-mibps 512
+
+# Change to elastic throughput (automatic scaling)
+aws efs update-file-system \
+  --file-system-id fs-12345678 \
+  --throughput-mode elastic
+```
+
+### Encryption
+
+#### Encryption Configuration
+
+```bash
+# Note: Encryption cannot be enabled or disabled after file system creation
+# Create an encrypted file system from the start
+
+# Create encrypted file system with default KMS key
+aws efs create-file-system \
+  --creation-token encrypted-efs-001 \
+  --encrypted \
+  --tags Key=Name,Value=EncryptedEFS
+
+# Create encrypted file system with custom KMS key
+aws efs create-file-system \
+  --creation-token encrypted-efs-002 \
+  --encrypted \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --tags Key=Name,Value=CustomKMSEncryptedEFS
+
+# Check encryption status
+aws efs describe-file-systems \
+  --file-system-id fs-12345678 \
+  --query "FileSystems[0].{Encrypted:Encrypted,KMSKeyId:KmsKeyId}" \
+  --output table
+```
+
+### File System Policies
+
+#### Create and Update File System Policies
+
+```bash
+# Create a file system policy (JSON file)
+cat > efs-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": [
+        "elasticfilesystem:ClientMount",
+        "elasticfilesystem:ClientWrite"
+      ],
+      "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-12345678"
+    }
+  ]
+}
+EOF
+
+# Apply the file system policy
+aws efs put-file-system-policy \
+  --file-system-id fs-12345678 \
+  --policy file://efs-policy.json
+
+# Create a policy that enforces encryption in transit
+cat > efs-secure-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "*",
+      "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-12345678",
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+aws efs put-file-system-policy \
+  --file-system-id fs-12345678 \
+  --policy file://efs-secure-policy.json
+
+# Create a policy with access point restrictions
+cat > efs-ap-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/MyApplicationRole"
+      },
+      "Action": "elasticfilesystem:ClientMount",
+      "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-12345678",
+      "Condition": {
+        "StringEquals": {
+          "elasticfilesystem:AccessPointArn": "arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-12345678"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+aws efs put-file-system-policy \
+  --file-system-id fs-12345678 \
+  --policy file://efs-ap-policy.json
+```
+
+#### View and Delete File System Policies
+
+```bash
+# Get the current file system policy
+aws efs describe-file-system-policy \
+  --file-system-id fs-12345678
+
+# Delete a file system policy
+aws efs delete-file-system-policy \
+  --file-system-id fs-12345678
+```
+
+### Replication Configuration
+
+#### Create Replication Configuration
+
+```bash
+# Create a replication configuration to another region
+aws efs create-replication-configuration \
+  --source-file-system-id fs-12345678 \
+  --destinations Region=us-west-2
+
+# Create replication with specific destination settings
+aws efs create-replication-configuration \
+  --source-file-system-id fs-12345678 \
+  --destinations Region=us-west-2,KmsKeyId=arn:aws:kms:us-west-2:123456789012:key/87654321-4321-4321-4321-210987654321,AvailabilityZoneName=us-west-2a
+
+# Create replication with multiple destinations
+aws efs create-replication-configuration \
+  --source-file-system-id fs-12345678 \
+  --destinations \
+    Region=us-west-2 \
+    Region=eu-west-1,KmsKeyId=arn:aws:kms:eu-west-1:123456789012:key/11111111-2222-3333-4444-555555555555
+```
+
+#### View Replication Configuration
+
+```bash
+# Describe replication configuration
+aws efs describe-replication-configurations \
+  --file-system-id fs-12345678
+
+# List all replication configurations
+aws efs describe-replication-configurations
+
+# Check replication status
+aws efs describe-replication-configurations \
+  --file-system-id fs-12345678 \
+  --query "Replications[*].{Source:SourceFileSystemId,Destination:Destinations[0].FileSystemId,Status:Destinations[0].Status}" \
+  --output table
+```
+
+#### Delete Replication Configuration
+
+```bash
+# Delete replication configuration
+aws efs delete-replication-configuration \
+  --source-file-system-id fs-12345678
+```
+
+### Tags Management
+
+#### Add and Update Tags
+
+```bash
+# Add tags to a file system
+aws efs tag-resource \
+  --resource-id fs-12345678 \
+  --tags Key=Environment,Value=Production Key=Project,Value=WebApp Key=CostCenter,Value=Engineering
+
+# Add tags to an access point
+aws efs tag-resource \
+  --resource-id fsap-12345678 \
+  --tags Key=Application,Value=WebServer Key=Owner,Value=TeamA
+
+# Update existing tags
+aws efs tag-resource \
+  --resource-id fs-12345678 \
+  --tags Key=Environment,Value=Staging
+```
+
+#### List Tags
+
+```bash
+# List tags for a file system
+aws efs list-tags-for-resource \
+  --resource-id fs-12345678
+
+# List tags for an access point
+aws efs list-tags-for-resource \
+  --resource-id fsap-12345678
+
+# Filter file systems by tag
+aws efs describe-file-systems \
+  --query "FileSystems[?Tags[?Key=='Environment' && Value=='Production']].{ID:FileSystemId,Name:Name}" \
+  --output table
+```
+
+#### Remove Tags
+
+```bash
+# Remove specific tags from a file system
+aws efs untag-resource \
+  --resource-id fs-12345678 \
+  --tag-keys Environment Project
+
+# Remove all tags (list all keys first)
+TAG_KEYS=$(aws efs list-tags-for-resource \
+  --resource-id fs-12345678 \
+  --query "Tags[*].Key" \
+  --output text)
+
+if [ ! -z "$TAG_KEYS" ]; then
+  aws efs untag-resource \
+    --resource-id fs-12345678 \
+    --tag-keys $TAG_KEYS
+fi
+```
+
+### Delete File Systems
+
+```bash
+# Delete a file system (must delete mount targets first)
+aws efs delete-file-system \
+  --file-system-id fs-12345678
+
+# Complete cleanup script for file system deletion
+FILE_SYSTEM_ID="fs-12345678"
+
+# 1. Delete all access points
+echo "Deleting access points..."
+for ap_id in $(aws efs describe-access-points \
+  --file-system-id $FILE_SYSTEM_ID \
+  --query "AccessPoints[*].AccessPointId" \
+  --output text); do
+  aws efs delete-access-point --access-point-id $ap_id
+  echo "Deleted access point: $ap_id"
+done
+
+# 2. Delete all mount targets
+echo "Deleting mount targets..."
+for mt_id in $(aws efs describe-mount-targets \
+  --file-system-id $FILE_SYSTEM_ID \
+  --query "MountTargets[*].MountTargetId" \
+  --output text); do
+  aws efs delete-mount-target --mount-target-id $mt_id
+  echo "Deleted mount target: $mt_id"
+done
+
+# 3. Wait for mount targets to be deleted
+echo "Waiting for mount targets to be deleted..."
+sleep 30
+
+# 4. Delete the file system
+echo "Deleting file system..."
+aws efs delete-file-system --file-system-id $FILE_SYSTEM_ID
+echo "File system deletion initiated: $FILE_SYSTEM_ID"
+```
+
+### Useful Automation Scripts
+
+#### Monitor File System Metrics
+
+```bash
+#!/bin/bash
+# Monitor EFS file system size and connections
+
+FILE_SYSTEM_ID="fs-12345678"
+REGION="us-east-1"
+
+# Get file system size in bytes
+SIZE_BYTES=$(aws cloudwatch get-metric-statistics \
+  --region $REGION \
+  --namespace AWS/EFS \
+  --metric-name MeteredIOBytes \
+  --dimensions Name=FileSystemId,Value=$FILE_SYSTEM_ID \
+  --start-time $(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum \
+  --query 'Datapoints[0].Sum' \
+  --output text)
+
+# Get client connections
+CONNECTIONS=$(aws cloudwatch get-metric-statistics \
+  --region $REGION \
+  --namespace AWS/EFS \
+  --metric-name ClientConnections \
+  --dimensions Name=FileSystemId,Value=$FILE_SYSTEM_ID \
+  --start-time $(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Average \
+  --query 'Datapoints[0].Average' \
+  --output text)
+
+echo "File System: $FILE_SYSTEM_ID"
+echo "Size (GB): $(echo "scale=2; $SIZE_BYTES / 1073741824" | bc)"
+echo "Client Connections: $CONNECTIONS"
+```
+
+#### Bulk File System Creation
+
+```bash
+#!/bin/bash
+# Create multiple EFS file systems with consistent configuration
+
+ENVIRONMENTS=("dev" "staging" "production")
+REGION="us-east-1"
+KMS_KEY_ID="arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+for env in "${ENVIRONMENTS[@]}"; do
+  echo "Creating EFS for environment: $env"
+  
+  FS_ID=$(aws efs create-file-system \
+    --creation-token "myapp-$env-$(date +%s)" \
+    --performance-mode generalPurpose \
+    --throughput-mode bursting \
+    --encrypted \
+    --kms-key-id $KMS_KEY_ID \
+    --tags Key=Name,Value="MyApp-$env" Key=Environment,Value=$env \
+    --region $REGION \
+    --query 'FileSystemId' \
+    --output text)
+  
+  echo "Created file system: $FS_ID for $env"
+  
+  # Enable lifecycle management
+  aws efs put-lifecycle-configuration \
+    --file-system-id $FS_ID \
+    --lifecycle-policies TransitionToIA=AFTER_30_DAYS \
+    --region $REGION
+  
+  # Enable automatic backups
+  aws efs put-backup-policy \
+    --file-system-id $FS_ID \
+    --backup-policy Status=ENABLED \
+    --region $REGION
+  
+  echo "Configured lifecycle and backup for: $FS_ID"
+  echo "---"
+done
 ```
 
 ---

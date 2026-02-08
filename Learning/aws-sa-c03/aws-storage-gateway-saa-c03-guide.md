@@ -14,7 +14,8 @@
 11. [Cost Optimization](#cost-optimization)
 12. [Exam Tips and Common Scenarios](#exam-tips-and-common-scenarios)
 13. [Hands-on Labs](#hands-on-labs)
-14. [FAQ](#faq)
+14. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+15. [FAQ](#faq)
 
 ---
 
@@ -816,6 +817,756 @@ def process_uploaded_file(bucket, key):
    # Update media server configuration
    # Create backup policies using virtual tapes
    ```
+
+---
+
+## AWS CLI Commands Reference
+
+### Gateway Activation and Setup
+
+#### Activate Gateway
+```bash
+# First, deploy the gateway VM or hardware appliance and obtain activation key
+# Activation key is obtained from gateway's web interface at http://gateway-ip/?activationRegion=us-east-1
+
+# Activate File Gateway
+aws storagegateway activate-gateway \
+  --activation-key ABCDE-12345-FGHIJ-67890-KLMNO \
+  --gateway-name "Production-File-Gateway" \
+  --gateway-timezone "GMT-5:00" \
+  --gateway-region us-east-1 \
+  --gateway-type FILE_S3 \
+  --tags Key=Environment,Value=Production Key=Department,Value=IT
+
+# Activate Volume Gateway (Cached mode)
+aws storagegateway activate-gateway \
+  --activation-key ABCDE-12345-FGHIJ-67890-KLMNO \
+  --gateway-name "Production-Volume-Gateway" \
+  --gateway-timezone "GMT-5:00" \
+  --gateway-region us-east-1 \
+  --gateway-type CACHED \
+  --tags Key=Environment,Value=Production
+
+# Activate Volume Gateway (Stored mode)
+aws storagegateway activate-gateway \
+  --activation-key ABCDE-12345-FGHIJ-67890-KLMNO \
+  --gateway-name "Backup-Volume-Gateway" \
+  --gateway-timezone "GMT-5:00" \
+  --gateway-region us-east-1 \
+  --gateway-type STORED
+
+# Activate Tape Gateway
+aws storagegateway activate-gateway \
+  --activation-key ABCDE-12345-FGHIJ-67890-KLMNO \
+  --gateway-name "Archive-Tape-Gateway" \
+  --gateway-timezone "GMT-5:00" \
+  --gateway-region us-east-1 \
+  --gateway-type VTL \
+  --medium-changer-type STK-L700 \
+  --tape-drive-type IBM-ULT3580-TD5
+```
+
+#### List and Describe Gateways
+```bash
+# List all gateways
+aws storagegateway list-gateways
+
+# List gateways with pagination
+aws storagegateway list-gateways --limit 10
+
+# Describe specific gateway
+aws storagegateway describe-gateway-information \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Get gateway metrics
+aws storagegateway list-local-disks \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+### Local Disks Management
+
+#### Add and Configure Cache
+```bash
+# List available local disks
+aws storagegateway list-local-disks \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Add cache disk (for File Gateway or Cached Volume Gateway)
+aws storagegateway add-cache \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --disk-ids "disk-1234abcd"
+
+# Add upload buffer (for Volume Gateway)
+aws storagegateway add-upload-buffer \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --disk-ids "disk-5678efgh"
+
+# Add working storage (for Stored Volume Gateway)
+aws storagegateway add-working-storage \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --disk-ids "disk-9012ijkl"
+
+# Describe cache status
+aws storagegateway describe-cache \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe upload buffer
+aws storagegateway describe-upload-buffer \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe working storage
+aws storagegateway describe-working-storage \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+### File Gateway Operations
+
+#### Create NFS File Share
+```bash
+# Create NFS file share with default settings
+aws storagegateway create-nfs-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::my-file-gateway-bucket/prefix \
+  --role arn:aws:iam::123456789012:role/StorageGatewayFileShareRole \
+  --default-storage-class S3_STANDARD \
+  --tags Key=Project,Value=FileSharing
+
+# Create NFS file share with specific client access
+aws storagegateway create-nfs-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::my-bucket/data \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --client-list "10.0.1.0/24" "10.0.2.50" \
+  --squash "RootSquash" \
+  --read-only false \
+  --default-storage-class S3_INTELLIGENT_TIERING \
+  --object-acl bucket-owner-full-control
+
+# Create NFS file share with guessed MIME types
+aws storagegateway create-nfs-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::media-bucket \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --guess-mime-type-enabled \
+  --requester-pays false \
+  --file-share-name "MediaShare"
+
+# Create NFS file share with cache refresh settings
+aws storagegateway create-nfs-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::shared-data \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --cache-attributes CacheStaleTimeoutInSeconds=300 \
+  --notification-policy '{"UploadNotificationPolicy":"{\"UploadComplete\":{\"Enabled\":true}}"}'
+```
+
+#### Create SMB File Share
+```bash
+# Create SMB file share with Active Directory authentication
+aws storagegateway create-smb-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::smb-bucket \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --authentication ActiveDirectory \
+  --default-storage-class S3_STANDARD \
+  --object-acl bucket-owner-full-control \
+  --valid-user-list "DOMAIN\\user1" "DOMAIN\\user2" \
+  --tags Key=Protocol,Value=SMB
+
+# Create SMB file share with guest access
+aws storagegateway create-smb-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::guest-bucket \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --authentication GuestAccess \
+  --guess-mime-type-enabled
+
+# Create SMB file share with file share visibility disabled
+aws storagegateway create-smb-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::hidden-share \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --authentication ActiveDirectory \
+  --smb-acl-enabled \
+  --access-based-enumeration \
+  --admin-user-list "DOMAIN\\admin"
+
+# Create SMB file share with case sensitivity
+aws storagegateway create-smb-file-share \
+  --client-token $(uuidgen) \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --location-arn arn:aws:s3:::case-sensitive-share \
+  --role arn:aws:iam::123456789012:role/StorageGatewayRole \
+  --authentication ActiveDirectory \
+  --case-sensitivity CaseSensitive
+```
+
+#### Manage File Shares
+```bash
+# List file shares
+aws storagegateway list-file-shares \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe NFS file share
+aws storagegateway describe-nfs-file-shares \
+  --file-share-arn-list arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678
+
+# Describe SMB file share
+aws storagegateway describe-smb-file-shares \
+  --file-share-arn-list arn:aws:storagegateway:us-east-1:123456789012:share/share-87654321
+
+# Update NFS file share
+aws storagegateway update-nfs-file-share \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678 \
+  --default-storage-class S3_INTELLIGENT_TIERING \
+  --client-list "10.0.0.0/16"
+
+# Update SMB file share
+aws storagegateway update-smb-file-share \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-87654321 \
+  --valid-user-list "DOMAIN\\newuser" \
+  --admin-user-list "DOMAIN\\admin"
+
+# Delete file share
+aws storagegateway delete-file-share \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678 \
+  --force-delete
+
+# Refresh cache for file share
+aws storagegateway refresh-cache \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678 \
+  --folder-list "/" \
+  --recursive
+
+# Notify when upload complete
+aws storagegateway notify-when-uploaded \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678
+```
+
+### Volume Gateway Operations
+
+#### Create Cached Volumes
+```bash
+# Create cached volume
+aws storagegateway create-cached-iscsi-volume \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --volume-size-in-bytes 107374182400 \
+  --snapshot-id snap-1234567890abcdef0 \
+  --target-name "cached-volume-1" \
+  --network-interface-id "10.0.1.100" \
+  --client-token $(uuidgen) \
+  --tags Key=VolumeType,Value=Cached
+
+# Create cached volume without source snapshot
+aws storagegateway create-cached-iscsi-volume \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --volume-size-in-bytes 536870912000 \
+  --target-name "data-volume-01" \
+  --network-interface-id "10.0.1.100" \
+  --client-token $(uuidgen) \
+  --kms-encrypted \
+  --kms-key arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+```
+
+#### Create Stored Volumes
+```bash
+# Create stored volume
+aws storagegateway create-stored-iscsi-volume \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --disk-id "disk-1234abcd" \
+  --preserve-existing-data false \
+  --target-name "stored-volume-1" \
+  --network-interface-id "10.0.1.100" \
+  --tags Key=VolumeType,Value=Stored
+
+# Create stored volume from snapshot
+aws storagegateway create-stored-iscsi-volume \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --disk-id "disk-5678efgh" \
+  --snapshot-id snap-0987654321fedcba0 \
+  --preserve-existing-data false \
+  --target-name "restored-volume" \
+  --network-interface-id "10.0.1.100" \
+  --kms-encrypted
+```
+
+#### Manage Volumes
+```bash
+# List volumes
+aws storagegateway list-volumes \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe cached iSCSI volumes
+aws storagegateway describe-cached-iscsi-volumes \
+  --volume-arns arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+
+# Describe stored iSCSI volumes
+aws storagegateway describe-stored-iscsi-volumes \
+  --volume-arns arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-87654321
+
+# Update volume information
+aws storagegateway update-vtl-device-type \
+  --vtl-device-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/device/vtl-device-12345678 \
+  --device-type "Medium Changer"
+
+# Delete volume
+aws storagegateway delete-volume \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+```
+
+#### Volume Snapshots
+```bash
+# Create snapshot from volume
+aws storagegateway create-snapshot \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678 \
+  --snapshot-description "Daily backup $(date +%Y-%m-%d)" \
+  --tags Key=BackupType,Value=Daily
+
+# Create snapshot from cached volume
+aws storagegateway create-snapshot-from-volume-recovery-point \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678 \
+  --snapshot-description "Recovery point snapshot" \
+  --tags Key=SnapshotType,Value=RecoveryPoint
+
+# List volume recovery points
+aws storagegateway list-volume-recovery-points \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe snapshot schedule
+aws storagegateway describe-snapshot-schedule \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+
+# Update snapshot schedule
+aws storagegateway update-snapshot-schedule \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678 \
+  --start-at 2 \
+  --recurrence-in-hours 24 \
+  --description "Daily snapshot at 2 AM"
+
+# Delete snapshot schedule
+aws storagegateway delete-snapshot-schedule \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+```
+
+### Tape Gateway (VTL) Operations
+
+#### Create Virtual Tapes
+```bash
+# Create single virtual tape
+aws storagegateway create-tapes \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tape-size-in-bytes 107374182400 \
+  --client-token $(uuidgen) \
+  --num-tapes-to-create 1 \
+  --tape-barcode-prefix "TAPE" \
+  --tags Key=TapePool,Value=Production
+
+# Create multiple virtual tapes
+aws storagegateway create-tapes \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tape-size-in-bytes 2199023255552 \
+  --client-token $(uuidgen) \
+  --num-tapes-to-create 10 \
+  --tape-barcode-prefix "PROD" \
+  --kms-encrypted \
+  --kms-key arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --pool-id GLACIER
+
+# Create tapes with WORM protection
+aws storagegateway create-tapes \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tape-size-in-bytes 1099511627776 \
+  --client-token $(uuidgen) \
+  --num-tapes-to-create 5 \
+  --tape-barcode-prefix "WORM" \
+  --worm true \
+  --tags Key=Compliance,Value=Required
+```
+
+#### Manage Virtual Tapes
+```bash
+# List tapes
+aws storagegateway list-tapes
+
+# List tapes for specific gateway
+aws storagegateway list-tapes \
+  --tape-arns arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345
+
+# Describe tapes
+aws storagegateway describe-tapes \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe tape with specific ARN
+aws storagegateway describe-tapes \
+  --tape-arns arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345
+
+# Describe tape archive
+aws storagegateway describe-tape-archives \
+  --tape-arns arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345
+
+# List tape archives
+aws storagegateway list-tape-archives
+
+# Retrieve tape archive
+aws storagegateway retrieve-tape-archive \
+  --tape-arn arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345 \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Retrieve tape recovery point
+aws storagegateway retrieve-tape-recovery-point \
+  --tape-arn arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345 \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Delete tape
+aws storagegateway delete-tape \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tape-arn arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345 \
+  --bypass-governance-retention
+
+# Delete tape archive
+aws storagegateway delete-tape-archive \
+  --tape-arn arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345 \
+  --bypass-governance-retention
+```
+
+#### Tape Pools
+```bash
+# List tape pools
+aws storagegateway list-tape-pools
+
+# Describe tape recovery points
+aws storagegateway describe-tape-recovery-points \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Assign tape pool
+aws storagegateway assign-tape-pool \
+  --tape-arn arn:aws:storagegateway:us-east-1:123456789012:tape/TAPE12345 \
+  --pool-id GLACIER \
+  --bypass-governance-retention
+
+# Create custom tape pool
+aws storagegateway create-tape-pool \
+  --pool-name "CustomArchive" \
+  --storage-class GLACIER \
+  --retention-lock-type GOVERNANCE \
+  --retention-lock-time-in-days 365 \
+  --tags Key=PoolType,Value=LongTermArchive
+```
+
+### Gateway Maintenance
+
+#### Software Updates
+```bash
+# Start gateway software update
+aws storagegateway update-gateway-software-now \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Update maintenance start time
+aws storagegateway update-maintenance-start-time \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --hour-of-day 2 \
+  --minute-of-hour 0 \
+  --day-of-week 0 \
+  --day-of-month 15
+
+# Describe maintenance start time
+aws storagegateway describe-maintenance-start-time \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+#### Gateway Operations
+```bash
+# Shutdown gateway
+aws storagegateway shutdown-gateway \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Start gateway (after shutdown)
+aws storagegateway start-gateway \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Disable gateway
+aws storagegateway disable-gateway \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Delete gateway
+aws storagegateway delete-gateway \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Update gateway information
+aws storagegateway update-gateway-information \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --gateway-name "Updated-Gateway-Name" \
+  --gateway-timezone "GMT-8:00"
+```
+
+### Bandwidth Management
+
+#### Configure Bandwidth Throttling
+```bash
+# Set bandwidth rate limit (in KB/s)
+aws storagegateway update-bandwidth-rate-limit \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --average-upload-rate-limit-in-bits-per-sec 102400000 \
+  --average-download-rate-limit-in-bits-per-sec 204800000
+
+# Set upload limit only
+aws storagegateway update-bandwidth-rate-limit \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --average-upload-rate-limit-in-bits-per-sec 51200000
+
+# Describe bandwidth rate limit
+aws storagegateway describe-bandwidth-rate-limit \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Delete bandwidth rate limit
+aws storagegateway delete-bandwidth-rate-limit \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --bandwidth-type UPLOAD
+
+# Update bandwidth rate limit schedule
+aws storagegateway update-bandwidth-rate-limit-schedule \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --bandwidth-rate-limit-intervals '
+  [
+    {
+      "StartHourOfDay": 8,
+      "StartMinuteOfHour": 0,
+      "EndHourOfDay": 17,
+      "EndMinuteOfHour": 0,
+      "DaysOfWeek": [1,2,3,4,5],
+      "AverageUploadRateLimitInBitsPerSec": 51200000
+    },
+    {
+      "StartHourOfDay": 18,
+      "StartMinuteOfHour": 0,
+      "EndHourOfDay": 6,
+      "EndMinuteOfHour": 0,
+      "DaysOfWeek": [0,1,2,3,4,5,6],
+      "AverageUploadRateLimitInBitsPerSec": 204800000
+    }
+  ]'
+
+# Describe bandwidth rate limit schedule
+aws storagegateway describe-bandwidth-rate-limit-schedule \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+### SMB Settings and Active Directory
+
+#### Join Active Directory Domain
+```bash
+# Join gateway to Active Directory
+aws storagegateway join-domain \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --domain-name "corp.example.com" \
+  --organizational-unit "OU=Gateways,DC=corp,DC=example,DC=com" \
+  --domain-controllers "dc1.corp.example.com" "dc2.corp.example.com" \
+  --user-name "admin" \
+  --password "SecurePassword123" \
+  --timeout-in-seconds 60
+
+# Describe SMB settings
+aws storagegateway describe-smb-settings \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Update SMB security strategy
+aws storagegateway update-smb-security-strategy \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --smb-security-strategy MandatoryEncryption
+
+# Update SMB file share visibility
+aws storagegateway update-smb-file-share-visibility \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --file-shares-visible false
+
+# Set SMB guest password
+aws storagegateway set-smb-guest-password \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --password "GuestPassword123"
+
+# Set local console password
+aws storagegateway set-local-console-password \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --local-console-password "ConsolePassword123"
+```
+
+### CHAP Authentication (iSCSI)
+
+```bash
+# Update CHAP credentials for volume
+aws storagegateway update-chap-credentials \
+  --target-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/target/iqn.1997-05.com.amazon:myvolume \
+  --secret-to-authenticate-initiator "InitiatorSecret123" \
+  --initiator-name "iqn.1991-05.com.microsoft:client1" \
+  --secret-to-authenticate-target "TargetSecret123"
+
+# Describe CHAP credentials
+aws storagegateway describe-chap-credentials \
+  --target-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/target/iqn.1997-05.com.amazon:myvolume
+
+# Delete CHAP credentials
+aws storagegateway delete-chap-credentials \
+  --target-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/target/iqn.1997-05.com.amazon:myvolume \
+  --initiator-name "iqn.1991-05.com.microsoft:client1"
+```
+
+### Monitoring and Metrics
+
+```bash
+# Get CloudWatch metrics for cache hit percentage
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/StorageGateway \
+  --metric-name CacheHitPercent \
+  --dimensions Name=GatewayId,Value=sgw-12345678 Name=GatewayName,Value=Production-Gateway \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z \
+  --period 3600 \
+  --statistics Average
+
+# Get cache used metric
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/StorageGateway \
+  --metric-name CacheUsed \
+  --dimensions Name=GatewayId,Value=sgw-12345678 \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z \
+  --period 3600 \
+  --statistics Average
+
+# Get upload buffer used
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/StorageGateway \
+  --metric-name UploadBufferUsed \
+  --dimensions Name=GatewayId,Value=sgw-12345678 \
+  --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z \
+  --period 3600 \
+  --statistics Average
+
+# Create CloudWatch alarm for cache hit percentage
+aws cloudwatch put-metric-alarm \
+  --alarm-name storage-gateway-low-cache-hit \
+  --alarm-description "Alert when cache hit is below 80%" \
+  --metric-name CacheHitPercent \
+  --namespace AWS/StorageGateway \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 80 \
+  --comparison-operator LessThanThreshold \
+  --dimensions Name=GatewayId,Value=sgw-12345678 \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:storage-alerts
+
+# Create alarm for file uploads
+aws cloudwatch put-metric-alarm \
+  --alarm-name storage-gateway-file-upload-failures \
+  --alarm-description "Alert on file upload failures" \
+  --metric-name FileUploadsFailed \
+  --namespace AWS/StorageGateway \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 1 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --dimensions Name=GatewayId,Value=sgw-12345678 \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:storage-alerts
+```
+
+### Audit and Logging
+
+```bash
+# Enable CloudWatch log group
+aws storagegateway update-gateway-information \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --cloud-watch-log-group-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/storagegateway
+
+# List file system associations (for audit trails)
+aws storagegateway list-file-system-associations \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Describe availability monitor test
+aws storagegateway describe-availability-monitor-test \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Start availability monitor test
+aws storagegateway start-availability-monitor-test \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+### Tags Management
+
+```bash
+# Add tags to gateway
+aws storagegateway add-tags-to-resource \
+  --resource-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tags Key=Environment,Value=Production Key=CostCenter,Value=IT Key=Backup,Value=Daily
+
+# List tags for resource
+aws storagegateway list-tags-for-resource \
+  --resource-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Remove tags from resource
+aws storagegateway remove-tags-from-resource \
+  --resource-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --tag-keys Environment CostCenter
+
+# Add tags to file share
+aws storagegateway add-tags-to-resource \
+  --resource-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-12345678 \
+  --tags Key=Department,Value=Finance Key=DataClassification,Value=Sensitive
+
+# Add tags to volume
+aws storagegateway add-tags-to-resource \
+  --resource-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678 \
+  --tags Key=Application,Value=Database Key=BackupSchedule,Value=Daily
+```
+
+### Automatic Tape Creation
+
+```bash
+# Create automatic tape creation policy
+aws storagegateway update-automatic-tape-creation-policy \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --automatic-tape-creation-rules '
+  [
+    {
+      "TapeBarcodePrefix": "AUTO",
+      "PoolId": "GLACIER",
+      "TapeSizeInBytes": 2199023255552,
+      "MinimumNumTapes": 5,
+      "Worm": false
+    }
+  ]'
+
+# List automatic tape creation policies
+aws storagegateway list-automatic-tape-creation-policies \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+
+# Delete automatic tape creation policy
+aws storagegateway delete-automatic-tape-creation-policy \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678
+```
+
+### VPC Endpoint Configuration
+
+```bash
+# Attach VPC endpoint to gateway
+aws storagegateway attach-volume \
+  --gateway-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678 \
+  --network-interface-id "10.0.1.100" \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+
+# Detach volume
+aws storagegateway detach-volume \
+  --volume-arn arn:aws:storagegateway:us-east-1:123456789012:gateway/sgw-12345678/volume/vol-12345678
+```
 
 ---
 

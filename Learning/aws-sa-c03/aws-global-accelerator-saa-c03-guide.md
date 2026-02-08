@@ -16,7 +16,8 @@
 13. [Global Accelerator vs Application Load Balancer](#global-accelerator-vs-alb)
 14. [Exam Tips for SAA-C03](#exam-tips-for-saa-c03)
 15. [Common Exam Scenarios](#common-exam-scenarios)
-16. [Hands-On Labs](#hands-on-labs)
+16. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+17. [Hands-On Labs](#hands-on-labs)
 
 ---
 
@@ -535,6 +536,421 @@ aws globalaccelerator create-listener \
 - Gradual traffic shifting from 0% to 100%
 - Instant rollback capability
 - Zero-downtime deployments
+
+---
+
+## AWS CLI Commands Reference
+
+### Create Accelerator
+
+```bash
+# Create a standard accelerator
+aws globalaccelerator create-accelerator \
+    --name MyAccelerator \
+    --ip-address-type IPV4 \
+    --enabled \
+    --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+
+# Create accelerator with specific IP addresses (BYOIP)
+aws globalaccelerator create-accelerator \
+    --name CustomIPAccelerator \
+    --ip-addresses 203.0.113.1 203.0.113.2 \
+    --enabled
+
+# Create dual-stack accelerator (IPv4 and IPv6)
+aws globalaccelerator create-accelerator \
+    --name DualStackAccelerator \
+    --ip-address-type DUAL_STACK \
+    --enabled
+
+# Describe accelerators
+aws globalaccelerator list-accelerators
+
+# Describe specific accelerator
+aws globalaccelerator describe-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+
+# Describe accelerator attributes
+aws globalaccelerator describe-accelerator-attributes \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+```
+
+### Update Accelerator Attributes
+
+```bash
+# Enable flow logs
+aws globalaccelerator update-accelerator-attributes \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --flow-logs-enabled \
+    --flow-logs-s3-bucket my-flow-logs-bucket \
+    --flow-logs-s3-prefix globalaccelerator/
+
+# Disable flow logs
+aws globalaccelerator update-accelerator-attributes \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --no-flow-logs-enabled
+
+# Update accelerator name
+aws globalaccelerator update-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --name UpdatedAcceleratorName
+
+# Disable accelerator
+aws globalaccelerator update-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --no-enabled
+
+# Enable accelerator
+aws globalaccelerator update-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --enabled
+```
+
+### Create Listeners
+
+```bash
+# Create TCP listener
+aws globalaccelerator create-listener \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --protocol TCP \
+    --port-ranges FromPort=80,ToPort=80 FromPort=443,ToPort=443 \
+    --client-affinity SOURCE_IP
+
+# Create UDP listener
+aws globalaccelerator create-listener \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --protocol UDP \
+    --port-ranges FromPort=53,ToPort=53 \
+    --client-affinity NONE
+
+# Create listener with port range
+aws globalaccelerator create-listener \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --protocol TCP \
+    --port-ranges FromPort=8000,ToPort=8100 \
+    --client-affinity SOURCE_IP
+
+# List listeners
+aws globalaccelerator list-listeners \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+
+# Describe listener
+aws globalaccelerator describe-listener \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz
+
+# Update listener
+aws globalaccelerator update-listener \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --port-ranges FromPort=80,ToPort=80 FromPort=443,ToPort=443 FromPort=8080,ToPort=8080 \
+    --client-affinity SOURCE_IP
+```
+
+### Create Endpoint Groups
+
+```bash
+# Create endpoint group in us-east-1
+aws globalaccelerator create-endpoint-group \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --endpoint-group-region us-east-1 \
+    --traffic-dial-percentage 100 \
+    --health-check-interval-seconds 30 \
+    --health-check-path "/health" \
+    --health-check-protocol HTTP \
+    --health-check-port 80 \
+    --threshold-count 3
+
+# Create endpoint group with custom health check
+aws globalaccelerator create-endpoint-group \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --endpoint-group-region us-west-2 \
+    --traffic-dial-percentage 50 \
+    --health-check-interval-seconds 10 \
+    --health-check-path "/api/health" \
+    --health-check-protocol HTTPS \
+    --health-check-port 443 \
+    --threshold-count 2
+
+# Create endpoint group with port override
+aws globalaccelerator create-endpoint-group \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --endpoint-group-region eu-west-1 \
+    --port-overrides ListenerPort=80,EndpointPort=8080 ListenerPort=443,EndpointPort=8443
+
+# List endpoint groups
+aws globalaccelerator list-endpoint-groups \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz
+
+# Describe endpoint group
+aws globalaccelerator describe-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34
+
+# Update endpoint group traffic dial
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 75
+```
+
+### Add Endpoints
+
+```bash
+# Add ALB endpoint
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations \
+        EndpointId=arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef,Weight=128,ClientIPPreservationEnabled=true
+
+# Add NLB endpoint
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations \
+        EndpointId=arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/net/my-nlb/abcdef1234567890,Weight=128,ClientIPPreservationEnabled=true
+
+# Add EC2 instance endpoint
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations \
+        EndpointId=i-0a1b2c3d4e5f6g7h8,Weight=128,ClientIPPreservationEnabled=false
+
+# Add Elastic IP endpoint
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations \
+        EndpointId=arn:aws:ec2:us-east-1:123456789012:eip-allocation/eipalloc-0a1b2c3d4e5f6g7h8,Weight=128
+
+# Add multiple endpoints with different weights
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations \
+        EndpointId=arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/alb-1/1234567890abcdef,Weight=200,ClientIPPreservationEnabled=true \
+        EndpointId=arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/alb-2/abcdef1234567890,Weight=56,ClientIPPreservationEnabled=true
+```
+
+### Custom Routing Accelerator
+
+```bash
+# Create custom routing accelerator
+aws globalaccelerator create-custom-routing-accelerator \
+    --name CustomRoutingAccelerator \
+    --ip-address-type IPV4 \
+    --enabled \
+    --tags Key=Type,Value=CustomRouting
+
+# Create custom routing listener
+aws globalaccelerator create-custom-routing-listener \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --port-ranges FromPort=5000,ToPort=10000
+
+# Create custom routing endpoint group
+aws globalaccelerator create-custom-routing-endpoint-group \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --endpoint-group-region us-east-1 \
+    --destination-configurations \
+        FromPort=80,ToPort=80,Protocols=TCP \
+        FromPort=443,ToPort=443,Protocols=TCP
+
+# Add custom routing endpoints
+aws globalaccelerator add-custom-routing-endpoints \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations EndpointId=subnet-0a1b2c3d4e5f6g7h8
+
+# Allow custom routing traffic
+aws globalaccelerator allow-custom-routing-traffic \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-id subnet-0a1b2c3d4e5f6g7h8 \
+    --allow-all-traffic-to-endpoint
+
+# Deny custom routing traffic
+aws globalaccelerator deny-custom-routing-traffic \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-id subnet-0a1b2c3d4e5f6g7h8 \
+    --deny-all-traffic-to-endpoint
+
+# List custom routing accelerators
+aws globalaccelerator list-custom-routing-accelerators
+
+# Describe custom routing accelerator
+aws globalaccelerator describe-custom-routing-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+```
+
+### Client Affinity
+
+```bash
+# Update listener to enable source IP affinity
+aws globalaccelerator update-listener \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --client-affinity SOURCE_IP
+
+# Disable client affinity
+aws globalaccelerator update-listener \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz \
+    --client-affinity NONE
+```
+
+### Health Checks
+
+```bash
+# Update endpoint group health check settings
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --health-check-interval-seconds 10 \
+    --health-check-path "/healthcheck" \
+    --health-check-protocol HTTPS \
+    --health-check-port 443 \
+    --threshold-count 2
+
+# Disable health checks (use for static IP endpoints)
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --health-check-interval-seconds 30 \
+    --threshold-count 3
+```
+
+### Traffic Dials
+
+```bash
+# Set traffic dial to 100% (full traffic)
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 100
+
+# Reduce traffic to 50% (blue/green deployment)
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 50
+
+# Set traffic to 0% (drain traffic)
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 0
+
+# Gradually increase traffic (canary deployment)
+# Start with 10%
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 10
+
+# Then increase to 25%
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --traffic-dial-percentage 25
+```
+
+### Tags Management
+
+```bash
+# Tag accelerator
+aws globalaccelerator tag-resource \
+    --resource-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --tags Key=Environment,Value=Production Key=CostCenter,Value=Engineering Key=Application,Value=WebPortal
+
+# List tags
+aws globalaccelerator list-tags-for-resource \
+    --resource-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+
+# Remove tags
+aws globalaccelerator untag-resource \
+    --resource-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --tag-keys Environment CostCenter
+```
+
+### Monitoring and Metrics
+
+```bash
+# Get CloudWatch metrics for processed bytes
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/GlobalAccelerator \
+    --metric-name ProcessedBytesIn \
+    --dimensions Name=Accelerator,Value=abcd1234-abcd-1234-abcd-1234567890ab \
+    --start-time 2026-02-07T00:00:00Z \
+    --end-time 2026-02-08T00:00:00Z \
+    --period 3600 \
+    --statistics Sum \
+    --unit Bytes
+
+# Get new connections metric
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/GlobalAccelerator \
+    --metric-name NewFlowCount \
+    --dimensions Name=Accelerator,Value=abcd1234-abcd-1234-abcd-1234567890ab \
+    --start-time 2026-02-07T00:00:00Z \
+    --end-time 2026-02-08T00:00:00Z \
+    --period 300 \
+    --statistics Sum
+
+# Create alarm for unhealthy endpoints
+aws cloudwatch put-metric-alarm \
+    --alarm-name global-accelerator-unhealthy-endpoints \
+    --alarm-description "Alert when endpoints are unhealthy" \
+    --metric-name HealthyEndpointCount \
+    --namespace AWS/GlobalAccelerator \
+    --statistic Average \
+    --period 300 \
+    --threshold 1 \
+    --comparison-operator LessThanThreshold \
+    --evaluation-periods 2 \
+    --dimensions Name=Accelerator,Value=abcd1234-abcd-1234-abcd-1234567890ab
+```
+
+### IP Address Management
+
+```bash
+# List IP sets for accelerator
+aws globalaccelerator list-accelerators \
+    --query 'Accelerators[?AcceleratorArn==`arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab`].IpSets'
+
+# Advertise IP addresses (for BYOIP)
+aws globalaccelerator advertise-byoip-cidr \
+    --cidr 203.0.113.0/24
+
+# Withdraw IP advertisement
+aws globalaccelerator withdraw-byoip-cidr \
+    --cidr 203.0.113.0/24
+
+ # Provision BYOIP address range
+aws globalaccelerator provision-byoip-cidr \
+    --cidr 203.0.113.0/24 \
+    --cidr-authorization-context \
+        Message="Authorization message",\
+        Signature="Signature from ROA"
+
+# Deprovision BYOIP
+aws globalaccelerator deprovision-byoip-cidr \
+    --cidr 203.0.113.0/24
+
+# List BYOIP CIDRs
+aws globalaccelerator list-byoip-cidrs
+```
+
+### Delete Resources
+
+```bash
+# Remove endpoint from endpoint group
+aws globalaccelerator update-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34 \
+    --endpoint-configurations []
+
+# Delete endpoint group
+aws globalaccelerator delete-endpoint-group \
+    --endpoint-group-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz/endpoint-group/ab12cd34
+
+# Delete listener
+aws globalaccelerator delete-listener \
+    --listener-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab/listener/0123wxyz
+
+# Delete accelerator (must disable first)
+aws globalaccelerator update-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab \
+    --no-enabled
+
+# Wait for accelerator to be disabled, then delete
+aws globalaccelerator delete-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+
+# Delete custom routing accelerator
+aws globalaccelerator delete-custom-routing-accelerator \
+    --accelerator-arn arn:aws:globalaccelerator::123456789012:accelerator/abcd1234-abcd-1234-abcd-1234567890ab
+```
 
 ---
 

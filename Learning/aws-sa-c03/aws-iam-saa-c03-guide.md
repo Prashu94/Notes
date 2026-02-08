@@ -11,6 +11,7 @@
 8. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
 9. [Common Scenarios and Use Cases](#common-scenarios-and-use-cases)
 10. [Practice Questions](#practice-questions)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
 
 ---
 
@@ -1297,6 +1298,1413 @@ C) Create a separate role for CloudTrail management
 D) Use resource-based policies on CloudTrail
 
 **Answer: B** - Explicit Deny always takes precedence and cannot be overridden.
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing IAM resources. These commands are essential for automation, scripting, and operational tasks.
+
+### Prerequisites
+
+```bash
+# Install AWS CLI (if not already installed)
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Configure AWS CLI with credentials
+aws configure
+# You'll be prompted for:
+# - AWS Access Key ID
+# - AWS Secret Access Key
+# - Default region name
+# - Default output format (json, yaml, text, table)
+
+# Verify configuration
+aws sts get-caller-identity
+```
+
+### User Management
+
+#### Create Users
+
+```bash
+# Create a new IAM user
+aws iam create-user --user-name john-doe
+
+# Create user with tags
+aws iam create-user \
+  --user-name jane-smith \
+  --tags Key=Department,Value=Engineering Key=Team,Value=DevOps
+
+# Create user and set console password
+aws iam create-user --user-name developer1
+aws iam create-login-profile \
+  --user-name developer1 \
+  --password 'TempPassword123!' \
+  --password-reset-required
+```
+
+#### List and Get Users
+
+```bash
+# List all IAM users
+aws iam list-users
+
+# List users with specific output format
+aws iam list-users --output table
+
+# Get specific user details
+aws iam get-user --user-name john-doe
+
+# List users with pagination
+aws iam list-users --max-items 10
+
+# Get current authenticated user
+aws iam get-user
+```
+
+#### Update Users
+
+```bash
+# Change user name
+aws iam update-user \
+  --user-name john-doe \
+  --new-user-name john-smith
+
+# Update user's path (for organizational hierarchy)
+aws iam update-user \
+  --user-name john-smith \
+  --new-path /engineering/developers/
+```
+
+#### Delete Users
+
+```bash
+# Delete login profile (console password)
+aws iam delete-login-profile --user-name john-doe
+
+# Delete access keys first
+aws iam list-access-keys --user-name john-doe
+aws iam delete-access-key \
+  --user-name john-doe \
+  --access-key-id AKIAIOSFODNN7EXAMPLE
+
+# Detach managed policies
+aws iam list-attached-user-policies --user-name john-doe
+aws iam detach-user-policy \
+  --user-name john-doe \
+  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+
+# Delete inline policies
+aws iam list-user-policies --user-name john-doe
+aws iam delete-user-policy \
+  --user-name john-doe \
+  --policy-name MyInlinePolicy
+
+# Remove from groups
+aws iam list-groups-for-user --user-name john-doe
+aws iam remove-user-from-group \
+  --user-name john-doe \
+  --group-name Developers
+
+# Finally, delete the user
+aws iam delete-user --user-name john-doe
+```
+
+### Group Management
+
+#### Create Groups
+
+```bash
+# Create a new group
+aws iam create-group --group-name Developers
+
+# Create group with path
+aws iam create-group \
+  --group-name Admins \
+  --path /privileged/
+```
+
+#### List Groups
+
+```bash
+# List all groups
+aws iam list-groups
+
+# List groups for a specific user
+aws iam list-groups-for-user --user-name john-doe
+
+# Get group details
+aws iam get-group --group-name Developers
+
+# List users in a group
+aws iam get-group --group-name Developers --output json | jq '.Users[].UserName'
+```
+
+#### Manage Group Membership
+
+```bash
+# Add user to group
+aws iam add-user-to-group \
+  --user-name john-doe \
+  --group-name Developers
+
+# Add multiple users to a group (using loop)
+for user in alice bob charlie; do
+  aws iam add-user-to-group --user-name $user --group-name Developers
+done
+
+# Remove user from group
+aws iam remove-user-from-group \
+  --user-name john-doe \
+  --group-name Developers
+```
+
+#### Delete Groups
+
+```bash
+# Remove all users from group first
+aws iam get-group --group-name Developers --query 'Users[].UserName' --output text | \
+  xargs -n 1 -I {} aws iam remove-user-from-group --user-name {} --group-name Developers
+
+# Detach all managed policies
+aws iam list-attached-group-policies --group-name Developers --query 'AttachedPolicies[].PolicyArn' --output text | \
+  xargs -n 1 -I {} aws iam detach-group-policy --group-name Developers --policy-arn {}
+
+# Delete all inline policies
+aws iam list-group-policies --group-name Developers --query 'PolicyNames[]' --output text | \
+  xargs -n 1 -I {} aws iam delete-group-policy --group-name Developers --policy-name {}
+
+# Delete the group
+aws iam delete-group --group-name Developers
+```
+
+### Role Management
+
+#### Create Roles
+
+```bash
+# Create role with trust policy from file
+cat > trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name EC2-S3-Access-Role \
+  --assume-role-policy-document file://trust-policy.json \
+  --description "Allows EC2 instances to access S3 buckets"
+
+# Create role for Lambda
+cat > lambda-trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name Lambda-Execution-Role \
+  --assume-role-policy-document file://lambda-trust-policy.json
+
+# Create cross-account role with external ID
+cat > cross-account-trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "unique-external-id-12345"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name CrossAccountRole \
+  --assume-role-policy-document file://cross-account-trust-policy.json
+
+# Create role with tags
+aws iam create-role \
+  --role-name AppRole \
+  --assume-role-policy-document file://trust-policy.json \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+```
+
+#### List and Get Roles
+
+```bash
+# List all roles
+aws iam list-roles
+
+# List roles with path prefix
+aws iam list-roles --path-prefix /service-role/
+
+# Get specific role
+aws iam get-role --role-name EC2-S3-Access-Role
+
+# List instance profiles
+aws iam list-instance-profiles
+
+# List instance profiles for a role
+aws iam list-instance-profiles-for-role --role-name EC2-S3-Access-Role
+```
+
+#### Assume Role
+
+```bash
+# Assume a role and get temporary credentials
+aws sts assume-role \
+  --role-arn arn:aws:iam::123456789012:role/CrossAccountRole \
+  --role-session-name my-session \
+  --duration-seconds 3600
+
+# Assume role with external ID
+aws sts assume-role \
+  --role-arn arn:aws:iam::123456789012:role/CrossAccountRole \
+  --role-session-name my-session \
+  --external-id unique-external-id-12345
+
+# Assume role with MFA
+aws sts assume-role \
+  --role-arn arn:aws:iam::123456789012:role/AdminRole \
+  --role-session-name admin-session \
+  --serial-number arn:aws:iam::123456789012:mfa/john-doe \
+  --token-code 123456
+
+# Use assumed role credentials (export to environment)
+RESPONSE=$(aws sts assume-role --role-arn arn:aws:iam::123456789012:role/MyRole --role-session-name session1)
+export AWS_ACCESS_KEY_ID=$(echo $RESPONSE | jq -r '.Credentials.AccessKeyId')
+export AWS_SECRET_ACCESS_KEY=$(echo $RESPONSE | jq -r '.Credentials.SecretAccessKey')
+export AWS_SESSION_TOKEN=$(echo $RESPONSE | jq -r '.Credentials.SessionToken')
+```
+
+#### Update Roles
+
+```bash
+# Update role description
+aws iam update-role \
+  --role-name EC2-S3-Access-Role \
+  --description "Updated description for EC2 S3 access"
+
+# Update assume role policy
+aws iam update-assume-role-policy \
+  --role-name EC2-S3-Access-Role \
+  --policy-document file://updated-trust-policy.json
+
+# Update max session duration (1 to 12 hours)
+aws iam update-role \
+  --role-name EC2-S3-Access-Role \
+  --max-session-duration 43200
+```
+
+#### Instance Profiles
+
+```bash
+# Create instance profile
+aws iam create-instance-profile \
+  --instance-profile-name EC2-S3-Instance-Profile
+
+# Add role to instance profile
+aws iam add-role-to-instance-profile \
+  --instance-profile-name EC2-S3-Instance-Profile \
+  --role-name EC2-S3-Access-Role
+
+# Remove role from instance profile
+aws iam remove-role-from-instance-profile \
+  --instance-profile-name EC2-S3-Instance-Profile \
+  --role-name EC2-S3-Access-Role
+
+# Delete instance profile
+aws iam delete-instance-profile \
+  --instance-profile-name EC2-S3-Instance-Profile
+
+# Attach instance profile to EC2 instance
+aws ec2 associate-iam-instance-profile \
+  --instance-id i-1234567890abcdef0 \
+  --iam-instance-profile Name=EC2-S3-Instance-Profile
+```
+
+#### Delete Roles
+
+```bash
+# Remove from instance profiles
+aws iam list-instance-profiles-for-role --role-name MyRole --query 'InstanceProfiles[].InstanceProfileName' --output text | \
+  xargs -n 1 -I {} aws iam remove-role-from-instance-profile --instance-profile-name {} --role-name MyRole
+
+# Detach managed policies
+aws iam list-attached-role-policies --role-name MyRole --query 'AttachedPolicies[].PolicyArn' --output text | \
+  xargs -n 1 -I {} aws iam detach-role-policy --role-name MyRole --policy-arn {}
+
+# Delete inline policies
+aws iam list-role-policies --role-name MyRole --query 'PolicyNames[]' --output text | \
+  xargs -n 1 -I {} aws iam delete-role-policy --role-name MyRole --policy-name {}
+
+# Delete the role
+aws iam delete-role --role-name MyRole
+```
+
+### Policy Management
+
+#### Create Managed Policies
+
+```bash
+# Create a custom managed policy
+cat > my-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::my-bucket/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::my-bucket"
+    }
+  ]
+}
+EOF
+
+aws iam create-policy \
+  --policy-name MyS3AccessPolicy \
+  --policy-document file://my-policy.json \
+  --description "Grants read and write access to my-bucket"
+
+# Create policy with tags
+aws iam create-policy \
+  --policy-name MyTaggedPolicy \
+  --policy-document file://my-policy.json \
+  --tags Key=Environment,Value=Production Key=Team,Value=DevOps
+```
+
+#### List and Get Policies
+
+```bash
+# List all customer managed policies
+aws iam list-policies --scope Local
+
+# List AWS managed policies
+aws iam list-policies --scope AWS
+
+# List all policies
+aws iam list-policies --scope All
+
+# List policies with pagination
+aws iam list-policies --max-items 20
+
+# Get policy details
+aws iam get-policy \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy
+
+# Get specific policy version
+aws iam get-policy-version \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy \
+  --version-id v1
+
+# Get default (active) policy version document
+POLICY_ARN="arn:aws:iam::123456789012:policy/MyS3AccessPolicy"
+VERSION_ID=$(aws iam get-policy --policy-arn $POLICY_ARN --query 'Policy.DefaultVersionId' --output text)
+aws iam get-policy-version --policy-arn $POLICY_ARN --version-id $VERSION_ID
+```
+
+#### Update Policies
+
+```bash
+# Create a new policy version (updates the policy)
+cat > updated-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::my-bucket/*"
+    }
+  ]
+}
+EOF
+
+aws iam create-policy-version \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy \
+  --policy-document file://updated-policy.json \
+  --set-as-default
+
+# List all policy versions
+aws iam list-policy-versions \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy
+
+# Set a specific version as default
+aws iam set-default-policy-version \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy \
+  --version-id v2
+
+# Delete old policy versions (keep only current)
+aws iam list-policy-versions \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy \
+  --query 'Versions[?!IsDefaultVersion].VersionId' \
+  --output text | \
+  xargs -n 1 -I {} aws iam delete-policy-version \
+    --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy \
+    --version-id {}
+```
+
+#### Inline Policies
+
+```bash
+# Put inline policy on user
+cat > user-inline-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ec2:DescribeInstances",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+aws iam put-user-policy \
+  --user-name john-doe \
+  --policy-name EC2ReadOnlyAccess \
+  --policy-document file://user-inline-policy.json
+
+# Put inline policy on group
+aws iam put-group-policy \
+  --group-name Developers \
+  --policy-name DevelopmentResources \
+  --policy-document file://group-inline-policy.json
+
+# Put inline policy on role
+aws iam put-role-policy \
+  --role-name MyRole \
+  --policy-name RoleInlinePolicy \
+  --policy-document file://role-inline-policy.json
+
+# Get inline policy document
+aws iam get-user-policy \
+  --user-name john-doe \
+  --policy-name EC2ReadOnlyAccess
+
+aws iam get-group-policy \
+  --group-name Developers \
+  --policy-name DevelopmentResources
+
+aws iam get-role-policy \
+  --role-name MyRole \
+  --policy-name RoleInlinePolicy
+
+# List inline policies
+aws iam list-user-policies --user-name john-doe
+aws iam list-group-policies --group-name Developers
+aws iam list-role-policies --role-name MyRole
+
+# Delete inline policies
+aws iam delete-user-policy \
+  --user-name john-doe \
+  --policy-name EC2ReadOnlyAccess
+
+aws iam delete-group-policy \
+  --group-name Developers \
+  --policy-name DevelopmentResources
+
+aws iam delete-role-policy \
+  --role-name MyRole \
+  --policy-name RoleInlinePolicy
+```
+
+#### Delete Managed Policies
+
+```bash
+# List all entities attached to the policy
+POLICY_ARN="arn:aws:iam::123456789012:policy/MyS3AccessPolicy"
+
+# Detach from users
+aws iam list-entities-for-policy --policy-arn $POLICY_ARN --entity-filter User --query 'PolicyUsers[].UserName' --output text | \
+  xargs -n 1 -I {} aws iam detach-user-policy --user-name {} --policy-arn $POLICY_ARN
+
+# Detach from groups
+aws iam list-entities-for-policy --policy-arn $POLICY_ARN --entity-filter Group --query 'PolicyGroups[].GroupName' --output text | \
+  xargs -n 1 -I {} aws iam detach-group-policy --group-name {} --policy-arn $POLICY_ARN
+
+# Detach from roles
+aws iam list-entities-for-policy --policy-arn $POLICY_ARN --entity-filter Role --query 'PolicyRoles[].RoleName' --output text | \
+  xargs -n 1 -I {} aws iam detach-role-policy --role-name {} --policy-arn $POLICY_ARN
+
+# Delete all non-default versions
+aws iam list-policy-versions --policy-arn $POLICY_ARN --query 'Versions[?!IsDefaultVersion].VersionId' --output text | \
+  xargs -n 1 -I {} aws iam delete-policy-version --policy-arn $POLICY_ARN --version-id {}
+
+# Delete the policy
+aws iam delete-policy --policy-arn $POLICY_ARN
+```
+
+### Attach and Detach Policies
+
+#### Attach Managed Policies
+
+```bash
+# Attach AWS managed policy to user
+aws iam attach-user-policy \
+  --user-name john-doe \
+  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+
+# Attach custom managed policy to user
+aws iam attach-user-policy \
+  --user-name john-doe \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy
+
+# Attach policy to group
+aws iam attach-group-policy \
+  --group-name Developers \
+  --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+
+# Attach policy to role
+aws iam attach-role-policy \
+  --role-name EC2-S3-Access-Role \
+  --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+# Attach multiple policies to a user
+for policy in arn:aws:iam::aws:policy/ReadOnlyAccess \
+              arn:aws:iam::aws:policy/IAMUserChangePassword; do
+  aws iam attach-user-policy --user-name john-doe --policy-arn $policy
+done
+```
+
+#### List Attached Policies
+
+```bash
+# List managed policies attached to user
+aws iam list-attached-user-policies --user-name john-doe
+
+# List managed policies attached to group
+aws iam list-attached-group-policies --group-name Developers
+
+# List managed policies attached to role
+aws iam list-attached-role-policies --role-name EC2-S3-Access-Role
+
+# List all entities that a policy is attached to
+aws iam list-entities-for-policy \
+  --policy-arn arn:aws:iam::123456789012:policy/MyS3AccessPolicy
+```
+
+#### Detach Managed Policies
+
+```bash
+# Detach policy from user
+aws iam detach-user-policy \
+  --user-name john-doe \
+  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+
+# Detach policy from group
+aws iam detach-group-policy \
+  --group-name Developers \
+  --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+
+# Detach policy from role
+aws iam detach-role-policy \
+  --role-name EC2-S3-Access-Role \
+  --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+# Detach all managed policies from a user
+aws iam list-attached-user-policies --user-name john-doe --query 'AttachedPolicies[].PolicyArn' --output text | \
+  xargs -n 1 -I {} aws iam detach-user-policy --user-name john-doe --policy-arn {}
+```
+
+### Access Keys Management
+
+#### Create Access Keys
+
+```bash
+# Create access key for a user
+aws iam create-access-key --user-name john-doe
+
+# Create access key and save to file
+aws iam create-access-key --user-name john-doe > john-doe-keys.json
+
+# Extract and display keys (save securely!)
+aws iam create-access-key --user-name john-doe | jq -r '.AccessKey | "Access Key ID: \(.AccessKeyId)\nSecret Access Key: \(.SecretAccessKey)"'
+
+# Create access key for current user
+CURRENT_USER=$(aws iam get-user --query 'User.UserName' --output text)
+aws iam create-access-key --user-name $CURRENT_USER
+```
+
+#### List and Get Access Keys
+
+```bash
+# List access keys for a user
+aws iam list-access-keys --user-name john-doe
+
+# List access keys for current user
+aws iam list-access-keys
+
+# Get access key metadata
+aws iam get-access-key-last-used \
+  --access-key-id AKIAIOSFODNN7EXAMPLE
+
+# Find all users with multiple access keys
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  key_count=$(aws iam list-access-keys --user-name $user --query 'length(AccessKeyMetadata)')
+  if [ "$key_count" -gt 1 ]; then
+    echo "User $user has $key_count access keys"
+  fi
+done
+```
+
+#### Update Access Keys
+
+```bash
+# Deactivate an access key
+aws iam update-access-key \
+  --user-name john-doe \
+  --access-key-id AKIAIOSFODNN7EXAMPLE \
+  --status Inactive
+
+# Activate an access key
+aws iam update-access-key \
+  --user-name john-doe \
+  --access-key-id AKIAIOSFODNN7EXAMPLE \
+  --status Active
+
+# Rotate access keys (create new, test, delete old)
+NEW_KEY=$(aws iam create-access-key --user-name john-doe)
+echo "New key created. Test it before deleting the old one."
+echo $NEW_KEY | jq -r '.AccessKey | "Access Key ID: \(.AccessKeyId)\nSecret Access Key: \(.SecretAccessKey)"'
+# After testing, delete old key:
+# aws iam delete-access-key --user-name john-doe --access-key-id OLD_KEY_ID
+```
+
+#### Delete Access Keys
+
+```bash
+# Delete a specific access key
+aws iam delete-access-key \
+  --user-name john-doe \
+  --access-key-id AKIAIOSFODNN7EXAMPLE
+
+# Delete all inactive access keys for a user
+aws iam list-access-keys --user-name john-doe --query 'AccessKeyMetadata[?Status==`Inactive`].AccessKeyId' --output text | \
+  xargs -n 1 -I {} aws iam delete-access-key --user-name john-doe --access-key-id {}
+```
+
+### MFA Device Management
+
+#### Virtual MFA Devices
+
+```bash
+# Create virtual MFA device
+aws iam create-virtual-mfa-device \
+  --virtual-mfa-device-name john-doe-mfa \
+  --outfile john-doe-mfa-qr.png \
+  --bootstrap-method QRCodePNG
+
+# Enable MFA device for user
+# After scanning QR code and getting two consecutive codes from authenticator app:
+aws iam enable-mfa-device \
+  --user-name john-doe \
+  --serial-number arn:aws:iam::123456789012:mfa/john-doe-mfa \
+  --authentication-code-1 123456 \
+  --authentication-code-2 789012
+
+# List MFA devices for user
+aws iam list-mfa-devices --user-name john-doe
+
+# List virtual MFA devices
+aws iam list-virtual-mfa-devices
+```
+
+#### Hardware MFA Devices
+
+```bash
+# Enable hardware MFA device
+aws iam enable-mfa-device \
+  --user-name john-doe \
+  --serial-number GAHT12345678 \
+  --authentication-code-1 123456 \
+  --authentication-code-2 789012
+```
+
+#### Deactivate and Delete MFA
+
+```bash
+# Deactivate MFA device
+aws iam deactivate-mfa-device \
+  --user-name john-doe \
+  --serial-number arn:aws:iam::123456789012:mfa/john-doe-mfa
+
+# Delete virtual MFA device (must be deactivated first)
+aws iam delete-virtual-mfa-device \
+  --serial-number arn:aws:iam::123456789012:mfa/john-doe-mfa
+
+# Resync MFA device (if out of sync)
+aws iam resync-mfa-device \
+  --user-name john-doe \
+  --serial-number arn:aws:iam::123456789012:mfa/john-doe-mfa \
+  --authentication-code-1 123456 \
+  --authentication-code-2 789012
+```
+
+### Password Policy Configuration
+
+```bash
+# Get current password policy
+aws iam get-account-password-policy
+
+# Set custom password policy
+aws iam update-account-password-policy \
+  --minimum-password-length 14 \
+  --require-symbols \
+  --require-numbers \
+  --require-uppercase-characters \
+  --require-lowercase-characters \
+  --allow-users-to-change-password \
+  --max-password-age 90 \
+  --password-reuse-prevention 5 \
+  --hard-expiry
+
+# Set less strict password policy
+aws iam update-account-password-policy \
+  --minimum-password-length 8 \
+  --allow-users-to-change-password \
+  --no-require-symbols \
+  --no-require-numbers
+
+# Delete password policy (revert to defaults)
+aws iam delete-account-password-policy
+```
+
+### User Password Management
+
+```bash
+# Create login profile with password
+aws iam create-login-profile \
+  --user-name john-doe \
+  --password 'TempPassword123!' \
+  --password-reset-required
+
+# Update user password
+aws iam update-login-profile \
+  --user-name john-doe \
+  --password 'NewPassword456!' \
+  --no-password-reset-required
+
+# Get login profile
+aws iam get-login-profile --user-name john-doe
+
+# Delete login profile (removes console access)
+aws iam delete-login-profile --user-name john-doe
+
+# Change your own password (requires old password)
+aws iam change-password \
+  --old-password 'OldPassword123!' \
+  --new-password 'NewPassword456!'
+```
+
+### Service-Linked Roles
+
+```bash
+# List service-linked roles
+aws iam list-roles --path-prefix /aws-service-role/
+
+# Create service-linked role
+aws iam create-service-linked-role \
+  --aws-service-name elasticbeanstalk.amazonaws.com
+
+aws iam create-service-linked-role \
+  --aws-service-name autoscaling.amazonaws.com
+
+# Create service-linked role with custom suffix
+aws iam create-service-linked-role \
+  --aws-service-name autoscaling.amazonaws.com \
+  --custom-suffix my-custom-suffix
+
+# Get service-linked role deletion status
+aws iam get-service-linked-role-deletion-status \
+  --deletion-task-id task-id-from-delete-response
+
+# Delete service-linked role (AWS handles cleanup)
+aws iam delete-service-linked-role \
+  --role-name AWSServiceRoleForAutoScaling
+```
+
+### Permission Boundaries
+
+```bash
+# Create permission boundary policy
+cat > permission-boundary.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:*",
+        "ec2:Describe*",
+        "cloudwatch:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [
+        "iam:*",
+        "organizations:*",
+        "account:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+aws iam create-policy \
+  --policy-name DeveloperBoundary \
+  --policy-document file://permission-boundary.json
+
+# Set permission boundary on user
+aws iam put-user-permissions-boundary \
+  --user-name john-doe \
+  --permissions-boundary arn:aws:iam::123456789012:policy/DeveloperBoundary
+
+# Set permission boundary on role
+aws iam put-role-permissions-boundary \
+  --role-name MyRole \
+  --permissions-boundary arn:aws:iam::123456789012:policy/DeveloperBoundary
+
+# Get user with permission boundary info
+aws iam get-user --user-name john-doe
+
+# Delete permission boundary from user
+aws iam delete-user-permissions-boundary --user-name john-doe
+
+# Delete permission boundary from role
+aws iam delete-role-permissions-boundary --role-name MyRole
+```
+
+### Tags for IAM Resources
+
+```bash
+# Tag a user
+aws iam tag-user \
+  --user-name john-doe \
+  --tags Key=Department,Value=Engineering Key=Environment,Value=Production
+
+# Tag a role
+aws iam tag-role \
+  --role-name MyRole \
+  --tags Key=Application,Value=WebApp Key=CostCenter,Value=12345
+
+# Tag a policy
+aws iam tag-policy \
+  --policy-arn arn:aws:iam::123456789012:policy/MyPolicy \
+  --tags Key=Compliance,Value=SOC2 Key=Owner,Value=SecurityTeam
+
+# List tags for user
+aws iam list-user-tags --user-name john-doe
+
+# List tags for role
+aws iam list-role-tags --role-name MyRole
+
+# List tags for policy
+aws iam list-policy-tags \
+  --policy-arn arn:aws:iam::123456789012:policy/MyPolicy
+
+# Untag resources
+aws iam untag-user \
+  --user-name john-doe \
+  --tag-keys Department Environment
+
+aws iam untag-role \
+  --role-name MyRole \
+  --tag-keys Application CostCenter
+
+aws iam untag-policy \
+  --policy-arn arn:aws:iam::123456789012:policy/MyPolicy \
+  --tag-keys Compliance Owner
+```
+
+### Account Alias
+
+```bash
+# Create account alias (for friendly sign-in URL)
+aws iam create-account-alias --account-alias my-company-name
+
+# List account aliases
+aws iam list-account-aliases
+
+# Delete account alias
+aws iam delete-account-alias --account-alias my-company-name
+
+# Get account sign-in URL
+ALIAS=$(aws iam list-account-aliases --query 'AccountAliases[0]' --output text)
+if [ "$ALIAS" != "None" ]; then
+  echo "Sign-in URL: https://${ALIAS}.signin.aws.amazon.com/console"
+else
+  ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+  echo "Sign-in URL: https://${ACCOUNT_ID}.signin.aws.amazon.com/console"
+fi
+```
+
+### Credential Reports
+
+```bash
+# Generate credential report
+aws iam generate-credential-report
+
+# Get credential report status
+aws iam generate-credential-report --query 'State' --output text
+
+# Download credential report
+aws iam get-credential-report --output text --query 'Content' | base64 --decode > credential-report.csv
+
+# View credential report
+cat credential-report.csv | column -t -s, | less -S
+
+# Analyze credential report (find users with old passwords)
+aws iam get-credential-report --output text --query 'Content' | base64 --decode | \
+  awk -F',' 'NR>1 && $5!="N/A" && $5!="no_information" {print $1, $5}' | \
+  while read user age; do
+    days=$(( ($(date +%s) - $(date -d "$age" +%s)) / 86400 ))
+    if [ $days -gt 90 ]; then
+      echo "User $user has not changed password in $days days"
+    fi
+  done
+
+# Find users without MFA
+aws iam get-credential-report --output text --query 'Content' | base64 --decode | \
+  awk -F',' 'NR>1 && $4=="false" && $8=="true" {print "User without MFA: " $1}'
+```
+
+### Access Analyzer
+
+```bash
+# Create access analyzer
+aws accessanalyzer create-analyzer \
+  --analyzer-name my-account-analyzer \
+  --type ACCOUNT \
+  --tags Key=Environment,Value=Production
+
+# Create organization analyzer (requires AWS Organizations)
+aws accessanalyzer create-analyzer \
+  --analyzer-name my-org-analyzer \
+  --type ORGANIZATION
+
+# List analyzers
+aws accessanalyzer list-analyzers
+
+# Get analyzer details
+aws accessanalyzer get-analyzer \
+  --analyzer-name my-account-analyzer
+
+# List findings
+aws accessanalyzer list-findings \
+  --analyzer-arn arn:aws:access-analyzer:us-east-1:123456789012:analyzer/my-account-analyzer
+
+# List findings with filters
+aws accessanalyzer list-findings \
+  --analyzer-arn arn:aws:access-analyzer:us-east-1:123456789012:analyzer/my-account-analyzer \
+  --filter '{"status": {"eq": ["ACTIVE"]}}'
+
+# Get finding details
+aws accessanalyzer get-finding \
+  --analyzer-arn arn:aws:access-analyzer:us-east-1:123456789012:analyzer/my-account-analyzer \
+  --id finding-id-12345
+
+# Update finding status
+aws accessanalyzer update-findings \
+  --analyzer-arn arn:aws:access-analyzer:us-east-1:123456789012:analyzer/my-account-analyzer \
+  --ids finding-id-12345 \
+  --status ARCHIVED
+
+# Start policy generation
+aws accessanalyzer start-policy-generation \
+  --policy-generation-details '{"principalArn":"arn:aws:iam::123456789012:role/MyRole"}' \
+  --cloud-trail-details '{"accessRole":"arn:aws:iam::123456789012:role/AccessAnalyzerRole","trails":[{"cloudTrailArn":"arn:aws:cloudtrail:us-east-1:123456789012:trail/my-trail"}],"startTime":"2024-01-01T00:00:00Z","endTime":"2024-01-31T23:59:59Z"}'
+
+# Get generated policy
+aws accessanalyzer get-generated-policy \
+  --job-id policy-gen-job-id-12345
+
+# Delete analyzer
+aws accessanalyzer delete-analyzer \
+  --analyzer-name my-account-analyzer
+```
+
+### Policy Simulation
+
+```bash
+# Simulate custom policy
+cat > test-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-bucket/*"
+    }
+  ]
+}
+EOF
+
+aws iam simulate-custom-policy \
+  --policy-input-list file://test-policy.json \
+  --action-names s3:GetObject s3:PutObject \
+  --resource-arns arn:aws:s3:::my-bucket/file.txt
+
+# Simulate principal policy (test user's effective permissions)
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::123456789012:user/john-doe \
+  --action-names s3:GetObject s3:PutObject ec2:DescribeInstances \
+  --resource-arns arn:aws:s3:::my-bucket/file.txt arn:aws:ec2:us-east-1:123456789012:instance/*
+
+# Simulate with context (e.g., IP address condition)
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::123456789012:user/john-doe \
+  --action-names s3:GetObject \
+  --resource-arns arn:aws:s3:::my-bucket/* \
+  --context-entries "ContextKeyName=aws:SourceIp,ContextKeyValues=203.0.113.0,ContextKeyType=ip"
+
+# Simulate with MFA context
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::123456789012:user/john-doe \
+  --action-names iam:DeleteUser \
+  --resource-arns "*" \
+  --context-entries "ContextKeyName=aws:MultiFactorAuthPresent,ContextKeyValues=true,ContextKeyType=boolean"
+
+# Simulate with resource policy
+aws iam simulate-custom-policy \
+  --policy-input-list file://identity-policy.json \
+  --resource-policy file://resource-policy.json \
+  --action-names s3:GetObject \
+  --resource-arns arn:aws:s3:::my-bucket/file.txt
+
+# Simulate permissions boundary effect
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::123456789012:user/john-doe \
+  --permissions-boundary-policy-input-list file://boundary-policy.json \
+  --action-names s3:DeleteBucket ec2:TerminateInstances \
+  --resource-arns "*"
+```
+
+### SAML and OIDC Identity Providers
+
+#### SAML Providers
+
+```bash
+# Create SAML provider
+aws iam create-saml-provider \
+  --saml-metadata-document file://saml-metadata.xml \
+  --name MyCompanySAML
+
+# List SAML providers
+aws iam list-saml-providers
+
+# Get SAML provider details
+aws iam get-saml-provider \
+  --saml-provider-arn arn:aws:iam::123456789012:saml-provider/MyCompanySAML
+
+# Update SAML provider metadata
+aws iam update-saml-provider \
+  --saml-metadata-document file://updated-saml-metadata.xml \
+  --saml-provider-arn arn:aws:iam::123456789012:saml-provider/MyCompanySAML
+
+# Delete SAML provider
+aws iam delete-saml-provider \
+  --saml-provider-arn arn:aws:iam::123456789012:saml-provider/MyCompanySAML
+
+# Create role for SAML federation
+cat > saml-trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:saml-provider/MyCompanySAML"
+      },
+      "Action": "sts:AssumeRoleWithSAML",
+      "Condition": {
+        "StringEquals": {
+          "SAML:aud": "https://signin.aws.amazon.com/saml"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name SAML-Admin-Role \
+  --assume-role-policy-document file://saml-trust-policy.json
+```
+
+#### OIDC Providers
+
+```bash
+# Create OIDC provider (e.g., for GitHub Actions)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+
+# List OIDC providers
+aws iam list-open-id-connect-providers
+
+# Get OIDC provider details
+aws iam get-open-id-connect-provider \
+  --open-id-connect-provider-arn arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com
+
+# Add client ID to OIDC provider
+aws iam add-client-id-to-open-id-connect-provider \
+  --open-id-connect-provider-arn arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com \
+  --client-id my-application
+
+# Remove client ID from OIDC provider
+aws iam remove-client-id-from-open-id-connect-provider \
+  --open-id-connect-provider-arn arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com \
+  --client-id my-application
+
+# Update OIDC provider thumbprint
+aws iam update-open-id-connect-provider-thumbprint \
+  --open-id-connect-provider-arn arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 a031c46782e6e6c662c2c87c76da9aa62ccabd8e
+
+# Delete OIDC provider
+aws iam delete-open-id-connect-provider \
+  --open-id-connect-provider-arn arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com
+
+# Create role for OIDC federation (GitHub Actions example)
+cat > oidc-trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:my-org/my-repo:*"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name GitHubActionsRole \
+  --assume-role-policy-document file://oidc-trust-policy.json
+```
+
+### Account Summary and Statistics
+
+```bash
+# Get account summary
+aws iam get-account-summary
+
+# Get specific metrics from account summary
+aws iam get-account-summary --query 'SummaryMap.{Users:Users,Groups:Groups,Roles:Roles,Policies:Policies}'
+
+# Count resources
+echo "Users: $(aws iam list-users --query 'length(Users)' --output text)"
+echo "Groups: $(aws iam list-groups --query 'length(Groups)' --output text)"
+echo "Roles: $(aws iam list-roles --query 'length(Roles)' --output text)"
+echo "Policies: $(aws iam list-policies --scope Local --query 'length(Policies)' --output text)"
+
+# Get account authorization details (comprehensive dump)
+aws iam get-account-authorization-details > account-authorization-details.json
+
+# Get account authorization details filtered by type
+aws iam get-account-authorization-details --filter User
+aws iam get-account-authorization-details --filter Role
+aws iam get-account-authorization-details --filter Group
+aws iam get-account-authorization-details --filter LocalManagedPolicy
+aws iam get-account-authorization-details --filter AWSManagedPolicy
+```
+
+### Useful Combination Commands
+
+```bash
+# Find all resources with a specific tag
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  tags=$(aws iam list-user-tags --user-name $user --query 'Tags[?Key==`Environment`].Value' --output text)
+  if [ -n "$tags" ]; then
+    echo "User: $user, Environment: $tags"
+  fi
+done
+
+# Audit users without MFA
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  mfa=$(aws iam list-mfa-devices --user-name $user --query 'MFADevices' --output text)
+  if [ -z "$mfa" ]; then
+    echo "WARNING: User $user does not have MFA enabled"
+  fi
+done
+
+# Find inactive access keys (not used in 90+ days)
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  for key in $(aws iam list-access-keys --user-name $user --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+    last_used=$(aws iam get-access-key-last-used --access-key-id $key --query 'AccessKeyLastUsed.LastUsedDate' --output text)
+    if [ "$last_used" != "None" ]; then
+      days_ago=$(( ($(date +%s) - $(date -d "$last_used" +%s)) / 86400 ))
+      if [ $days_ago -gt 90 ]; then
+        echo "User: $user, Key: $key, Last used: $days_ago days ago"
+      fi
+    fi
+  done
+done
+
+# Generate security report
+cat > security-report.sh << 'EOFSCRIPT'
+#!/bin/bash
+echo "=================================="
+echo "IAM Security Report"
+echo "Generated: $(date)"
+echo "=================================="
+echo ""
+echo "Account Summary:"
+aws iam get-account-summary --query 'SummaryMap.{Users:Users,Groups:Groups,Roles:Roles}' --output table
+echo ""
+echo "Users without MFA:"
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  mfa=$(aws iam list-mfa-devices --user-name $user --query 'MFADevices' --output text)
+  if [ -z "$mfa" ]; then
+    echo "  - $user"
+  fi
+done
+echo ""
+echo "Unused Access Keys (90+ days):"
+for user in $(aws iam list-users --query 'Users[].UserName' --output text); do
+  for key in $(aws iam list-access-keys --user-name $user --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+    last_used=$(aws iam get-access-key-last-used --access-key-id $key --query 'AccessKeyLastUsed.LastUsedDate' --output text)
+    if [ "$last_used" != "None" ]; then
+      days=$(( ($(date +%s) - $(date -d "$last_used" +%s)) / 86400 ))
+      if [ $days -gt 90 ]; then
+        echo "  - User: $user, Key: $key ($days days)"
+      fi
+    fi
+  done
+done
+EOFSCRIPT
+chmod +x security-report.sh
+./security-report.sh
+
+# Bulk operations: Create multiple users
+cat > users.txt << 'EOF'
+alice
+bob
+charlie
+diana
+EOF
+
+while read username; do
+  echo "Creating user: $username"
+  aws iam create-user --user-name $username
+  aws iam add-user-to-group --user-name $username --group-name Developers
+  aws iam create-login-profile --user-name $username --password "TempPass123!" --password-reset-required
+done < users.txt
+
+# Export all policies to files
+mkdir -p iam-policies
+for policy_arn in $(aws iam list-policies --scope Local --query 'Policies[].Arn' --output text); do
+  policy_name=$(echo $policy_arn | awk -F'/' '{print $NF}')
+  version_id=$(aws iam get-policy --policy-arn $policy_arn --query 'Policy.DefaultVersionId' --output text)
+  aws iam get-policy-version --policy-arn $policy_arn --version-id $version_id --query 'PolicyVersion.Document' > "iam-policies/${policy_name}.json"
+  echo "Exported: $policy_name"
+done
+```
+
+### Best Practices for CLI Usage
+
+```bash
+# Use profiles for multiple accounts
+aws configure --profile production
+aws configure --profile development
+
+# Use with specific profile
+aws iam list-users --profile production
+
+# Set default region
+aws configure set region us-east-1
+aws configure set region eu-west-1 --profile production
+
+# Use output formats
+aws iam list-users --output json    # Default, programmatic
+aws iam list-users --output yaml    # Human-readable
+aws iam list-users --output table   # Formatted table
+aws iam list-users --output text    # Tab-delimited
+
+# Use JQ for JSON parsing
+aws iam list-users | jq '.Users[] | {name: .UserName, created: .CreateDate}'
+aws iam list-users | jq -r '.Users[].UserName'
+
+# Use query parameter (built-in JMESPath)
+aws iam list-users --query 'Users[].UserName'
+aws iam list-users --query 'Users[?contains(UserName, `admin`)]'
+aws iam list-users --query 'Users[].{Name:UserName,ID:UserId}' --output table
+
+# Dry run and validation
+aws iam create-user --user-name test-user --generate-cli-skeleton
+aws iam create-user --user-name test-user --cli-input-json file://user-config.json
+
+# Debugging
+aws iam list-users --debug 2> debug.log
+aws iam list-users --no-verify-ssl  # For testing only
+
+# Pagination handling
+aws iam list-users --max-items 100 --starting-token $NEXT_TOKEN
+
+# Using environment variables
+export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_OUTPUT=json
+export AWS_PROFILE=production
+```
 
 ---
 

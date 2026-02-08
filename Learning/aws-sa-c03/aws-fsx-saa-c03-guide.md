@@ -12,8 +12,9 @@
 9. [Integration with Other AWS Services](#integration-with-other-aws-services)
 10. [Best Practices](#best-practices)
 11. [SAA-C03 Exam Tips](#saa-c03-exam-tips)
-12. [Common Scenarios](#common-scenarios)
-13. [Practice Questions](#practice-questions)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Common Scenarios](#common-scenarios)
+14. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1480,6 +1481,733 @@ Amazon FSx for OpenZFS provides fully managed file storage built on the OpenZFS 
 - Compliance certifications and standards
 - Audit and monitoring capabilities
 - Data residency and sovereignty
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing all FSx file system types. These commands are essential for automation, deployment, and operational management.
+
+### Prerequisites
+
+```bash
+# Install AWS CLI (if not already installed)
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Configure AWS CLI
+aws configure
+
+# Verify installation and FSx service availability
+aws --version
+aws fsx help
+```
+
+### FSx for Windows File Server
+
+#### Create Windows File Server File Systems
+
+```bash
+# Create a Single-AZ Windows File Server with SSD storage
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 300 \
+  --storage-type SSD \
+  --subnet-ids subnet-12345678 \
+  --windows-configuration \
+    ActiveDirectoryId=d-1234567890,ThroughputCapacity=16,AutomaticBackupRetentionDays=7,DailyAutomaticBackupStartTime=03:00,WeeklyMaintenanceStartTime=1:03:00,DeploymentType=SINGLE_AZ_2,PreferredSubnetId=subnet-12345678 \
+  --tags Key=Name,Value=MyWindowsFS Key=Environment,Value=Production
+
+# Create a Multi-AZ Windows File Server for high availability
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 500 \
+  --storage-type SSD \
+  --subnet-ids subnet-12345678 subnet-87654321 \
+  --security-group-ids sg-12345678 \
+  --windows-configuration \
+    ActiveDirectoryId=d-1234567890,ThroughputCapacity=32,AutomaticBackupRetentionDays=14,DailyAutomaticBackupStartTime=02:00,WeeklyMaintenanceStartTime=7:02:00,DeploymentType=MULTI_AZ_1,PreferredSubnetId=subnet-12345678 \
+  --tags Key=Name,Value=MyHAWindowsFS Key=Tier,Value=Enterprise
+
+# Create Windows File Server with HDD storage (cost-optimized)
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 2000 \
+  --storage-type HDD \
+  --subnet-ids subnet-12345678 \
+  --windows-configuration \
+    ActiveDirectoryId=d-1234567890,ThroughputCapacity=16,DeploymentType=SINGLE_AZ_2,PreferredSubnetId=subnet-12345678 \
+  --tags Key=Name,Value=MyHDDWindowsFS Key=Purpose,Value=Archive
+
+# Create Windows File Server with self-managed Active Directory
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 300 \
+  --storage-type SSD \
+  --subnet-ids subnet-12345678 \
+  --windows-configuration '
+    ThroughputCapacity=16,
+    SelfManagedActiveDirectoryConfiguration={
+      DomainName="corp.example.com",
+      OrganizationalUnitDistinguishedName="OU=Computers,DC=corp,DC=example,DC=com",
+      FileSystemAdministratorsGroup="FSAdmins",
+      UserName="Admin",
+      Password="YourSecurePassword123!",
+      DnsIps=["10.0.1.10","10.0.2.10"]
+    },
+    DeploymentType=SINGLE_AZ_2,
+    PreferredSubnetId=subnet-12345678' \
+  --tags Key=Name,Value=SelfManagedADFS
+
+# Create Windows File Server with deduplication enabled
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 300 \
+  --storage-type SSD \
+  --subnet-ids subnet-12345678 \
+  --windows-configuration \
+    ActiveDirectoryId=d-1234567890,ThroughputCapacity=16,DeploymentType=SINGLE_AZ_2,PreferredSubnetId=subnet-12345678,CopyTagsToBackups=true,DataCompressionType=LZ4 \
+  --tags Key=Name,Value=DedupEnabledFS
+```
+
+#### List and Describe Windows File Systems
+
+```bash
+# List all FSx file systems
+aws fsx describe-file-systems
+
+# Describe a specific file system
+aws fsx describe-file-systems \
+  --file-system-ids fs-0123456789abcdef0
+
+# List Windows File Server systems only
+aws fsx describe-file-systems \
+  --query "FileSystems[?FileSystemType=='WINDOWS']"
+
+# Get file system DNS name
+aws fsx describe-file-systems \
+  --file-system-ids fs-0123456789abcdef0 \
+  --query "FileSystems[0].DNSName" \
+  --output text
+
+# Get file system details in table format
+aws fsx describe-file-systems \
+  --query "FileSystems[*].{ID:FileSystemId,Type:FileSystemType,Size:StorageCapacity,State:Lifecycle}" \
+  --output table
+```
+
+### FSx for Lustre
+
+#### Create Lustre File Systems
+
+```bash
+# Create a scratch Lustre file system (temporary, high-performance)
+aws fsx create-file-system \
+  --file-system-type LUSTRE \
+  --storage-capacity 1200 \
+  --subnet-ids subnet-12345678 \
+  --lustre-configuration \
+    DeploymentType=SCRATCH_2,PerUnitStorageThroughput=200 \
+  --tags Key=Name,Value=MyScratchLustreFS Key=Purpose,Value=MLTraining
+
+# Create a persistent Lustre file system with S3 data repository
+aws fsx create-file-system \
+  --file-system-type LUSTRE \
+  --storage-capacity 2400 \
+  --subnet-ids subnet-12345678 \
+  --security-group-ids sg-12345678 \
+  --lustre-configuration '
+    DeploymentType=PERSISTENT_2,
+    PerUnitStorageThroughput=125,
+    DataCompressionType=LZ4,
+    AutoImportPolicy=NEW_CHANGED,
+    ImportPath="s3://my-data-bucket/input/",
+    ExportPath="s3://my-data-bucket/output/",
+    WeeklyMaintenanceStartTime="3:05:00"' \
+  --tags Key=Name,Value=MyPersistentLustreFS
+
+# Create persistent Lustre with high throughput (500 MB/s/TiB)
+aws fsx create-file-system \
+  --file-system-type LUSTRE \
+  --storage-capacity 4800 \
+  --subnet-ids subnet-12345678 \
+  --lustre-configuration \
+    DeploymentType=PERSISTENT_2,PerUnitStorageThroughput=500,DataCompressionType=LZ4 \
+  --tags Key=Name,Value=HighThroughputLustre Key=Workload,Value=HPC
+
+# Create Lustre with custom drive cache settings
+aws fsx create-file-system \
+  --file-system-type LUSTRE \
+  --storage-capacity 1200 \
+  --subnet-ids subnet-12345678 \
+  --lustre-configuration '
+    DeploymentType=PERSISTENT_2,
+    PerUnitStorageThroughput=250,
+    DriveCacheType=READ' \
+  --tags Key=Name,Value=CachedLustreFS
+```
+
+#### Manage Data Repository Associations (Lustre)
+
+```bash
+# Create a data repository association for S3
+aws fsx create-data-repository-association \
+  --file-system-id fs-0123456789abcdef0 \
+  --data-repository-path s3://my-bucket/data/ \
+  --file-system-path /mnt/s3data \
+  --batch-import-meta-data-on-create \
+  --s3 AutoImportPolicy=NEW_CHANGED,AutoExportPolicy=NEW_CHANGED \
+  --tags Key=Name,Value=S3DataRepoAssoc
+
+# List data repository associations
+aws fsx describe-data-repository-associations \
+  --filters Name=file-system-id,Values=fs-0123456789abcdef0
+
+# Describe a specific data repository association
+aws fsx describe-data-repository-associations \
+  --association-ids dra-0123456789abcdef0
+
+# Update data repository association
+aws fsx update-data-repository-association \
+  --association-id dra-0123456789abcdef0 \
+  --s3 AutoImportPolicy=NEW_CHANGED_DELETED,AutoExportPolicy=NEW_CHANGED_DELETED
+
+# Delete a data repository association
+aws fsx delete-data-repository-association \
+  --association-id dra-0123456789abcdef0
+
+# Create data repository task (sync data from/to S3)
+aws fsx create-data-repository-task \
+  --file-system-id fs-0123456789abcdef0 \
+  --type EXPORT_TO_REPOSITORY \
+  --paths /data/results \
+  --report Enabled=true,Path=s3://my-bucket/reports/,Format=REPORT_CSV_20191124
+
+# Check data repository task status
+aws fsx describe-data-repository-tasks \
+  --task-ids task-0123456789abcdef0
+```
+
+### FSx for NetApp ONTAP
+
+#### Create NetApp ONTAP File Systems
+
+```bash
+# Create a NetApp ONTAP file system
+aws fsx create-file-system \
+  --file-system-type ONTAP \
+  --storage-capacity 1024 \
+  --subnet-ids subnet-12345678 subnet-87654321 \
+  --security-group-ids sg-12345678 \
+  --ontap-configuration '
+    DeploymentType=MULTI_AZ_1,
+    ThroughputCapacity=128,
+    PreferredSubnetId=subnet-12345678,
+    RouteTableIds=["rtb-12345678"],
+    WeeklyMaintenanceStartTime="6:02:00",
+    AutomaticBackupRetentionDays=14,
+    DailyAutomaticBackupStartTime="03:00"' \
+  --tags Key=Name,Value=MyONTAPFS Key=Type,Value=MultiProtocol
+
+# Create a Single-AZ ONTAP file system
+aws fsx create-file-system \
+  --file-system-type ONTAP \
+  --storage-capacity 1024 \
+  --subnet-ids subnet-12345678 \
+  --ontap-configuration \
+    DeploymentType=SINGLE_AZ_1,ThroughputCapacity=128,PreferredSubnetId=subnet-12345678 \
+  --tags Key=Name,Value=SingleAZONTAP
+
+# Create storage virtual machine (SVM)
+aws fsx create-storage-virtual-machine \
+  --file-system-id fs-0123456789abcdef0 \
+  --name svm01 \
+  --active-directory-configuration '
+    NetBiosName="FSVMSVM",
+    SelfManagedActiveDirectoryConfiguration={
+      DomainName="corp.example.com",
+      OrganizationalUnitDistinguishedName="OU=Computers,DC=corp,DC=example,DC=com",
+      FileSystemAdministratorsGroup="FSAdmins",
+      UserName="Admin",
+      Password="YourSecurePassword123!",
+      DnsIps=["10.0.1.10"]
+    }' \
+  --tags Key=Name,Value=ProductionSVM
+
+# Create a volume on ONTAP SVM
+aws fsx create-volume \
+  --volume-type ONTAP \
+  --name vol01 \
+  --ontap-configuration '
+    StorageVirtualMachineId="svm-0123456789abcdef0",
+    SizeInMegabytes=102400,
+    SecurityStyle=UNIX,
+    JunctionPath="/vol01",
+    StorageEfficiencyEnabled=true,
+    TieringPolicy={CoolingPeriod=31,Name="AUTO"}' \
+  --tags Key=Name,Value=DataVolume
+
+# List storage virtual machines
+aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=fs-0123456789abcdef0
+
+# List volumes
+aws fsx describe-volumes \
+  --filters Name=file-system-id,Values=fs-0123456789abcdef0
+```
+
+### FSx for OpenZFS
+
+#### Create OpenZFS File Systems
+
+```bash
+# Create an OpenZFS file system
+aws fsx create-file-system \
+  --file-system-type OPENZFS \
+  --storage-capacity 64 \
+  --subnet-ids subnet-12345678 \
+  --security-group-ids sg-12345678 \
+  --open-zfs-configuration '
+    DeploymentType=SINGLE_AZ_1,
+    ThroughputCapacity=64,
+    AutomaticBackupRetentionDays=7,
+    DailyAutomaticBackupStartTime="03:00",
+    WeeklyMaintenanceStartTime="5:03:00",
+    CopyTagsToBackups=true,
+    CopyTagsToVolumes=true,
+    RootVolumeConfiguration={
+      DataCompressionType="ZSTD",
+      NfsExports=[{
+        ClientConfigurations=[{
+          Clients="*",
+          Options=["rw","crossmnt","no_root_squash"]
+        }]
+      }],
+      ReadOnly=false,
+      RecordSizeKiB=128,
+      UserAndGroupQuotas=[{
+        Id=1000,
+        StorageCapacityQuotaGiB=100,
+        Type="USER"
+      }]
+    }' \
+  --tags Key=Name,Value=MyOpenZFSFS Key=Purpose,Value=Database
+
+# Create a volume on OpenZFS file system
+aws fsx create-volume \
+  --volume-type OPENZFS \
+  --name zfsvol01 \
+  --open-zfs-configuration '
+    ParentVolumeId="fsvol-0123456789abcdef0",
+    StorageCapacityQuotaGiB=500,
+    StorageCapacityReservationGiB=100,
+    DataCompressionType="ZSTD",
+    CopyTagsToSnapshots=true,
+    ReadOnly=false,
+    NfsExports=[{
+      ClientConfigurations=[{
+        Clients="10.0.0.0/16",
+        Options=["rw","crossmnt","no_root_squash"]
+      }]
+    }],
+    UserAndGroupQuotas=[{
+      Id=1000,
+      StorageCapacityQuotaGiB=100,
+      Type="USER"
+    }]' \
+  --tags Key=Name,Value=AppVolume
+
+# Create OpenZFS snapshot
+aws fsx create-volume-from-backup \
+  --backup-id backup-0123456789abcdef0 \
+  --name restored-volume
+```
+
+### Backups Management
+
+#### Create Backups
+
+```bash
+# Create a manual backup for any FSx file system
+aws fsx create-backup \
+  --file-system-id fs-0123456789abcdef0 \
+  --tags Key=Name,Value=ManualBackup Key=Reason,Value=BeforeMaintenance
+
+# Create a backup for a specific volume (ONTAP/OpenZFS)
+aws fsx create-backup \
+  --volume-id fsvol-0123456789abcdef0 \
+  --tags Key=Name,Value=VolumeBackup
+
+# Create backup with client request token for idempotency
+aws fsx create-backup \
+  --file-system-id fs-0123456789abcdef0 \
+  --client-request-token $(uuidgen) \
+  --tags Key=Type,Value=Scheduled
+```
+
+#### List and Describe Backups
+
+```bash
+# List all backups
+aws fsx describe-backups
+
+# List backups for a specific file system
+aws fsx describe-backups \
+  --filters Name=file-system-id,Values=fs-0123456789abcdef0
+
+# Describe a specific backup
+aws fsx describe-backups \
+  --backup-ids backup-0123456789abcdef0
+
+# List backups by type (automatic or user-initiated)
+aws fsx describe-backups \
+  --filters Name=backup-type,Values=USER_INITIATED
+
+# Get backup details in table format
+aws fsx describe-backups \
+  --query "Backups[*].{ID:BackupId,Type:Type,State:Lifecycle,Created:CreationTime}" \
+  --output table
+```
+
+#### Restore from Backups
+
+```bash
+# Restore a file system from backup
+aws fsx create-file-system-from-backup \
+  --backup-id backup-0123456789abcdef0 \
+  --subnet-ids subnet-12345678 \
+  --security-group-ids sg-12345678 \
+  --tags Key=Name,Value=RestoredFS Key=Source,Value=backup-0123456789abcdef0
+
+# Restore a Windows File Server from backup with modified configuration
+aws fsx create-file-system-from-backup \
+  --backup-id backup-0123456789abcdef0 \
+  --subnet-ids subnet-12345678 \
+  --windows-configuration \
+    ThroughputCapacity=32,AutomaticBackupRetentionDays=14 \
+  --tags Key=Name,Value=RestoredWindowsFS
+
+# Restore a volume from backup (ONTAP/OpenZFS)
+aws fsx create-volume-from-backup \
+  --backup-id backup-0123456789abcdef0 \
+  --name restored-volume \
+  --tags Key=Name,Value=RestoredVolume
+```
+
+#### Copy Backups
+
+```bash
+# Copy a backup to another region
+aws fsx copy-backup \
+  --source-backup-id backup-0123456789abcdef0 \
+  --source-region us-east-1 \
+  --region us-west-2 \
+  --tags Key=Name,Value=CopiedBackup Key=SourceRegion,Value=us-east-1
+
+# Copy backup with custom KMS key
+aws fsx copy-backup \
+  --source-backup-id backup-0123456789abcdef0 \
+  --source-region us-east-1 \
+  --kms-key-id arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  --region us-west-2
+```
+
+#### Delete Backups
+
+```bash
+# Delete a specific backup
+aws fsx delete-backup \
+  --backup-id backup-0123456789abcdef0
+
+# Delete all user-initiated backups older than 30 days
+CUTOFF_DATE=$(date -u -d '30 days ago' +%Y-%m-%d)
+
+for backup_id in $(aws fsx describe-backups \
+  --filters Name=backup-type,Values=USER_INITIATED \
+  --query "Backups[?CreationTime<'$CUTOFF_DATE'].BackupId" \
+  --output text); do
+  aws fsx delete-backup --backup-id $backup_id
+  echo "Deleted backup: $backup_id"
+done
+```
+
+### Update File Systems
+
+#### Update Windows File Server
+
+```bash
+# Update throughput capacity
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --windows-configuration ThroughputCapacity=64
+
+# Update automatic backup settings
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --windows-configuration \
+    AutomaticBackupRetentionDays=30,DailyAutomaticBackupStartTime=02:00,WeeklyMaintenanceStartTime=7:03:00
+
+# Enable audit logging
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --windows-configuration '
+    AuditLogConfiguration={
+      FileAccessAuditLogLevel="SUCCESS_AND_FAILURE",
+      FileShareAccessAuditLogLevel="SUCCESS_AND_FAILURE",
+      AuditLogDestination="arn:aws:logs:us-east-1:123456789012:log-group:/aws/fsx/windows"
+    }'
+```
+
+#### Update Lustre File System
+
+```bash
+# Update Lustre configuration
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --lustre-configuration \
+    WeeklyMaintenanceStartTime=4:05:00,AutoImportPolicy=NEW_CHANGED_DELETED
+
+# Update data compression
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --lustre-configuration DataCompressionType=LZ4
+```
+
+#### Update ONTAP Configuration
+
+```bash
+# Update ONTAP file system
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --ontap-configuration \
+    WeeklyMaintenanceStartTime=6:03:00,AutomaticBackupRetentionDays=21
+
+# Update storage virtual machine
+aws fsx update-storage-virtual-machine \
+  --storage-virtual-machine-id svm-0123456789abcdef0 \
+  --active-directory-configuration SelfManagedActiveDirectoryConfiguration='{Password="NewPassword123!"}'
+
+# Update ONTAP volume
+aws fsx update-volume \
+  --volume-id fsvol-0123456789abcdef0 \
+  --ontap-configuration 'SizeInMegabytes=204800,StorageEfficiencyEnabled=true'
+```
+
+#### Update OpenZFS Configuration
+
+```bash
+# Update OpenZFS file system
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --open-zfs-configuration \
+    ThroughputCapacity=128,WeeklyMaintenanceStartTime=5:04:00
+
+# Update OpenZFS volume
+aws fsx update-volume \
+  --volume-id fsvol-0123456789abcdef0 \
+  --open-zfs-configuration '
+    StorageCapacityQuotaGiB=1000,
+    DataCompressionType="ZSTD",
+    NfsExports=[{
+      ClientConfigurations=[{
+        Clients="10.0.0.0/8",
+        Options=["rw","crossmnt","no_root_squash"]
+      }]
+    }]'
+```
+
+### Storage Capacity Updates
+
+```bash
+# Increase storage capacity for Windows File Server
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --storage-capacity 1000
+
+# Increase storage capacity for Lustre (persistent only)
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --storage-capacity 4800
+
+# Increase storage capacity for ONTAP
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --storage-capacity 2048
+
+# Increase storage capacity for OpenZFS
+aws fsx update-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --storage-capacity 128
+
+# Check storage capacity update status
+aws fsx describe-file-systems \
+  --file-system-ids fs-0123456789abcdef0 \
+  --query "FileSystems[0].AdministrativeActions[?ActionType=='FILE_SYSTEM_UPDATE']"
+```
+
+### Tags Management
+
+```bash
+# Add tags to a file system
+aws fsx tag-resource \
+  --resource-arn arn:aws:fsx:us-east-1:123456789012:file-system/fs-0123456789abcdef0 \
+  --tags Key=Environment,Value=Production Key=Owner,Value=TeamA Key=CostCenter,Value=Engineering
+
+# Add tags to a backup
+aws fsx tag-resource \
+  --resource-arn arn:aws:fsx:us-east-1:123456789012:backup/backup-0123456789abcdef0 \
+  --tags Key=Type,Value=Monthly Key=Retention,Value=90days
+
+# Add tags to a volume
+aws fsx tag-resource \
+  --resource-arn arn:aws:fsx:us-east-1:123456789012:volume/fsvol-0123456789abcdef0 \
+  --tags Key=Application,Value=Database Key=Tier,Value=Critical
+
+# List tags for a resource
+aws fsx list-tags-for-resource \
+  --resource-arn arn:aws:fsx:us-east-1:123456789012:file-system/fs-0123456789abcdef0
+
+# Remove tags from a resource
+aws fsx untag-resource \
+  --resource-arn arn:aws:fsx:us-east-1:123456789012:file-system/fs-0123456789abcdef0 \
+  --tag-keys Environment Owner
+```
+
+### Delete Resources
+
+```bash
+# Delete a file system (creates final backup by default)
+aws fsx delete-file-system \
+  --file-system-id fs-0123456789abcdef0
+
+# Delete a file system without creating final backup
+aws fsx delete-file-system \
+  --file-system-id fs-0123456789abcdef0 \
+  --windows-configuration SkipFinalBackup=true
+
+# Delete a volume
+aws fsx delete-volume \
+  --volume-id fsvol-0123456789abcdef0
+
+# Delete a storage virtual machine
+aws fsx delete-storage-virtual-machine \
+  --storage-virtual-machine-id svm-0123456789abcdef0
+
+# Cleanup script - delete file system and all associated resources
+FILE_SYSTEM_ID="fs-0123456789abcdef0"
+
+echo "Getting volumes for file system: $FILE_SYSTEM_ID"
+VOLUMES=$(aws fsx describe-volumes \
+  --filters Name=file-system-id,Values=$FILE_SYSTEM_ID \
+  --query "Volumes[*].VolumeId" \
+  --output text)
+
+# Delete volumes
+for vol_id in $VOLUMES; do
+  echo "Deleting volume: $vol_id"
+  aws fsx delete-volume --volume-id $vol_id
+done
+
+# Wait for volumes to be deleted
+sleep 60
+
+# Get SVMs
+SVMS=$(aws fsx describe-storage-virtual-machines \
+  --filters Name=file-system-id,Values=$FILE_SYSTEM_ID \
+  --query "StorageVirtualMachines[*].StorageVirtualMachineId" \
+  --output text)
+
+# Delete SVMs
+for svm_id in $SVMS; do
+  echo "Deleting SVM: $svm_id"
+  aws fsx delete-storage-virtual-machine --storage-virtual-machine-id $svm_id
+done
+
+# Wait for SVMs to be deleted
+sleep 60
+
+# Delete file system
+echo "Deleting file system: $FILE_SYSTEM_ID"
+aws fsx delete-file-system --file-system-id $FILE_SYSTEM_ID
+```
+
+### Monitoring and Troubleshooting
+
+```bash
+# Get file system metrics from CloudWatch
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/FSx \
+  --metric-name DataReadBytes \
+  --dimensions Name=FileSystemId,Value=fs-0123456789abcdef0 \
+  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum \
+  --output table
+
+# Check for administrative actions (updates, scaling, etc.)
+aws fsx describe-file-systems \
+  --file-system-ids fs-0123456789abcdef0 \
+  --query "FileSystems[0].AdministrativeActions" \
+  --output table
+
+# Monitor backup progress
+aws fsx describe-backups \
+  --backup-ids backup-0123456789abcdef0 \
+  --query "Backups[0].{State:Lifecycle,Progress:ProgressPercent}" \
+  --output table
+```
+
+### Automation Scripts
+
+#### Multi-Environment FSx Deployment
+
+```bash
+#!/bin/bash
+# Deploy FSx for Windows File Server across multiple environments
+
+ENVIRONMENTS=("dev" "staging" "production")
+AD_ID="d-1234567890"
+REGION="us-east-1"
+
+for env in "${ENVIRONMENTS[@]}"; do
+  echo "Creating FSx for $env environment"
+  
+  # Set environment-specific parameters
+  case $env in
+    "dev")
+      STORAGE=300
+      THROUGHPUT=16
+      SUBNET="subnet-dev123"
+      ;;
+    "staging")
+      STORAGE=500
+      THROUGHPUT=32
+      SUBNET="subnet-stage123"
+      ;;
+    "production")
+      STORAGE=1000
+      THROUGHPUT=64
+      SUBNET="subnet-prod123"
+      ;;
+  esac
+  
+  FS_ID=$(aws fsx create-file-system \
+    --file-system-type WINDOWS \
+    --storage-capacity $STORAGE \
+    --storage-type SSD \
+    --subnet-ids $SUBNET \
+    --windows-configuration \
+      ActiveDirectoryId=$AD_ID,ThroughputCapacity=$THROUGHPUT,DeploymentType=SINGLE_AZ_2,PreferredSubnetId=$SUBNET,AutomaticBackupRetentionDays=7 \
+    --tags Key=Name,Value="FSx-$env" Key=Environment,Value=$env \
+    --region $REGION \
+    --query 'FileSystem.FileSystemId' \
+    --output text)
+  
+  echo "Created file system $FS_ID for $env"
+  echo "---"
+done
+```
 
 ---
 

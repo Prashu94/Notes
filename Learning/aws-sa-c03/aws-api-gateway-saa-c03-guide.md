@@ -9,7 +9,8 @@
 6. [Deployment and Stages](#deployment-and-stages)
 7. [Cost Optimization and Best Practices](#cost-optimization-and-best-practices)
 8. [Exam-Focused Key Points](#exam-focused-key-points)
-9. [Common Scenarios and Use Cases](#common-scenarios-and-use-cases)
+9. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+10. [Common Scenarios and Use Cases](#common-scenarios-and-use-cases)
 
 ---
 
@@ -1408,6 +1409,967 @@ When asked about cost optimization:
 - **Timeout Error**: Verify backend response time < 29 seconds
 - **Permission Error**: Check IAM roles and resource policies
 - **VPC Integration**: Ensure proper VPC configuration and routing
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing API Gateway REST APIs, deployments, authorizers, and related operations.
+
+### Create REST APIs
+
+```bash
+# Create a new REST API
+aws apigateway create-rest-api \
+    --name "MyAPI" \
+    --description "My REST API" \
+    --endpoint-configuration types=REGIONAL
+
+# Create a REST API with edge-optimized endpoint
+aws apigateway create-rest-api \
+    --name "MyEdgeAPI" \
+    --endpoint-configuration types=EDGE
+
+# Create a private REST API
+aws apigateway create-rest-api \
+    --name "MyPrivateAPI" \
+    --endpoint-configuration types=PRIVATE \
+    --policy file://resource-policy.json
+
+# Create REST API with API key source
+aws apigateway create-rest-api \
+    --name "MyAPI" \
+    --api-key-source HEADER
+
+# Create REST API with minimum compression size
+aws apigateway create-rest-api \
+    --name "MyAPI" \
+    --minimum-compression-size 1024
+
+# Get all REST APIs
+aws apigateway get-rest-apis
+
+# Get a specific REST API
+aws apigateway get-rest-api \
+    --rest-api-id abc123
+
+# Update REST API
+aws apigateway update-rest-api \
+    --rest-api-id abc123 \
+    --patch-operations op=replace,path=/name,value="UpdatedAPI"
+
+# Delete REST API
+aws apigateway delete-rest-api \
+    --rest-api-id abc123
+```
+
+### Create Resources and Methods
+
+```bash
+# Get the root resource ID
+aws apigateway get-resources \
+    --rest-api-id abc123 \
+    --query 'items[?path==`/`].id' \
+    --output text
+
+# Create a new resource
+aws apigateway create-resource \
+    --rest-api-id abc123 \
+    --parent-id root-id \
+    --path-part users
+
+# Create a nested resource
+aws apigateway create-resource \
+    --rest-api-id abc123 \
+    --parent-id users-resource-id \
+    --path-part "{userId}"
+
+# List all resources
+aws apigateway get-resources \
+    --rest-api-id abc123
+
+# Get a specific resource
+aws apigateway get-resource \
+    --rest-api-id abc123 \
+    --resource-id resource-id
+
+# Create GET method
+aws apigateway put-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --authorization-type NONE
+
+# Create method with API key required
+aws apigateway put-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --authorization-type NONE \
+    --api-key-required
+
+# Create method with custom authorizer
+aws apigateway put-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --authorization-type CUSTOM \
+    --authorizer-id authorizer-id
+
+# Create method with IAM authorization
+aws apigateway put-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --authorization-type AWS_IAM
+
+# Create method with Cognito authorization
+aws apigateway put-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --authorization-type COGNITO_USER_POOLS \
+    --authorizer-id authorizer-id
+
+# Set up Lambda integration
+aws apigateway put-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --type AWS_PROXY \
+    --integration-http-method POST \
+    --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:MyFunction/invocations"
+
+# Set up HTTP integration
+aws apigateway put-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --type HTTP \
+    --integration-http-method GET \
+    --uri "https://example.com/api/resource"
+
+# Set up HTTP proxy integration
+aws apigateway put-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method ANY \
+    --type HTTP_PROXY \
+    --integration-http-method ANY \
+    --uri "https://example.com/{proxy}"
+
+# Set up AWS service integration (e.g., S3)
+aws apigateway put-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --type AWS \
+    --integration-http-method GET \
+    --uri "arn:aws:apigateway:us-east-1:s3:path/bucket-name/object-key" \
+    --credentials "arn:aws:iam::123456789012:role/APIGatewayS3Role"
+
+# Set up mock integration
+aws apigateway put-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --type MOCK \
+    --request-templates '{"application/json":"{\"statusCode\": 200}"}'
+
+# Create method response
+aws apigateway put-method-response \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --status-code 200 \
+    --response-models '{"application/json":"Empty"}'
+
+# Create integration response
+aws apigateway put-integration-response \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --status-code 200 \
+    --selection-pattern ""
+
+# Delete method
+aws apigateway delete-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET
+
+# Delete resource
+aws apigateway delete-resource \
+    --rest-api-id abc123 \
+    --resource-id resource-id
+```
+
+### Deploy APIs (Stages)
+
+```bash
+# Create a deployment
+aws apigateway create-deployment \
+    --rest-api-id abc123 \
+    --stage-name prod
+
+# Create deployment with description
+aws apigateway create-deployment \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --description "Production deployment v1.0"
+
+# Create deployment with stage description
+aws apigateway create-deployment \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --stage-description "Production stage" \
+    --description "Initial production deployment"
+
+# Create deployment with variables
+aws apigateway create-deployment \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --variables lambdaAlias=prod,environment=production
+
+# Get deployments
+aws apigateway get-deployments \
+    --rest-api-id abc123
+
+# Get a specific deployment
+aws apigateway get-deployment \
+    --rest-api-id abc123 \
+    --deployment-id deployment-id
+
+# Create a stage
+aws apigateway create-stage \
+    --rest-api-id abc123 \
+    --stage-name staging \
+    --deployment-id deployment-id
+
+# Create stage with cache settings
+aws apigateway create-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --deployment-id deployment-id \
+    --cache-cluster-enabled \
+    --cache-cluster-size 0.5
+
+# Create stage with throttling
+aws apigateway create-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --deployment-id deployment-id \
+    --throttle-settings rateLimit=1000,burstLimit=2000
+
+# Get stages
+aws apigateway get-stages \
+    --rest-api-id abc123
+
+# Get a specific stage
+aws apigateway get-stage \
+    --rest-api-id abc123 \
+    --stage-name prod
+
+# Update stage settings
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations op=replace,path=/cacheClusterEnabled,value=true
+
+# Enable CloudWatch logging for stage
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/*/*/logging/loglevel,value=INFO \
+        op=replace,path=/*/*/logging/dataTrace,value=true
+
+# Enable X-Ray tracing
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations op=replace,path=/tracingEnabled,value=true
+
+# Set stage variables
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/variables/lambdaAlias,value=prod \
+        op=replace,path=/variables/environment,value=production
+
+# Delete stage
+aws apigateway delete-stage \
+    --rest-api-id abc123 \
+    --stage-name staging
+
+# Delete deployment
+aws apigateway delete-deployment \
+    --rest-api-id abc123 \
+    --deployment-id deployment-id
+```
+
+### Create and Configure Authorizers
+
+```bash
+# Create Lambda authorizer (TOKEN type)
+aws apigateway create-authorizer \
+    --rest-api-id abc123 \
+    --name "MyLambdaAuthorizer" \
+    --type TOKEN \
+    --authorizer-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:MyAuthFunction/invocations" \
+    --authorizer-credentials "arn:aws:iam::123456789012:role/APIGatewayAuthRole" \
+    --identity-source "method.request.header.Authorization"
+
+# Create Lambda authorizer (REQUEST type)
+aws apigateway create-authorizer \
+    --rest-api-id abc123 \
+    --name "RequestAuthorizer" \
+    --type REQUEST \
+    --authorizer-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:MyAuthFunction/invocations" \
+    --identity-source "method.request.header.Authorization,context.sourceIp"
+
+# Create Cognito User Pool authorizer
+aws apigateway create-authorizer \
+    --rest-api-id abc123 \
+    --name "CognitoAuthorizer" \
+    --type COGNITO_USER_POOLS \
+    --provider-arns "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_ABC123" \
+    --identity-source "method.request.header.Authorization"
+
+# Create authorizer with caching
+aws apigateway create-authorizer \
+    --rest-api-id abc123 \
+    --name "CachedAuthorizer" \
+    --type TOKEN \
+    --authorizer-uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:MyAuthFunction/invocations" \
+    --identity-source "method.request.header.Authorization" \
+    --authorizer-result-ttl-in-seconds 300
+
+# List authorizers
+aws apigateway get-authorizers \
+    --rest-api-id abc123
+
+# Get a specific authorizer
+aws apigateway get-authorizer \
+    --rest-api-id abc123 \
+    --authorizer-id authorizer-id
+
+# Update authorizer
+aws apigateway update-authorizer \
+    --rest-api-id abc123 \
+    --authorizer-id authorizer-id \
+    --patch-operations op=replace,path=/authorizerResultTtlInSeconds,value=600
+
+# Delete authorizer
+aws apigateway delete-authorizer \
+    --rest-api-id abc123 \
+    --authorizer-id authorizer-id
+```
+
+### API Keys and Usage Plans
+
+```bash
+# Create an API key
+aws apigateway create-api-key \
+    --name "MyAPIKey" \
+    --description "API key for external partners" \
+    --enabled
+
+# Create API key with value
+aws apigateway create-api-key \
+    --name "MyAPIKey" \
+    --value "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" \
+    --enabled
+
+# Get all API keys
+aws apigateway get-api-keys
+
+# Get API keys with name filter
+aws apigateway get-api-keys \
+    --name-query "Partner"
+
+# Get a specific API key
+aws apigateway get-api-key \
+    --api-key key-id \
+    --include-value
+
+# Update API key
+aws apigateway update-api-key \
+    --api-key key-id \
+    --patch-operations op=replace,path=/enabled,value=false
+
+# Delete API key
+aws apigateway delete-api-key \
+    --api-key key-id
+
+# Create usage plan
+aws apigateway create-usage-plan \
+    --name "BasicPlan" \
+    --description "Basic usage plan" \
+    --throttle rateLimit=100,burstLimit=200 \
+    --quota limit=10000,period=MONTH
+
+# Create usage plan with API stages
+aws apigateway create-usage-plan \
+    --name "PremiumPlan" \
+    --api-stages apiId=abc123,stage=prod \
+    --throttle rateLimit=1000,burstLimit=2000 \
+    --quota limit=100000,period=MONTH,offset=0
+
+# Get usage plans
+aws apigateway get-usage-plans
+
+# Get a specific usage plan
+aws apigateway get-usage-plan \
+    --usage-plan-id plan-id
+
+# Update usage plan
+aws apigateway update-usage-plan \
+    --usage-plan-id plan-id \
+    --patch-operations \
+        op=replace,path=/throttle/rateLimit,value=500 \
+        op=replace,path=/quota/limit,value=50000
+
+# Delete usage plan
+aws apigateway delete-usage-plan \
+    --usage-plan-id plan-id
+
+# Create usage plan key (associate API key with usage plan)
+aws apigateway create-usage-plan-key \
+    --usage-plan-id plan-id \
+    --key-id key-id \
+    --key-type API_KEY
+
+# Get usage plan keys
+aws apigateway get-usage-plan-keys \
+    --usage-plan-id plan-id
+
+# Get usage (API key usage statistics)
+aws apigateway get-usage \
+    --usage-plan-id plan-id \
+    --start-date "2024-01-01" \
+    --end-date "2024-01-31"
+
+# Get usage for specific API key
+aws apigateway get-usage \
+    --usage-plan-id plan-id \
+    --key-id key-id \
+    --start-date "2024-01-01" \
+    --end-date "2024-01-31"
+
+# Delete usage plan key
+aws apigateway delete-usage-plan-key \
+    --usage-plan-id plan-id \
+    --key-id key-id
+```
+
+### Custom Domains
+
+```bash
+# Create custom domain name
+aws apigateway create-domain-name \
+    --domain-name api.example.com \
+    --certificate-arn "arn:aws:acm:us-east-1:123456789012:certificate/abc123" \
+    --endpoint-configuration types=REGIONAL \
+    --regional-certificate-arn "arn:aws:acm:us-east-1:123456789012:certificate/abc123"
+
+# Create edge-optimized custom domain
+aws apigateway create-domain-name \
+    --domain-name api.example.com \
+    --certificate-arn "arn:aws:acm:us-east-1:123456789012:certificate/abc123" \
+    --endpoint-configuration types=EDGE
+
+# Create custom domain with security policy
+aws apigateway create-domain-name \
+    --domain-name api.example.com \
+    --certificate-arn "arn:aws:acm:us-east-1:123456789012:certificate/abc123" \
+    --security-policy TLS_1_2 \
+    --endpoint-configuration types=REGIONAL
+
+# Get custom domain names
+aws apigateway get-domain-names
+
+# Get a specific custom domain
+aws apigateway get-domain-name \
+    --domain-name api.example.com
+
+# Update custom domain
+aws apigateway update-domain-name \
+    --domain-name api.example.com \
+    --patch-operations op=replace,path=/certificateArn,value="arn:aws:acm:us-east-1:123456789012:certificate/new-cert"
+
+# Delete custom domain
+aws apigateway delete-domain-name \
+    --domain-name api.example.com
+
+# Create base path mapping
+aws apigateway create-base-path-mapping \
+    --domain-name api.example.com \
+    --rest-api-id abc123 \
+    --stage prod
+
+# Create base path mapping with base path
+aws apigateway create-base-path-mapping \
+    --domain-name api.example.com \
+    --rest-api-id abc123 \
+    --stage prod \
+    --base-path v1
+
+# Get base path mappings
+aws apigateway get-base-path-mappings \
+    --domain-name api.example.com
+
+# Get a specific base path mapping
+aws apigateway get-base-path-mapping \
+    --domain-name api.example.com \
+    --base-path v1
+
+# Update base path mapping
+aws apigateway update-base-path-mapping \
+    --domain-name api.example.com \
+    --base-path v1 \
+    --patch-operations op=replace,path=/stage,value=staging
+
+# Delete base path mapping
+aws apigateway delete-base-path-mapping \
+    --domain-name api.example.com \
+    --base-path v1
+```
+
+### Request and Response Transformations
+
+```bash
+# Create request validator
+aws apigateway create-request-validator \
+    --rest-api-id abc123 \
+    --name "BodyValidator" \
+    --validate-request-body
+
+# Create request validator for parameters
+aws apigateway create-request-validator \
+    --rest-api-id abc123 \
+    --name "ParamsValidator" \
+    --validate-request-parameters
+
+# Create full request validator
+aws apigateway create-request-validator \
+    --rest-api-id abc123 \
+    --name "FullValidator" \
+    --validate-request-body \
+    --validate-request-parameters
+
+# Get request validators
+aws apigateway get-request-validators \
+    --rest-api-id abc123
+
+# Update method to use request validator
+aws apigateway update-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --patch-operations op=replace,path=/requestValidatorId,value=validator-id
+
+# Create model for request/response
+aws apigateway create-model \
+    --rest-api-id abc123 \
+    --name "UserModel" \
+    --content-type "application/json" \
+    --schema file://user-schema.json
+
+# Get models
+aws apigateway get-models \
+    --rest-api-id abc123
+
+# Get a specific model
+aws apigateway get-model \
+    --rest-api-id abc123 \
+    --model-name UserModel
+
+# Delete model
+aws apigateway delete-model \
+    --rest-api-id abc123 \
+    --model-name UserModel
+
+# Update integration with request template
+aws apigateway update-integration \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --patch-operations op=replace,path=/requestTemplates~1application~1json,value='{"body": $input.json("$")}'
+
+# Update integration response with response template
+aws apigateway update-integration-response \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --status-code 200 \
+    --patch-operations op=replace,path=/responseTemplates~1application~1json,value='{"message": "Success"}'
+```
+
+### Throttling and Quotas
+
+```bash
+# Set account-level throttle settings
+aws apigateway update-account \
+    --patch-operations \
+        op=replace,path=/throttle/rateLimit,value=10000 \
+        op=replace,path=/throttle/burstLimit,value=5000
+
+# Get account settings
+aws apigateway get-account
+
+# Set stage-level throttle settings
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/throttle/rateLimit,value=1000 \
+        op=replace,path=/throttle/burstLimit,value=2000
+
+# Set method-level throttle settings
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/*/GET/throttle/rateLimit,value=500 \
+        op=replace,path=/*/POST/throttle/burstLimit,value=1000
+
+# Set throttle for specific resource method
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/~1users~1{id}/GET/throttle/rateLimit,value=100
+```
+
+### CloudWatch Logging
+
+```bash
+# Enable CloudWatch logs for API Gateway (account level)
+aws apigateway update-account \
+    --patch-operations op=add,path=/cloudwatchRoleArn,value="arn:aws:iam::123456789012:role/APIGatewayCloudWatchRole"
+
+# Enable execution logging for stage
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/*/*/logging/loglevel,value=INFO \
+        op=replace,path=/*/*/logging/dataTrace,value=true \
+        op=replace,path=/*/*/metrics/enabled,value=true
+
+# Enable access logging for stage
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/accessLogSettings/destinationArn,value="arn:aws:logs:us-east-1:123456789012:log-group:api-gateway-logs" \
+        op=replace,path=/accessLogSettings/format,value='$context.requestId'
+
+# Disable logging
+aws apigateway update-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --patch-operations \
+        op=replace,path=/*/*/logging/loglevel,value=OFF \
+        op=replace,path=/*/*/logging/dataTrace,value=false
+```
+
+### Export and Import APIs (Swagger/OpenAPI)
+
+```bash
+# Export API as Swagger/OpenAPI 2.0
+aws apigateway get-export \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --export-type swagger \
+    --accepts application/json \
+    swagger.json
+
+# Export API as OpenAPI 3.0
+aws apigateway get-export \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --export-type oas30 \
+    --accepts application/json \
+    openapi.json
+
+# Export API with extensions
+aws apigateway get-export \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --export-type oas30 \
+    --parameters extensions='integrations' \
+    openapi-full.json
+
+# Export API with API Gateway extensions and postman collection
+aws apigateway get-export \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --export-type swagger \
+    --parameters extensions='apigateway' \
+    --accepts application/json \
+    swagger-with-extensions.json
+
+# Import API from Swagger file (creates new API)
+aws apigateway import-rest-api \
+    --body file://swagger.json
+
+# Import API with fail on warnings
+aws apigateway import-rest-api \
+    --fail-on-warnings \
+    --body file://swagger.json
+
+# Import API with parameters
+aws apigateway import-rest-api \
+    --parameters endpointConfigurationTypes=REGIONAL \
+    --body file://swagger.json
+
+# Update existing API from Swagger file
+aws apigateway put-rest-api \
+    --rest-api-id abc123 \
+    --mode merge \
+    --body file://swagger.json
+
+# Overwrite existing API from Swagger file
+aws apigateway put-rest-api \
+    --rest-api-id abc123 \
+    --mode overwrite \
+    --body file://swagger.json
+
+# Update API with fail on warnings
+aws apigateway put-rest-api \
+    --rest-api-id abc123 \
+    --mode merge \
+    --fail-on-warnings \
+    --body file://swagger.json
+```
+
+### Test Invoke Method
+
+```bash
+# Test invoke a method
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET
+
+# Test invoke with path parameters
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --path-with-query-string "/users/123"
+
+# Test invoke with query string
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --path-with-query-string "/users?status=active&limit=10"
+
+# Test invoke with headers
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --headers '{"Content-Type":"application/json","Authorization":"Bearer token123"}'
+
+# Test invoke with body
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method POST \
+    --body '{"name":"John","email":"john@example.com"}'
+
+# Test invoke with stage variables
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --stage-variables '{"lambdaAlias":"dev"}'
+
+# Test invoke with client certificate
+aws apigateway test-invoke-method \
+    --rest-api-id abc123 \
+    --resource-id resource-id \
+    --http-method GET \
+    --client-certificate-id cert-id
+```
+
+### Generate SDK
+
+```bash
+# Generate JavaScript SDK
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type javascript \
+    javascript-sdk.zip
+
+# Generate Android SDK
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type android \
+    android-sdk.zip
+
+# Generate iOS SDK (Objective-C)
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type objectivec \
+    ios-sdk.zip
+
+# Generate iOS SDK (Swift)
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type swift \
+    swift-sdk.zip
+
+# Generate Java SDK
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type java \
+    java-sdk.zip
+
+# Generate Ruby SDK
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type ruby \
+    ruby-sdk.zip
+
+# Generate SDK with parameters
+aws apigateway get-sdk \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --sdk-type javascript \
+    --parameters serviceName='MyAPI' \
+    javascript-sdk.zip
+
+# Get available SDK types
+aws apigateway get-sdk-types
+
+# Get specific SDK type details
+aws apigateway get-sdk-type \
+    --id javascript
+```
+
+### Additional Useful Commands
+
+```bash
+# Get API Gateway resource policy
+aws apigateway get-rest-api \
+    --rest-api-id abc123 \
+    --query 'policy' \
+    --output text
+
+# Update resource policy
+aws apigateway update-rest-api \
+    --rest-api-id abc123 \
+    --patch-operations op=replace,path=/policy,value=file://resource-policy.json
+
+# Create VPC Link for private integrations
+aws apigateway create-vpc-link \
+    --name "MyVPCLink" \
+    --target-arns "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/abc123"
+
+# Get VPC links
+aws apigateway get-vpc-links
+
+# Get specific VPC link
+aws apigateway get-vpc-link \
+    --vpc-link-id vpc-link-id
+
+# Delete VPC link
+aws apigateway delete-vpc-link \
+    --vpc-link-id vpc-link-id
+
+# Create client certificate
+aws apigateway generate-client-certificate \
+    --description "Client certificate for backend authentication"
+
+# Get client certificates
+aws apigateway get-client-certificates
+
+# Get specific client certificate
+aws apigateway get-client-certificate \
+    --client-certificate-id cert-id
+
+# Delete client certificate
+aws apigateway delete-client-certificate \
+    --client-certificate-id cert-id
+
+# Flush stage cache
+aws apigateway flush-stage-cache \
+    --rest-api-id abc123 \
+    --stage-name prod
+
+# Tag API
+aws apigateway tag-resource \
+    --resource-arn "arn:aws:apigateway:us-east-1::/restapis/abc123" \
+    --tags Environment=Production,Owner=TeamA
+
+# Get tags
+aws apigateway get-tags \
+    --resource-arn "arn:aws:apigateway:us-east-1::/restapis/abc123"
+
+# Untag API
+aws apigateway untag-resource \
+    --resource-arn "arn:aws:apigateway:us-east-1::/restapis/abc123" \
+    --tag-keys Environment Owner
+```
+
+### Common Query Patterns
+
+```bash
+# Get all REST API IDs and names
+aws apigateway get-rest-apis \
+    --query 'items[*].[id,name]' \
+    --output table
+
+# Get root resource ID for an API
+aws apigateway get-resources \
+    --rest-api-id abc123 \
+    --query 'items[?path==`/`].id' \
+    --output text
+
+# List all resources with their paths
+aws apigateway get-resources \
+    --rest-api-id abc123 \
+    --query 'items[*].[path,id]' \
+    --output table
+
+# Get deployment ID for a stage
+aws apigateway get-stage \
+    --rest-api-id abc123 \
+    --stage-name prod \
+    --query 'deploymentId' \
+    --output text
+
+# Get API endpoint URL
+aws apigateway get-rest-api \
+    --rest-api-id abc123 \
+    --query 'id' \
+    --output text | \
+    xargs -I {} echo "https://{}.execute-api.us-east-1.amazonaws.com/prod"
+
+# Check if API key is enabled
+aws apigateway get-api-key \
+    --api-key key-id \
+    --query 'enabled' \
+    --output text
+
+# Get usage plan quota
+aws apigateway get-usage-plan \
+    --usage-plan-id plan-id \
+    --query 'quota' \
+    --output json
+```
 
 ---
 

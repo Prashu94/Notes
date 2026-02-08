@@ -11,6 +11,7 @@
 - [Best Practices](#best-practices)
 - [Integration Patterns](#integration-patterns)
 - [Cost Optimization](#cost-optimization)
+- [AWS CLI Commands Reference](#aws-cli-commands-reference)
 - [Exam Tips](#exam-tips)
 
 ---
@@ -437,6 +438,480 @@ Architecture:
 ### Free Tier
 - 1 million requests per month
 - Applies to both Standard and FIFO queues
+
+---
+
+## AWS CLI Commands Reference
+
+### Create Queues
+
+#### Create Standard Queue
+```bash
+# Create a basic standard queue
+aws sqs create-queue --queue-name MyStandardQueue
+
+# Create standard queue with attributes
+aws sqs create-queue \
+  --queue-name MyConfiguredQueue \
+  --attributes '{
+    "DelaySeconds": "5",
+    "MaximumMessageSize": "262144",
+    "MessageRetentionPeriod": "345600",
+    "ReceiveMessageWaitTimeSeconds": "20",
+    "VisibilityTimeout": "30"
+  }'
+
+# Create queue with tags
+aws sqs create-queue \
+  --queue-name MyTaggedQueue \
+  --tags Environment=Production,Application=WebApp,CostCenter=Engineering
+```
+
+#### Create FIFO Queue
+```bash
+# Create basic FIFO queue
+aws sqs create-queue \
+  --queue-name MyFIFOQueue.fifo \
+  --attributes FifoQueue=true
+
+# Create FIFO queue with content-based deduplication
+aws sqs create-queue \
+  --queue-name MyDedupQueue.fifo \
+  --attributes '{
+    "FifoQueue": "true",
+    "ContentBasedDeduplication": "true"
+  }'
+
+# Create high-throughput FIFO queue
+aws sqs create-queue \
+  --queue-name MyHighThroughputQueue.fifo \
+  --attributes '{
+    "FifoQueue": "true",
+    "DeduplicationScope": "messageGroup",
+    "FifoThroughputLimit": "perMessageGroupId"
+  }'
+```
+
+### List and Get Queue Information
+
+```bash
+# List all queues
+aws sqs list-queues
+
+# List queues with name prefix
+aws sqs list-queues --queue-name-prefix MyApp
+
+# Get queue URL by name
+aws sqs get-queue-url --queue-name MyStandardQueue
+
+# Get queue attributes
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attribute-names All
+
+# Get specific queue attributes
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attribute-names ApproximateNumberOfMessages VisibilityTimeout
+```
+
+### Send Messages
+
+#### Send to Standard Queue
+```bash
+# Send simple message
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --message-body "Hello from SQS!"
+
+# Send message with delay
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --message-body "Delayed message" \
+  --delay-seconds 60
+
+# Send message with attributes
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --message-body "Order notification" \
+  --message-attributes '{
+    "OrderId": {"DataType":"String","StringValue":"12345"},
+    "Amount": {"DataType":"Number","StringValue":"99.99"},
+    "Priority": {"DataType":"String","StringValue":"high"}
+  }'
+
+# Send message from file
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --message-body file://message.txt
+```
+
+#### Send to FIFO Queue
+```bash
+# Send message to FIFO queue with message group
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyFIFOQueue.fifo \
+  --message-body "First FIFO message" \
+  --message-group-id "order-group-1" \
+  --message-deduplication-id "unique-id-1"
+
+# Send with content-based deduplication enabled
+aws sqs send-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyDedupQueue.fifo \
+  --message-body "This message uses content-based dedup" \
+  --message-group-id "order-group-1"
+```
+
+#### Batch Send Messages
+```bash
+# Send batch of messages to standard queue
+aws sqs send-message-batch \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --entries '[
+    {"Id":"1","MessageBody":"First message"},
+    {"Id":"2","MessageBody":"Second message","DelaySeconds":10},
+    {"Id":"3","MessageBody":"Third message"}
+  ]'
+
+# Send batch to FIFO queue
+aws sqs send-message-batch \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyFIFOQueue.fifo \
+  --entries file://batch-messages.json
+
+# Example batch-messages.json for FIFO:
+# [
+#   {
+#     "Id": "1",
+#     "MessageBody": "First ordered message",
+#     "MessageGroupId": "group1",
+#     "MessageDeduplicationId": "dedup1"
+#   },
+#   {
+#     "Id": "2",
+#     "MessageBody": "Second ordered message",
+#     "MessageGroupId": "group1",
+#     "MessageDeduplicationId": "dedup2"
+#   }
+# ]
+```
+
+### Receive Messages
+
+#### Short Polling (Default)
+```bash
+# Receive one message
+aws sqs receive-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue
+
+# Receive multiple messages (up to 10)
+aws sqs receive-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --max-number-of-messages 10
+
+# Receive with message attributes
+aws sqs receive-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attribute-names All \
+  --message-attribute-names All
+```
+
+#### Long Polling
+```bash
+# Enable long polling for this receive request (up to 20 seconds)
+aws sqs receive-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --wait-time-seconds 20 \
+  --max-number-of-messages 10
+
+# Long polling helps reduce empty responses and costs
+```
+
+#### Receive with Visibility Timeout Override
+```bash
+# Change visibility timeout for received messages
+aws sqs receive-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --visibility-timeout 300 \
+  --max-number-of-messages 5
+```
+
+### Delete Messages
+
+```bash
+# Delete single message (requires receipt handle from receive-message)
+aws sqs delete-message \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --receipt-handle "AQEBzWwaKH...ReceiptHandleFromReceiveMessage"
+
+# Delete batch of messages
+aws sqs delete-message-batch \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --entries '[
+    {"Id":"1","ReceiptHandle":"AQEBzWwaKH..."},
+    {"Id":"2","ReceiptHandle":"AQEBwXuKL..."}
+  ]'
+```
+
+### Change Message Visibility
+
+```bash
+# Extend visibility timeout for a message being processed
+aws sqs change-message-visibility \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --receipt-handle "AQEBzWwaKH..." \
+  --visibility-timeout 600
+
+# Change visibility for multiple messages
+aws sqs change-message-visibility-batch \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --entries '[
+    {"Id":"1","ReceiptHandle":"AQEBzWwaKH...","VisibilityTimeout":300},
+    {"Id":"2","ReceiptHandle":"AQEBwXuKL...","VisibilityTimeout":300}
+  ]'
+```
+
+### Purge Queue
+
+```bash
+# Delete all messages in queue (cannot be undone)
+aws sqs purge-queue \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue
+
+# Note: Can only purge once every 60 seconds
+```
+
+### Configure Queue Attributes
+
+#### Visibility Timeout
+```bash
+# Set visibility timeout (0 seconds to 12 hours)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes VisibilityTimeout=300
+```
+
+#### Message Retention Period
+```bash
+# Set retention period (60 seconds to 14 days)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes MessageRetentionPeriod=1209600
+```
+
+#### Delivery Delay
+```bash
+# Set default delay for all messages (0 to 900 seconds)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes DelaySeconds=30
+```
+
+#### Maximum Message Size
+```bash
+# Set max message size (1,024 bytes to 262,144 bytes)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes MaximumMessageSize=131072
+```
+
+#### Enable Long Polling
+```bash
+# Set receive message wait time for long polling
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes ReceiveMessageWaitTimeSeconds=20
+```
+
+### Dead Letter Queue (DLQ) Configuration
+
+```bash
+# Configure DLQ for a queue
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes '{
+    "RedrivePolicy": "{
+      \"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:123456789012:MyDLQ\",
+      \"maxReceiveCount\":\"3\"
+    }"
+  }'
+
+# Remove DLQ configuration
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes RedrivePolicy=""
+
+# Configure redrive allow policy on DLQ (specify which queues can use this DLQ)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyDLQ \
+  --attributes '{
+    "RedriveAllowPolicy": "{
+      \"redrivePermission\":\"byQueue\",
+      \"sourceQueueArns\":[
+        \"arn:aws:sqs:us-east-1:123456789012:MyStandardQueue\",
+        \"arn:aws:sqs:us-east-1:123456789012:MyOtherQueue\"
+      ]
+    }"
+  }'
+```
+
+### Server-Side Encryption (SSE)
+
+```bash
+# Enable SSE with AWS managed key (SSE-SQS)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes SqsManagedSseEnabled=true
+
+# Enable SSE with customer managed KMS key (SSE-KMS)
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes '{
+    "KmsMasterKeyId": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+    "KmsDataKeyReusePeriodSeconds": "300"
+  }'
+
+# Disable SSE
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes SqsManagedSseEnabled=false
+```
+
+### Queue Policies
+
+```bash
+# Set queue policy for cross-account access
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes Policy='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::999999999999:root"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:MyStandardQueue"}]}'
+
+# Allow SNS topic to send messages to queue
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes Policy='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"sns.amazonaws.com"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:MyStandardQueue","Condition":{"ArnEquals":{"aws:SourceArn":"arn:aws:sns:us-east-1:123456789012:MyTopic"}}}]}'
+
+# Allow S3 to send event notifications
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attributes Policy='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"s3.amazonaws.com"},"Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:MyStandardQueue","Condition":{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::my-bucket"}}}]}'
+```
+
+### FIFO Queue Specific Operations
+
+#### Deduplication Configuration
+```bash
+# Enable content-based deduplication
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyFIFOQueue.fifo \
+  --attributes ContentBasedDeduplication=true
+
+# Configure deduplication scope and throughput
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyFIFOQueue.fifo \
+  --attributes '{
+    "DeduplicationScope": "messageGroup",
+    "FifoThroughputLimit": "perMessageGroupId"
+  }'
+```
+
+### Tags Management
+
+```bash
+# Add tags to queue
+aws sqs tag-queue \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --tags Environment=Production CostCenter=Engineering Application=OrderProcessing
+
+# List tags for queue
+aws sqs list-queue-tags \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue
+
+# Remove tags from queue
+aws sqs untag-queue \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --tag-keys Environment CostCenter
+```
+
+### Delete Queue
+
+```bash
+# Delete queue (cannot be undone, deletes all messages)
+aws sqs delete-queue \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue
+```
+
+### Advanced Operations
+
+#### List Dead Letter Source Queues
+```bash
+# Find queues using this queue as DLQ
+aws sqs list-dead-letter-source-queues \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyDLQ
+```
+
+#### Start Message Move Task
+```bash
+# Move messages from DLQ back to source queue
+aws sqs start-message-move-task \
+  --source-arn arn:aws:sqs:us-east-1:123456789012:MyDLQ \
+  --destination-arn arn:aws:sqs:us-east-1:123456789012:MyStandardQueue \
+  --max-number-of-messages-per-second 10
+
+# List message move tasks
+aws sqs list-message-move-tasks \
+  --source-arn arn:aws:sqs:us-east-1:123456789012:MyDLQ
+
+# Cancel message move task
+aws sqs cancel-message-move-task \
+  --task-handle <task-handle-from-start>
+```
+
+### Monitoring Commands
+
+```bash
+# Get approximate number of messages
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible ApproximateNumberOfMessagesDelayed
+
+# Get queue creation and modification timestamps
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/MyStandardQueue \
+  --attribute-names CreatedTimestamp LastModifiedTimestamp
+```
+
+### Useful Query Examples
+
+```bash
+# Get all queue URLs and format as list
+aws sqs list-queues --output text
+
+# Get queue URL by name and store in variable
+QUEUE_URL=$(aws sqs get-queue-url --queue-name MyStandardQueue --output text)
+
+# Count approximate messages in queue
+aws sqs get-queue-attributes \
+  --queue-url $QUEUE_URL \
+  --attribute-names ApproximateNumberOfMessages \
+  --query 'Attributes.ApproximateNumberOfMessages' \
+  --output text
+
+# Send and receive in a script
+#!/bin/bash
+QUEUE_URL="https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+
+# Send message
+aws sqs send-message --queue-url $QUEUE_URL --message-body "Test message"
+
+# Receive message
+MESSAGE=$(aws sqs receive-message --queue-url $QUEUE_URL)
+RECEIPT_HANDLE=$(echo $MESSAGE | jq -r '.Messages[0].ReceiptHandle')
+
+# Process message (your logic here)
+echo "Processing message..."
+
+# Delete message after processing
+aws sqs delete-message --queue-url $QUEUE_URL --receipt-handle $RECEIPT_HANDLE
+```
 
 ---
 

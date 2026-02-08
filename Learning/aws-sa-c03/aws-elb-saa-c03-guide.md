@@ -13,7 +13,8 @@
 10. [Monitoring and Logging](#monitoring-and-logging)
 11. [Best Practices](#best-practices)
 12. [Common Use Cases](#common-use-cases)
-13. [Exam Tips](#exam-tips)
+13. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+14. [Exam Tips](#exam-tips)
 
 ## Overview
 
@@ -654,6 +655,1000 @@ ALB → Lambda Integration:
     - Event processing
     - Legacy application modernization
 ```
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing Elastic Load Balancers. All commands use AWS CLI v2 syntax.
+
+### Application Load Balancer (ALB) Management
+
+#### Create Application Load Balancer
+
+```bash
+# Create an internet-facing ALB
+aws elbv2 create-load-balancer \
+  --name my-application-load-balancer \
+  --subnets subnet-12345678 subnet-87654321 \
+  --security-groups sg-12345678 \
+  --scheme internet-facing \
+  --type application \
+  --ip-address-type ipv4 \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+
+# Create an internal ALB
+aws elbv2 create-load-balancer \
+  --name my-internal-alb \
+  --subnets subnet-12345678 subnet-87654321 \
+  --security-groups sg-12345678 \
+  --scheme internal \
+  --type application
+
+# Create ALB with dual-stack (IPv4 and IPv6)
+aws elbv2 create-load-balancer \
+  --name my-dualstack-alb \
+  --subnets subnet-12345678 subnet-87654321 \
+  --security-groups sg-12345678 \
+  --ip-address-type dualstack
+```
+
+#### Describe and List ALBs
+
+```bash
+# List all load balancers
+aws elbv2 describe-load-balancers
+
+# Describe specific load balancer
+aws elbv2 describe-load-balancers \
+  --load-balancer-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+
+# Describe load balancers by name
+aws elbv2 describe-load-balancers \
+  --names my-application-load-balancer
+
+# Filter load balancers with JMESPath query
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[?Type==`application`].[LoadBalancerName,DNSName,State.Code]' \
+  --output table
+```
+
+#### Modify ALB Attributes
+
+```bash
+# Enable access logs
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes \
+    Key=access_logs.s3.enabled,Value=true \
+    Key=access_logs.s3.bucket,Value=my-alb-logs \
+    Key=access_logs.s3.prefix,Value=my-app
+
+# Enable deletion protection
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes Key=deletion_protection.enabled,Value=true
+
+# Configure idle timeout (default is 60 seconds)
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes Key=idle_timeout.timeout_seconds,Value=120
+
+# Enable HTTP/2
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes Key=routing.http2.enabled,Value=true
+
+# Enable drop invalid header fields
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes Key=routing.http.drop_invalid_header_fields.enabled,Value=true
+```
+
+#### Delete ALB
+
+```bash
+# Delete load balancer
+aws elbv2 delete-load-balancer \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+```
+
+### Network Load Balancer (NLB) Management
+
+#### Create Network Load Balancer
+
+```bash
+# Create internet-facing NLB
+aws elbv2 create-load-balancer \
+  --name my-network-load-balancer \
+  --subnets subnet-12345678 subnet-87654321 \
+  --type network \
+  --scheme internet-facing \
+  --tags Key=Environment,Value=Production
+
+# Create NLB with static IP addresses (Elastic IPs)
+aws elbv2 create-load-balancer \
+  --name my-nlb-with-eip \
+  --type network \
+  --subnet-mappings SubnetId=subnet-12345678,AllocationId=eipalloc-12345678 \
+                    SubnetId=subnet-87654321,AllocationId=eipalloc-87654321
+
+# Create internal NLB
+aws elbv2 create-load-balancer \
+  --name my-internal-nlb \
+  --subnets subnet-12345678 subnet-87654321 \
+  --scheme internal \
+  --type network
+```
+
+#### Modify NLB Attributes
+
+```bash
+# Enable cross-zone load balancing (disabled by default for NLB)
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=true
+
+# Enable access logs for NLB
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --attributes \
+    Key=access_logs.s3.enabled,Value=true \
+    Key=access_logs.s3.bucket,Value=my-nlb-logs \
+    Key=access_logs.s3.prefix,Value=my-app
+
+# Enable deletion protection
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --attributes Key=deletion_protection.enabled,Value=true
+```
+
+### Classic Load Balancer (CLB) Operations
+
+#### Create Classic Load Balancer
+
+```bash
+# Create Classic Load Balancer (using older elb command)
+aws elb create-load-balancer \
+  --load-balancer-name my-classic-load-balancer \
+  --listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80" \
+             "Protocol=HTTPS,LoadBalancerPort=443,InstanceProtocol=HTTP,InstancePort=80,SSLCertificateId=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012" \
+  --subnets subnet-12345678 subnet-87654321 \
+  --security-groups sg-12345678
+```
+
+#### Configure CLB Health Checks
+
+```bash
+# Configure health check for CLB
+aws elb configure-health-check \
+  --load-balancer-name my-classic-load-balancer \
+  --health-check \
+    Target=HTTP:80/health,\
+    Interval=30,\
+    Timeout=5,\
+    UnhealthyThreshold=2,\
+    HealthyThreshold=2
+```
+
+#### Manage CLB Instances
+
+```bash
+# Register instances with CLB
+aws elb register-instances-with-load-balancer \
+  --load-balancer-name my-classic-load-balancer \
+  --instances i-12345678 i-87654321
+
+# Deregister instances from CLB
+aws elb deregister-instances-from-load-balancer \
+  --load-balancer-name my-classic-load-balancer \
+  --instances i-12345678
+
+# Describe instance health
+aws elb describe-instance-health \
+  --load-balancer-name my-classic-load-balancer
+```
+
+#### Delete CLB
+
+```bash
+# Delete Classic Load Balancer
+aws elb delete-load-balancer \
+  --load-balancer-name my-classic-load-balancer
+```
+
+### Target Groups Management
+
+#### Create Target Groups
+
+```bash
+# Create target group for EC2 instances (ALB/NLB)
+aws elbv2 create-target-group \
+  --name my-targets \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id vpc-12345678 \
+  --health-check-protocol HTTP \
+  --health-check-path /health \
+  --health-check-interval-seconds 30 \
+  --health-check-timeout-seconds 5 \
+  --healthy-threshold-count 2 \
+  --unhealthy-threshold-count 2 \
+  --matcher HttpCode=200
+
+# Create target group with IP address targets
+aws elbv2 create-target-group \
+  --name my-ip-targets \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id vpc-12345678 \
+  --target-type ip
+
+# Create target group for Lambda functions
+aws elbv2 create-target-group \
+  --name my-lambda-targets \
+  --target-type lambda
+
+# Create target group for NLB with TCP protocol
+aws elbv2 create-target-group \
+  --name my-tcp-targets \
+  --protocol TCP \
+  --port 3306 \
+  --vpc-id vpc-12345678 \
+  --health-check-protocol TCP
+
+# Create target group with advanced health check settings
+aws elbv2 create-target-group \
+  --name my-advanced-targets \
+  --protocol HTTPS \
+  --port 443 \
+  --vpc-id vpc-12345678 \
+  --health-check-protocol HTTPS \
+  --health-check-path /api/health \
+  --health-check-interval-seconds 10 \
+  --health-check-timeout-seconds 5 \
+  --healthy-threshold-count 3 \
+  --unhealthy-threshold-count 3 \
+  --matcher HttpCode=200-299
+```
+
+#### Describe Target Groups
+
+```bash
+# List all target groups
+aws elbv2 describe-target-groups
+
+# Describe specific target group
+aws elbv2 describe-target-groups \
+  --target-group-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+
+# Describe target groups by name
+aws elbv2 describe-target-groups \
+  --names my-targets
+
+# List target groups for a load balancer
+aws elbv2 describe-target-groups \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+```
+
+#### Register and Deregister Targets
+
+```bash
+# Register EC2 instances with target group
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --targets Id=i-12345678 Id=i-87654321
+
+# Register targets with specific ports
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --targets Id=i-12345678,Port=8080 Id=i-87654321,Port=8081
+
+# Register IP address targets
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-ip-targets/1234567890abcdef \
+  --targets Id=10.0.1.10 Id=10.0.2.20
+
+# Register IP targets with availability zone
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-ip-targets/1234567890abcdef \
+  --targets Id=10.0.1.10,AvailabilityZone=us-east-1a Id=10.0.2.20,AvailabilityZone=us-east-1b
+
+# Register Lambda function as target
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-lambda-targets/1234567890abcdef \
+  --targets Id=arn:aws:lambda:us-east-1:123456789012:function:my-function
+
+# Deregister targets from target group
+aws elbv2 deregister-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --targets Id=i-12345678 Id=i-87654321
+```
+
+#### Modify Target Group Attributes
+
+```bash
+# Configure deregistration delay (connection draining)
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=deregistration_delay.timeout_seconds,Value=30
+
+# Enable stickiness (session affinity) for ALB
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes \
+    Key=stickiness.enabled,Value=true \
+    Key=stickiness.type,Value=lb_cookie \
+    Key=stickiness.lb_cookie.duration_seconds,Value=86400
+
+# Enable application-based stickiness
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes \
+    Key=stickiness.enabled,Value=true \
+    Key=stickiness.type,Value=app_cookie \
+    Key=stickiness.app_cookie.cookie_name,Value=MyCookie \
+    Key=stickiness.app_cookie.duration_seconds,Value=86400
+
+# Enable slow start mode
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=slow_start.duration_seconds,Value=30
+
+# Configure load balancing algorithm (for ALB)
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=load_balancing.algorithm.type,Value=least_outstanding_requests
+
+# Enable cross-zone load balancing for target group
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=true
+
+# Configure Lambda multi-value headers
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-lambda-targets/1234567890abcdef \
+  --attributes Key=lambda.multi_value_headers.enabled,Value=true
+```
+
+#### Delete Target Group
+
+```bash
+# Delete target group
+aws elbv2 delete-target-group \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+```
+
+### Health Checks Configuration
+
+#### Check Target Health
+
+```bash
+# Describe target health for a target group
+aws elbv2 describe-target-health \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+
+# Check health of specific targets
+aws elbv2 describe-target-health \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --targets Id=i-12345678 Id=i-87654321
+
+# Get health status with detailed output
+aws elbv2 describe-target-health \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --query 'TargetHealthDescriptions[*].[Target.Id,TargetHealth.State,TargetHealth.Reason]' \
+  --output table
+```
+
+#### Modify Health Check Settings
+
+```bash
+# Modify target group health check settings
+aws elbv2 modify-target-group \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --health-check-protocol HTTP \
+  --health-check-path /health \
+  --health-check-interval-seconds 15 \
+  --health-check-timeout-seconds 5 \
+  --healthy-threshold-count 2 \
+  --unhealthy-threshold-count 2
+
+# Configure advanced health check with custom port
+aws elbv2 modify-target-group \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --health-check-port 8080 \
+  --health-check-protocol HTTP \
+  --health-check-path /api/health \
+  --matcher HttpCode=200,202
+
+# Enable health check for NLB with TCP
+aws elbv2 modify-target-group \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tcp-targets/1234567890abcdef \
+  --health-check-protocol TCP \
+  --health-check-interval-seconds 30
+```
+
+### Listeners Management
+
+#### Create Listeners
+
+```bash
+# Create HTTP listener for ALB
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+
+# Create HTTPS listener with SSL certificate
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --protocol HTTPS \
+  --port 443 \
+  --certificates CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --ssl-policy ELBSecurityPolicy-TLS-1-2-2017-01 \
+  --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+
+# Create HTTP listener with redirect to HTTPS
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions Type=redirect,RedirectConfig="{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}"
+
+# Create listener with fixed response
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --protocol HTTP \
+  --port 8080 \
+  --default-actions Type=fixed-response,FixedResponseConfig="{StatusCode=200,ContentType=text/plain,MessageBody='Hello World'}"
+
+# Create TCP listener for NLB
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --protocol TCP \
+  --port 3306 \
+  --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tcp-targets/1234567890abcdef
+
+# Create TLS listener for NLB
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --protocol TLS \
+  --port 443 \
+  --certificates CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --ssl-policy ELBSecurityPolicy-TLS-1-2-2017-01 \
+  --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+```
+
+#### Describe Listeners
+
+```bash
+# List all listeners for a load balancer
+aws elbv2 describe-listeners \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+
+# Describe specific listener
+aws elbv2 describe-listeners \
+  --listener-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef
+```
+
+#### Modify Listeners
+
+```bash
+# Modify listener default action
+aws elbv2 modify-listener \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --default-actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-new-targets/1234567890abcdef
+
+# Update SSL certificate
+aws elbv2 modify-listener \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --certificates CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/new-cert-id
+
+# Update SSL policy
+aws elbv2 modify-listener \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --ssl-policy ELBSecurityPolicy-TLS-1-3-2021-06
+```
+
+#### Delete Listener
+
+```bash
+# Delete listener
+aws elbv2 delete-listener \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef
+```
+
+### Listener Rules Management
+
+#### Create Listener Rules
+
+```bash
+# Create path-based routing rule
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 10 \
+  --conditions Field=path-pattern,Values='/api/*' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-targets/1234567890abcdef
+
+# Create host-based routing rule
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 20 \
+  --conditions Field=host-header,Values='api.example.com' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-targets/1234567890abcdef
+
+# Create rule with multiple conditions
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 30 \
+  --conditions \
+    Field=host-header,Values='admin.example.com' \
+    Field=path-pattern,Values='/admin/*' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/admin-targets/1234567890abcdef
+
+# Create rule based on HTTP headers
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 40 \
+  --conditions Field=http-header,HttpHeaderName=User-Agent,Values='*Mobile*' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/mobile-targets/1234567890abcdef
+
+# Create rule based on query strings
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 50 \
+  --conditions Field=query-string,Values='Key=version,Value=v2' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/v2-targets/1234567890abcdef
+
+# Create rule based on source IP
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 60 \
+  --conditions Field=source-ip,Values='192.0.2.0/24','198.51.100.0/24' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/internal-targets/1234567890abcdef
+
+# Create rule based on HTTP request method
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 70 \
+  --conditions Field=http-request-method,Values='POST','PUT' \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/write-targets/1234567890abcdef
+
+# Create rule with redirect action
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 80 \
+  --conditions Field=path-pattern,Values='/old-path/*' \
+  --actions Type=redirect,RedirectConfig="{Protocol=HTTPS,Port=443,Path='/new-path/#{path}',StatusCode=HTTP_301}"
+
+# Create rule with fixed response
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 90 \
+  --conditions Field=path-pattern,Values='/maintenance' \
+  --actions Type=fixed-response,FixedResponseConfig="{StatusCode=503,ContentType=text/html,MessageBody='<html>Service Unavailable</html>'}"
+
+# Create rule with weighted target groups
+aws elbv2 create-rule \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --priority 100 \
+  --conditions Field=path-pattern,Values='/canary/*' \
+  --actions Type=forward,ForwardConfig="{TargetGroups=[{TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/stable/1234567890abcdef,Weight=90},{TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/canary/1234567890abcdef,Weight=10}],TargetGroupStickinessConfig={Enabled=true,DurationSeconds=3600}}"
+```
+
+#### Describe Rules
+
+```bash
+# List all rules for a listener
+aws elbv2 describe-rules \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef
+
+# Describe specific rule
+aws elbv2 describe-rules \
+  --rule-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/1234567890abcdef
+
+# Get rules in priority order
+aws elbv2 describe-rules \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --query 'Rules | sort_by(@, &Priority)' \
+  --output table
+```
+
+#### Modify Rules
+
+```bash
+# Modify rule conditions
+aws elbv2 modify-rule \
+  --rule-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/1234567890abcdef \
+  --conditions Field=path-pattern,Values='/api/v2/*'
+
+# Modify rule actions
+aws elbv2 modify-rule \
+  --rule-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/1234567890abcdef \
+  --actions Type=forward,TargetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/new-targets/1234567890abcdef
+```
+
+#### Change Rule Priority
+
+```bash
+# Set rule priority
+aws elbv2 set-rule-priorities \
+  --rule-priorities \
+    RuleArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/rule1,Priority=5 \
+    RuleArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/rule2,Priority=10
+```
+
+#### Delete Rule
+
+```bash
+# Delete listener rule
+aws elbv2 delete-rule \
+  --rule-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/my-alb/1234567890abcdef/1234567890abcdef/1234567890abcdef
+```
+
+### SSL/TLS Certificates Management
+
+#### Add Certificates to Listener
+
+```bash
+# Add additional certificates to HTTPS listener
+aws elbv2 add-listener-certificates \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --certificates \
+    CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/cert1 \
+    CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/cert2
+```
+
+#### Describe Listener Certificates
+
+```bash
+# List certificates attached to listener
+aws elbv2 describe-listener-certificates \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef
+```
+
+#### Remove Certificates from Listener
+
+```bash
+# Remove certificates from listener
+aws elbv2 remove-listener-certificates \
+  --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/my-alb/1234567890abcdef/1234567890abcdef \
+  --certificates CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/cert1
+```
+
+#### Describe SSL Policies
+
+```bash
+# List all SSL policies
+aws elbv2 describe-ssl-policies
+
+# Describe specific SSL policy
+aws elbv2 describe-ssl-policies \
+  --names ELBSecurityPolicy-TLS-1-2-2017-01
+
+# List recommended SSL policies
+aws elbv2 describe-ssl-policies \
+  --query 'SslPolicies[?contains(Name, `Recommended`)].Name'
+```
+
+### Access Logs Configuration
+
+```bash
+# Enable access logs for ALB
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes \
+    Key=access_logs.s3.enabled,Value=true \
+    Key=access_logs.s3.bucket,Value=my-loadbalancer-logs \
+    Key=access_logs.s3.prefix,Value=my-app/production
+
+# Disable access logs
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes Key=access_logs.s3.enabled,Value=false
+
+# Get access logs configuration
+aws elbv2 describe-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --query 'Attributes[?contains(Key, `access_logs`)]'
+```
+
+### Tags Management
+
+```bash
+# Add tags to load balancer
+aws elbv2 add-tags \
+  --resource-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --tags Key=Environment,Value=Production Key=Owner,Value=TeamA Key=CostCenter,Value=12345
+
+# Add tags to multiple resources
+aws elbv2 add-tags \
+  --resource-arns \
+    arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+    arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --tags Key=Project,Value=WebApp Key=Version,Value=2.0
+
+# Describe tags
+aws elbv2 describe-tags \
+  --resource-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+
+# Remove tags from load balancer
+aws elbv2 remove-tags \
+  --resource-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --tag-keys Environment Owner
+```
+
+### Load Balancer Attributes
+
+```bash
+# Get all load balancer attributes
+aws elbv2 describe-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef
+
+# Get target group attributes
+aws elbv2 describe-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef
+
+# Enable HTTP/2 and HTTP desync mitigation
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes \
+    Key=routing.http2.enabled,Value=true \
+    Key=routing.http.desync_mitigation_mode,Value=defensive
+
+# Configure timeout and keep-alive settings
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --attributes \
+    Key=idle_timeout.timeout_seconds,Value=120 \
+    Key=routing.http.x_amzn_tls_version_and_cipher_suite.enabled,Value=true
+```
+
+### Cross-Zone Load Balancing
+
+```bash
+# Enable cross-zone load balancing for NLB (disabled by default)
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=true
+
+# Disable cross-zone load balancing
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/1234567890abcdef \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=false
+
+# Enable cross-zone for target group (ALB)
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=use_load_balancer_configuration
+```
+
+### Connection Draining / Deregistration Delay
+
+```bash
+# Set deregistration delay to 30 seconds
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=deregistration_delay.timeout_seconds,Value=30
+
+# Set longer deregistration delay for long-running connections
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --attributes Key=deregistration_delay.timeout_seconds,Value=300
+
+# Configure connection termination for NLB
+aws elbv2 modify-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tcp-targets/1234567890abcdef \
+  --attributes \
+    Key=deregistration_delay.timeout_seconds,Value=120 \
+    Key=deregistration_delay.connection_termination.enabled,Value=true
+```
+
+### Monitoring and Metrics
+
+```bash
+# Get CloudWatch metrics for load balancer
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name RequestCount \
+  --dimensions Name=LoadBalancer,Value=app/my-alb/1234567890abcdef \
+  --start-time 2026-02-08T00:00:00Z \
+  --end-time 2026-02-08T23:59:59Z \
+  --period 3600 \
+  --statistics Sum
+
+# Get target response time metrics
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name TargetResponseTime \
+  --dimensions Name=LoadBalancer,Value=app/my-alb/1234567890abcdef \
+  --start-time 2026-02-08T00:00:00Z \
+  --end-time 2026-02-08T23:59:59Z \
+  --period 300 \
+  --statistics Average,Maximum
+
+# Get unhealthy target count
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name UnHealthyHostCount \
+  --dimensions \
+    Name=LoadBalancer,Value=app/my-alb/1234567890abcdef \
+    Name=TargetGroup,Value=targetgroup/my-targets/1234567890abcdef \
+  --start-time 2026-02-08T00:00:00Z \
+  --end-time 2026-02-08T23:59:59Z \
+  --period 300 \
+  --statistics Maximum
+```
+
+### Useful Query and Filter Examples
+
+```bash
+# List all ALBs with their DNS names
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[?Type==`application`].[LoadBalancerName,DNSName,State.Code]' \
+  --output table
+
+# List all NLBs
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[?Type==`network`].[LoadBalancerName,DNSName]' \
+  --output table
+
+# Get load balancers by tag
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[*].LoadBalancerArn' \
+  --output text | xargs -I {} aws elbv2 describe-tags --resource-arns {} \
+  --query 'TagDescriptions[?Tags[?Key==`Environment`&&Value==`Production`]].ResourceArn' \
+  --output text
+
+# List all target groups with health check settings
+aws elbv2 describe-target-groups \
+  --query 'TargetGroups[*].[TargetGroupName,Protocol,Port,HealthCheckPath,HealthCheckIntervalSeconds]' \
+  --output table
+
+# Find unhealthy targets across all target groups
+aws elbv2 describe-target-groups \
+  --query 'TargetGroups[*].TargetGroupArn' \
+  --output text | xargs -n1 aws elbv2 describe-target-health --target-group-arn | \
+  jq '.TargetHealthDescriptions[] | select(.TargetHealth.State != "healthy")'
+
+# Get all listeners for a load balancer with their rules count
+aws elbv2 describe-listeners \
+  --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  --query 'Listeners[*].[Protocol,Port,ListenerArn]' \
+  --output table
+
+# Export load balancer configuration to JSON
+aws elbv2 describe-load-balancers \
+  --load-balancer-arns arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/1234567890abcdef \
+  > my-alb-config.json
+
+# Get all target groups and their stickiness settings
+aws elbv2 describe-target-group-attributes \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-targets/1234567890abcdef \
+  --query 'Attributes[?contains(Key, `stickiness`)]' \
+  --output table
+```
+
+### Batch Operations and Automation
+
+```bash
+# Create complete ALB setup with target group and listener
+# Step 1: Create target group
+TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
+  --name my-web-targets \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id vpc-12345678 \
+  --health-check-path /health \
+  --query 'TargetGroups[0].TargetGroupArn' \
+  --output text)
+
+# Step 2: Create load balancer
+LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer \
+  --name my-web-alb \
+  --subnets subnet-12345678 subnet-87654321 \
+  --security-groups sg-12345678 \
+  --tags Key=Environment,Value=Production \
+  --query 'LoadBalancers[0].LoadBalancerArn' \
+  --output text)
+
+# Step 3: Create HTTP listener with redirect to HTTPS
+aws elbv2 create-listener \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions Type=redirect,RedirectConfig="{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}"
+
+# Step 4: Create HTTPS listener
+LISTENER_ARN=$(aws elbv2 create-listener \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --protocol HTTPS \
+  --port 443 \
+  --certificates CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/12345678 \
+  --ssl-policy ELBSecurityPolicy-TLS-1-2-2017-01 \
+  --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN \
+  --query 'Listeners[0].ListenerArn' \
+  --output text)
+
+# Step 5: Register targets
+aws elbv2 register-targets \
+  --target-group-arn $TARGET_GROUP_ARN \
+  --targets Id=i-12345678 Id=i-87654321
+
+# Step 6: Enable access logs
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --attributes \
+    Key=access_logs.s3.enabled,Value=true \
+    Key=access_logs.s3.bucket,Value=my-logs \
+    Key=deletion_protection.enabled,Value=true
+
+echo "ALB Setup Complete!"
+echo "Load Balancer ARN: $LOAD_BALANCER_ARN"
+echo "Target Group ARN: $TARGET_GROUP_ARN"
+echo "Listener ARN: $LISTENER_ARN"
+
+# Delete complete ALB setup (cleanup)
+# Note: Delete in reverse order
+aws elbv2 delete-listener --listener-arn $LISTENER_ARN
+aws elbv2 delete-load-balancer --load-balancer-arn $LOAD_BALANCER_ARN
+aws elbv2 delete-target-group --target-group-arn $TARGET_GROUP_ARN
+```
+
+### Advanced Scenarios
+
+```bash
+# Blue-Green Deployment with weighted target groups
+# Create blue target group
+BLUE_TG=$(aws elbv2 create-target-group \
+  --name blue-targets \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id vpc-12345678 \
+  --query 'TargetGroups[0].TargetGroupArn' \
+  --output text)
+
+# Create green target group
+GREEN_TG=$(aws elbv2 create-target-group \
+  --name green-targets \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id vpc-12345678 \
+  --query 'TargetGroups[0].TargetGroupArn' \
+  --output text)
+
+# Create listener with 90/10 traffic split
+aws elbv2 create-listener \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions Type=forward,ForwardConfig="{TargetGroups=[{TargetGroupArn=$BLUE_TG,Weight=90},{TargetGroupArn=$GREEN_TG,Weight=10}]}"
+
+# Gradually shift traffic to green (canary deployment)
+# Update to 50/50
+aws elbv2 modify-listener \
+  --listener-arn $LISTENER_ARN \
+  --default-actions Type=forward,ForwardConfig="{TargetGroups=[{TargetGroupArn=$BLUE_TG,Weight=50},{TargetGroupArn=$GREEN_TG,Weight=50}]}"
+
+# Complete migration to green
+aws elbv2 modify-listener \
+  --listener-arn $LISTENER_ARN \
+  --default-actions Type=forward,ForwardConfig="{TargetGroups=[{TargetGroupArn=$GREEN_TG,Weight=100}]}"
+
+# Multi-region failover with Route 53 health checks
+# Create health check for ALB
+aws route53 create-health-check \
+  --caller-reference $(date +%s) \
+  --health-check-config \
+    Type=HTTPS_STR_MATCH,\
+    ResourcePath=/health,\
+    FullyQualifiedDomainName=my-alb-123456.us-east-1.elb.amazonaws.com,\
+    Port=443,\
+    RequestInterval=30,\
+    FailureThreshold=3,\
+    SearchString=healthy
+```
+
+These CLI commands provide comprehensive coverage for managing AWS Elastic Load Balancers. Remember to replace placeholder ARNs, IDs, and names with your actual values.
 
 ## Exam Tips
 

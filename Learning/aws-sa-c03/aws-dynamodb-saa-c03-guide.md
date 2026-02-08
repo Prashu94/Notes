@@ -20,7 +20,8 @@
 17. [Integration with Other AWS Services](#integration-with-other-aws-services)
 18. [Best Practices](#best-practices)
 19. [Common Use Cases](#common-use-cases)
-20. [Exam Tips](#exam-tips)
+20. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+21. [Exam Tips](#exam-tips)
 
 ## Introduction
 
@@ -870,6 +871,993 @@ def create_content_version(content_id, version, content_data):
             'Status': 'draft'
         }
     )
+```
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing DynamoDB tables, items, and related operations.
+
+### Create and Manage Tables
+
+```bash
+# Create a table with simple primary key (partition key only)
+aws dynamodb create-table \
+    --table-name Users \
+    --attribute-definitions \
+        AttributeName=UserID,AttributeType=S \
+    --key-schema \
+        AttributeName=UserID,KeyType=HASH \
+    --billing-mode PAY_PER_REQUEST
+
+# Create a table with composite primary key (partition key + sort key)
+aws dynamodb create-table \
+    --table-name Orders \
+    --attribute-definitions \
+        AttributeName=CustomerID,AttributeType=S \
+        AttributeName=OrderDate,AttributeType=S \
+    --key-schema \
+        AttributeName=CustomerID,KeyType=HASH \
+        AttributeName=OrderDate,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
+# Create a table with GSI and LSI
+aws dynamodb create-table \
+    --table-name Products \
+    --attribute-definitions \
+        AttributeName=ProductID,AttributeType=S \
+        AttributeName=Category,AttributeType=S \
+        AttributeName=Price,AttributeType=N \
+        AttributeName=CreatedDate,AttributeType=S \
+    --key-schema \
+        AttributeName=ProductID,KeyType=HASH \
+        AttributeName=CreatedDate,KeyType=RANGE \
+    --global-secondary-indexes \
+        "[
+            {
+                \"IndexName\": \"CategoryIndex\",
+                \"KeySchema\": [
+                    {\"AttributeName\":\"Category\",\"KeyType\":\"HASH\"},
+                    {\"AttributeName\":\"Price\",\"KeyType\":\"RANGE\"}
+                ],
+                \"Projection\": {\"ProjectionType\":\"ALL\"},
+                \"ProvisionedThroughput\": {
+                    \"ReadCapacityUnits\": 5,
+                    \"WriteCapacityUnits\": 5
+                }
+            }
+        ]" \
+    --local-secondary-indexes \
+        "[
+            {
+                \"IndexName\": \"PriceIndex\",
+                \"KeySchema\": [
+                    {\"AttributeName\":\"ProductID\",\"KeyType\":\"HASH\"},
+                    {\"AttributeName\":\"Price\",\"KeyType\":\"RANGE\"}
+                ],
+                \"Projection\": {\"ProjectionType\":\"ALL\"}
+            }
+        ]" \
+    --billing-mode PROVISIONED \
+    --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10
+
+# Describe a table
+aws dynamodb describe-table --table-name Users
+
+# List all tables
+aws dynamodb list-tables
+
+# Update table billing mode
+aws dynamodb update-table \
+    --table-name Users \
+    --billing-mode PAY_PER_REQUEST
+
+# Update table provisioned throughput
+aws dynamodb update-table \
+    --table-name Orders \
+    --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10
+
+# Delete a table
+aws dynamodb delete-table --table-name Users
+
+# Wait for table to be active
+aws dynamodb wait table-exists --table-name Users
+```
+
+### Put, Get, Update, Delete Items
+
+```bash
+# Put an item
+aws dynamodb put-item \
+    --table-name Users \
+    --item '{
+        "UserID": {"S": "user-123"},
+        "Name": {"S": "John Doe"},
+        "Email": {"S": "john@example.com"},
+        "Age": {"N": "30"},
+        "Active": {"BOOL": true}
+    }'
+
+# Put item with condition (only if not exists)
+aws dynamodb put-item \
+    --table-name Users \
+    --item '{
+        "UserID": {"S": "user-456"},
+        "Name": {"S": "Jane Smith"},
+        "Email": {"S": "jane@example.com"}
+    }' \
+    --condition-expression "attribute_not_exists(UserID)"
+
+# Get an item
+aws dynamodb get-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}'
+
+# Get item with specific attributes
+aws dynamodb get-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --projection-expression "Name, Email"
+
+# Get item with consistent read
+aws dynamodb get-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --consistent-read
+
+# Update an item
+aws dynamodb update-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --update-expression "SET Age = :age, #n = :name" \
+    --expression-attribute-names '{"#n": "Name"}' \
+    --expression-attribute-values '{
+        ":age": {"N": "31"},
+        ":name": {"S": "John Updated"}
+    }'
+
+# Update item with atomic counter
+aws dynamodb update-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --update-expression "SET LoginCount = LoginCount + :inc" \
+    --expression-attribute-values '{":inc": {"N": "1"}}' \
+    --return-values UPDATED_NEW
+
+# Update item with condition
+aws dynamodb update-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --update-expression "SET Active = :active" \
+    --condition-expression "Age > :min_age" \
+    --expression-attribute-values '{
+        ":active": {"BOOL": false},
+        ":min_age": {"N": "18"}
+    }'
+
+# Delete an item
+aws dynamodb delete-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}'
+
+# Delete item with condition and return old values
+aws dynamodb delete-item \
+    --table-name Users \
+    --key '{"UserID": {"S": "user-123"}}' \
+    --condition-expression "Active = :inactive" \
+    --expression-attribute-values '{":inactive": {"BOOL": false}}' \
+    --return-values ALL_OLD
+```
+
+### Batch Operations
+
+```bash
+# Batch write items (put and delete)
+aws dynamodb batch-write-item \
+    --request-items '{
+        "Users": [
+            {
+                "PutRequest": {
+                    "Item": {
+                        "UserID": {"S": "user-001"},
+                        "Name": {"S": "Alice"},
+                        "Email": {"S": "alice@example.com"}
+                    }
+                }
+            },
+            {
+                "PutRequest": {
+                    "Item": {
+                        "UserID": {"S": "user-002"},
+                        "Name": {"S": "Bob"},
+                        "Email": {"S": "bob@example.com"}
+                    }
+                }
+            },
+            {
+                "DeleteRequest": {
+                    "Key": {
+                        "UserID": {"S": "user-999"}
+                    }
+                }
+            }
+        ]
+    }'
+
+# Batch get items (up to 100 items, 16 MB)
+aws dynamodb batch-get-item \
+    --request-items '{
+        "Users": {
+            "Keys": [
+                {"UserID": {"S": "user-001"}},
+                {"UserID": {"S": "user-002"}},
+                {"UserID": {"S": "user-003"}}
+            ],
+            "ProjectionExpression": "UserID, Name, Email"
+        },
+        "Orders": {
+            "Keys": [
+                {
+                    "CustomerID": {"S": "cust-001"},
+                    "OrderDate": {"S": "2024-01-15"}
+                }
+            ]
+        }
+    }'
+
+# Batch get with consistent read
+aws dynamodb batch-get-item \
+    --request-items '{
+        "Users": {
+            "Keys": [
+                {"UserID": {"S": "user-001"}},
+                {"UserID": {"S": "user-002"}}
+            ],
+            "ConsistentRead": true
+        }
+    }'
+```
+
+### Query Operations
+
+```bash
+# Query with partition key only
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --expression-attribute-values '{
+        ":cust_id": {"S": "customer-123"}
+    }'
+
+# Query with partition key and sort key range
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id AND OrderDate BETWEEN :start_date AND :end_date" \
+    --expression-attribute-values '{
+        ":cust_id": {"S": "customer-123"},
+        ":start_date": {"S": "2024-01-01"},
+        ":end_date": {"S": "2024-12-31"}
+    }'
+
+# Query with filter expression
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --filter-expression "TotalAmount > :min_amount" \
+    --expression-attribute-values '{
+        ":cust_id": {"S": "customer-123"},
+        ":min_amount": {"N": "100"}
+    }'
+
+# Query on GSI
+aws dynamodb query \
+    --table-name Products \
+    --index-name CategoryIndex \
+    --key-condition-expression "Category = :cat AND Price < :max_price" \
+    --expression-attribute-values '{
+        ":cat": {"S": "Electronics"},
+        ":max_price": {"N": "500"}
+    }'
+
+# Query with projection
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --projection-expression "OrderID, OrderDate, TotalAmount" \
+    --expression-attribute-values '{":cust_id": {"S": "customer-123"}}'
+
+# Query with limit and pagination
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --expression-attribute-values '{":cust_id": {"S": "customer-123"}}' \
+    --limit 10
+
+# Query in reverse order (descending)
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --expression-attribute-values '{":cust_id": {"S": "customer-123"}}' \
+    --scan-index-forward false
+
+# Query with consistent read
+aws dynamodb query \
+    --table-name Orders \
+    --key-condition-expression "CustomerID = :cust_id" \
+    --expression-attribute-values '{":cust_id": {"S": "customer-123"}}' \
+    --consistent-read
+```
+
+### Scan Operations
+
+```bash
+# Scan entire table
+aws dynamodb scan --table-name Users
+
+# Scan with filter expression
+aws dynamodb scan \
+    --table-name Users \
+    --filter-expression "Age > :min_age AND Active = :active" \
+    --expression-attribute-values '{
+        ":min_age": {"N": "25"},
+        ":active": {"BOOL": true}
+    }'
+
+# Scan with projection
+aws dynamodb scan \
+    --table-name Users \
+    --projection-expression "UserID, Name, Email"
+
+# Parallel scan (segment 0 of 4)
+aws dynamodb scan \
+    --table-name Users \
+    --total-segments 4 \
+    --segment 0
+
+# Scan with limit
+aws dynamodb scan \
+    --table-name Users \
+    --limit 50
+
+# Scan on GSI
+aws dynamodb scan \
+    --table-name Products \
+    --index-name CategoryIndex
+
+# Scan with consistent read (only for base table, not GSI)
+aws dynamodb scan \
+    --table-name Users \
+    --consistent-read
+```
+
+### Global Tables
+
+```bash
+# Create a global table (v2019.11.21)
+aws dynamodb create-global-table \
+    --global-table-name GlobalUsers \
+    --replication-group RegionName=us-east-1 RegionName=eu-west-1 RegionName=ap-southeast-1
+
+# Update global table (add new region)
+aws dynamodb update-global-table \
+    --global-table-name GlobalUsers \
+    --replica-updates Create={RegionName=us-west-2}
+
+# Describe global table
+aws dynamodb describe-global-table \
+    --global-table-name GlobalUsers
+
+# List global tables
+aws dynamodb list-global-tables
+
+# Update global table settings
+aws dynamodb update-global-table-settings \
+    --global-table-name GlobalUsers \
+    --global-table-billing-mode PAY_PER_REQUEST
+
+# Describe global table settings
+aws dynamodb describe-global-table-settings \
+    --global-table-name GlobalUsers
+```
+
+### DynamoDB Streams
+
+```bash
+# Enable streams on a table
+aws dynamodb update-table \
+    --table-name Users \
+    --stream-specification \
+        StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+
+# List streams
+aws dynamodbstreams list-streams \
+    --table-name Users
+
+# Describe a stream
+aws dynamodbstreams describe-stream \
+    --stream-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/stream/2024-01-15T00:00:00.000"
+
+# Get shard iterator
+aws dynamodbstreams get-shard-iterator \
+    --stream-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/stream/2024-01-15T00:00:00.000" \
+    --shard-id "shardId-00000001234567890123-abcdefgh" \
+    --shard-iterator-type LATEST
+
+# Get stream records
+aws dynamodbstreams get-records \
+    --shard-iterator "AAAAAAAAAAGx1...=="
+
+# Disable streams
+aws dynamodb update-table \
+    --table-name Users \
+    --stream-specification StreamEnabled=false
+```
+
+### Backup and Restore
+
+```bash
+# Create on-demand backup
+aws dynamodb create-backup \
+    --table-name Users \
+    --backup-name users-backup-2024-01-15
+
+# List backups
+aws dynamodb list-backups \
+    --table-name Users
+
+# List all backups
+aws dynamodb list-backups
+
+# Describe backup
+aws dynamodb describe-backup \
+    --backup-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/backup/01234567890123-abcdefgh"
+
+# Restore from backup
+aws dynamodb restore-table-from-backup \
+    --target-table-name UsersRestored \
+    --backup-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/backup/01234567890123-abcdefgh"
+
+# Delete backup
+aws dynamodb delete-backup \
+    --backup-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/backup/01234567890123-abcdefgh"
+
+# Enable point-in-time recovery (PITR)
+aws dynamodb update-continuous-backups \
+    --table-name Users \
+    --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
+
+# Describe continuous backups
+aws dynamodb describe-continuous-backups \
+    --table-name Users
+
+# Restore to a point in time
+aws dynamodb restore-table-to-point-in-time \
+    --source-table-name Users \
+    --target-table-name UsersRestored \
+    --restore-date-time "2024-01-15T12:00:00Z"
+
+# Restore to latest restorable time
+aws dynamodb restore-table-to-point-in-time \
+    --source-table-name Users \
+    --target-table-name UsersRestored \
+    --use-latest-restorable-time
+```
+
+### DynamoDB Accelerator (DAX)
+
+```bash
+# Create DAX cluster
+aws dax create-cluster \
+    --cluster-name my-dax-cluster \
+    --node-type dax.r5.large \
+    --replication-factor 3 \
+    --iam-role-arn "arn:aws:iam::123456789012:role/DAXServiceRole" \
+    --subnet-group my-dax-subnet-group \
+    --security-group-ids sg-12345678
+
+# Describe DAX cluster
+aws dax describe-clusters \
+    --cluster-names my-dax-cluster
+
+# List DAX clusters
+aws dax describe-clusters
+
+# Update DAX cluster
+aws dax update-cluster \
+    --cluster-name my-dax-cluster \
+    --preferred-maintenance-window "sun:05:00-sun:06:00"
+
+# Increase DAX cluster nodes
+aws dax increase-replication-factor \
+    --cluster-name my-dax-cluster \
+    --new-replication-factor 5
+
+# Decrease DAX cluster nodes
+aws dax decrease-replication-factor \
+    --cluster-name my-dax-cluster \
+    --new-replication-factor 3
+
+# Delete DAX cluster
+aws dax delete-cluster \
+    --cluster-name my-dax-cluster
+
+# Create DAX subnet group
+aws dax create-subnet-group \
+    --subnet-group-name my-dax-subnet-group \
+    --subnet-ids subnet-12345678 subnet-87654321
+
+# Create DAX parameter group
+aws dax create-parameter-group \
+    --parameter-group-name my-dax-params \
+    --description "Custom DAX parameters"
+
+# Describe DAX parameter groups
+aws dax describe-parameter-groups
+```
+
+### Auto Scaling Configuration
+
+```bash
+# Register scalable target for table
+aws application-autoscaling register-scalable-target \
+    --service-namespace dynamodb \
+    --resource-id "table/Users" \
+    --scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+    --min-capacity 5 \
+    --max-capacity 100
+
+# Register scalable target for write capacity
+aws application-autoscaling register-scalable-target \
+    --service-namespace dynamodb \
+    --resource-id "table/Users" \
+    --scalable-dimension "dynamodb:table:WriteCapacityUnits" \
+    --min-capacity 5 \
+    --max-capacity 100
+
+# Create scaling policy for read capacity
+aws application-autoscaling put-scaling-policy \
+    --service-namespace dynamodb \
+    --resource-id "table/Users" \
+    --scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+    --policy-name "MyReadScalingPolicy" \
+    --policy-type TargetTrackingScaling \
+    --target-tracking-scaling-policy-configuration '{
+        "TargetValue": 70.0,
+        "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "DynamoDBReadCapacityUtilization"
+        },
+        "ScaleInCooldown": 60,
+        "ScaleOutCooldown": 60
+    }'
+
+# Create scaling policy for write capacity
+aws application-autoscaling put-scaling-policy \
+    --service-namespace dynamodb \
+    --resource-id "table/Users" \
+    --scalable-dimension "dynamodb:table:WriteCapacityUnits" \
+    --policy-name "MyWriteScalingPolicy" \
+    --policy-type TargetTrackingScaling \
+    --target-tracking-scaling-policy-configuration '{
+        "TargetValue": 70.0,
+        "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "DynamoDBWriteCapacityUtilization"
+        },
+        "ScaleInCooldown": 60,
+        "ScaleOutCooldown": 60
+    }'
+
+# Register GSI for auto scaling
+aws application-autoscaling register-scalable-target \
+    --service-namespace dynamodb \
+    --resource-id "table/Products/index/CategoryIndex" \
+    --scalable-dimension "dynamodb:index:ReadCapacityUnits" \
+    --min-capacity 5 \
+    --max-capacity 50
+
+# Describe scaling policies
+aws application-autoscaling describe-scaling-policies \
+    --service-namespace dynamodb
+
+# Deregister scalable target
+aws application-autoscaling deregister-scalable-target \
+    --service-namespace dynamodb \
+    --resource-id "table/Users" \
+    --scalable-dimension "dynamodb:table:ReadCapacityUnits"
+```
+
+### Tags Management
+
+```bash
+# Add tags to a table
+aws dynamodb tag-resource \
+    --resource-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users" \
+    --tags Key=Environment,Value=Production Key=Owner,Value=TeamA Key=CostCenter,Value=Engineering
+
+# List tags for a table
+aws dynamodb list-tags-of-resource \
+    --resource-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users"
+
+# Remove tags from a table
+aws dynamodb untag-resource \
+    --resource-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users" \
+    --tag-keys Environment Owner
+```
+
+### Time to Live (TTL) Configuration
+
+```bash
+# Enable TTL on a table
+aws dynamodb update-time-to-live \
+    --table-name Users \
+    --time-to-live-specification "Enabled=true,AttributeName=ExpirationTime"
+
+# Describe TTL settings
+aws dynamodb describe-time-to-live \
+    --table-name Users
+
+# Disable TTL
+aws dynamodb update-time-to-live \
+    --table-name Users \
+    --time-to-live-specification "Enabled=false,AttributeName=ExpirationTime"
+```
+
+### Global Secondary Indexes (GSI) Management
+
+```bash
+# Create a GSI on existing table
+aws dynamodb update-table \
+    --table-name Users \
+    --attribute-definitions AttributeName=Email,AttributeType=S \
+    --global-secondary-index-updates '[
+        {
+            "Create": {
+                "IndexName": "EmailIndex",
+                "KeySchema": [
+                    {"AttributeName": "Email", "KeyType": "HASH"}
+                ],
+                "Projection": {
+                    "ProjectionType": "ALL"
+                },
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 5,
+                    "WriteCapacityUnits": 5
+                }
+            }
+        }
+    ]'
+
+# Update GSI provisioned throughput
+aws dynamodb update-table \
+    --table-name Users \
+    --global-secondary-index-updates '[
+        {
+            "Update": {
+                "IndexName": "EmailIndex",
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 10,
+                    "WriteCapacityUnits": 10
+                }
+            }
+        }
+    ]'
+
+# Delete a GSI
+aws dynamodb update-table \
+    --table-name Users \
+    --global-secondary-index-updates '[
+        {
+            "Delete": {
+                "IndexName": "EmailIndex"
+            }
+        }
+    ]'
+
+# Create GSI with projection (only specific attributes)
+aws dynamodb update-table \
+    --table-name Users \
+    --attribute-definitions AttributeName=Country,AttributeType=S \
+    --global-secondary-index-updates '[
+        {
+            "Create": {
+                "IndexName": "CountryIndex",
+                "KeySchema": [
+                    {"AttributeName": "Country", "KeyType": "HASH"}
+                ],
+                "Projection": {
+                    "ProjectionType": "INCLUDE",
+                    "NonKeyAttributes": ["Name", "Email"]
+                },
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 5,
+                    "WriteCapacityUnits": 5
+                }
+            }
+        }
+    ]'
+```
+
+### Local Secondary Indexes (LSI) Management
+
+```bash
+# Note: LSI can only be created at table creation time
+# Create table with LSI
+aws dynamodb create-table \
+    --table-name Orders \
+    --attribute-definitions \
+        AttributeName=CustomerID,AttributeType=S \
+        AttributeName=OrderDate,AttributeType=S \
+        AttributeName=OrderStatus,AttributeType=S \
+    --key-schema \
+        AttributeName=CustomerID,KeyType=HASH \
+        AttributeName=OrderDate,KeyType=RANGE \
+    --local-secondary-indexes '[
+        {
+            "IndexName": "StatusIndex",
+            "KeySchema": [
+                {"AttributeName": "CustomerID", "KeyType": "HASH"},
+                {"AttributeName": "OrderStatus", "KeyType": "RANGE"}
+            ],
+            "Projection": {
+                "ProjectionType": "ALL"
+            }
+        }
+    ]' \
+    --billing-mode PAY_PER_REQUEST
+
+# Query using LSI
+aws dynamodb query \
+    --table-name Orders \
+    --index-name StatusIndex \
+    --key-condition-expression "CustomerID = :cust_id AND OrderStatus = :status" \
+    --expression-attribute-values '{
+        ":cust_id": {"S": "customer-123"},
+        ":status": {"S": "SHIPPED"}
+    }'
+```
+
+### Transactions
+
+```bash
+# TransactWriteItems - atomic write across multiple items
+aws dynamodb transact-write-items \
+    --transact-items '[
+        {
+            "Put": {
+                "TableName": "Users",
+                "Item": {
+                    "UserID": {"S": "user-123"},
+                    "Balance": {"N": "100"}
+                },
+                "ConditionExpression": "attribute_not_exists(UserID)"
+            }
+        },
+        {
+            "Update": {
+                "TableName": "Accounts",
+                "Key": {
+                    "AccountID": {"S": "acc-456"}
+                },
+                "UpdateExpression": "SET Balance = Balance - :amount",
+                "ExpressionAttributeValues": {
+                    ":amount": {"N": "100"},
+                    ":min_balance": {"N": "0"}
+                },
+                "ConditionExpression": "Balance >= :min_balance"
+            }
+        },
+        {
+            "Delete": {
+                "TableName": "PendingTransactions",
+                "Key": {
+                    "TransactionID": {"S": "txn-789"}
+                }
+            }
+        }
+    ]'
+
+# TransactGetItems - atomic read across multiple items
+aws dynamodb transact-get-items \
+    --transact-items '[
+        {
+            "Get": {
+                "TableName": "Users",
+                "Key": {
+                    "UserID": {"S": "user-123"}
+                },
+                "ProjectionExpression": "UserID, Balance"
+            }
+        },
+        {
+            "Get": {
+                "TableName": "Accounts",
+                "Key": {
+                    "AccountID": {"S": "acc-456"}
+                }
+            }
+        }
+    ]'
+
+# Transaction with condition check
+aws dynamodb transact-write-items \
+    --transact-items '[
+        {
+            "ConditionCheck": {
+                "TableName": "Users",
+                "Key": {
+                    "UserID": {"S": "user-123"}
+                },
+                "ConditionExpression": "Active = :true",
+                "ExpressionAttributeValues": {
+                    ":true": {"BOOL": true}
+                }
+            }
+        },
+        {
+            "Put": {
+                "TableName": "Orders",
+                "Item": {
+                    "OrderID": {"S": "order-001"},
+                    "CustomerID": {"S": "user-123"},
+                    "Amount": {"N": "99.99"}
+                }
+            }
+        }
+    ]'
+```
+
+### Export to S3
+
+```bash
+# Export table to S3
+aws dynamodb export-table-to-point-in-time \
+    --table-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users" \
+    --s3-bucket "my-exports-bucket" \
+    --s3-prefix "dynamodb-exports/" \
+    --export-format DYNAMODB_JSON
+
+# Export to S3 with specific time
+aws dynamodb export-table-to-point-in-time \
+    --table-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users" \
+    --s3-bucket "my-exports-bucket" \
+    --s3-prefix "dynamodb-exports/users/" \
+    --export-time "2024-01-15T12:00:00Z" \
+    --export-format ION
+
+# Export with SSE encryption
+aws dynamodb export-table-to-point-in-time \
+    --table-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users" \
+    --s3-bucket "my-exports-bucket" \
+    --s3-prefix "dynamodb-exports/" \
+    --s3-sse-algorithm AES256
+
+# Describe export
+aws dynamodb describe-export \
+    --export-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/export/01234567890123-abcdefgh"
+
+# List exports
+aws dynamodb list-exports \
+    --table-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users"
+```
+
+### Import from S3
+
+```bash
+# Import table from S3
+aws dynamodb import-table \
+    --s3-bucket-source S3Bucket=my-imports-bucket,S3KeyPrefix=dynamodb-imports/ \
+    --input-format DYNAMODB_JSON \
+    --table-creation-parameters '{
+        "TableName": "ImportedUsers",
+        "AttributeDefinitions": [
+            {"AttributeName": "UserID", "AttributeType": "S"}
+        ],
+        "KeySchema": [
+            {"AttributeName": "UserID", "KeyType": "HASH"}
+        ],
+        "BillingMode": "PAY_PER_REQUEST"
+    }'
+
+# Import with provisioned capacity
+aws dynamodb import-table \
+    --s3-bucket-source S3Bucket=my-imports-bucket,S3KeyPrefix=data/ \
+    --input-format ION \
+    --table-creation-parameters '{
+        "TableName": "ImportedOrders",
+        "AttributeDefinitions": [
+            {"AttributeName": "OrderID", "AttributeType": "S"},
+            {"AttributeName": "OrderDate", "AttributeType": "S"}
+        ],
+        "KeySchema": [
+            {"AttributeName": "OrderID", "KeyType": "HASH"},
+            {"AttributeName": "OrderDate", "KeyType": "RANGE"}
+        ],
+        "BillingMode": "PROVISIONED",
+        "ProvisionedThroughput": {
+            "ReadCapacityUnits": 10,
+            "WriteCapacityUnits": 10
+        }
+    }'
+
+# Import with compression
+aws dynamodb import-table \
+    --s3-bucket-source S3Bucket=my-imports-bucket,S3KeyPrefix=compressed/,InputCompressionType=GZIP \
+    --input-format CSV \
+    --input-format-options Csv={Delimiter=",",HeaderList=["UserID","Name","Email"]} \
+    --table-creation-parameters '{
+        "TableName": "ImportedUsersCSV",
+        "AttributeDefinitions": [
+            {"AttributeName": "UserID", "AttributeType": "S"}
+        ],
+        "KeySchema": [
+            {"AttributeName": "UserID", "KeyType": "HASH"}
+        ],
+        "BillingMode": "PAY_PER_REQUEST"
+    }'
+
+# Describe import
+aws dynamodb describe-import \
+    --import-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users/import/01234567890123-abcdefgh"
+
+# List imports
+aws dynamodb list-imports \
+    --table-arn "arn:aws:dynamodb:us-east-1:123456789012:table/Users"
+```
+
+### Additional Useful Commands
+
+```bash
+# Describe table limits
+aws dynamodb describe-limits
+
+# Get table contributor insights status
+aws dynamodb describe-contributor-insights \
+    --table-name Users
+
+# Update contributor insights
+aws dynamodb update-contributor-insights \
+    --table-name Users \
+    --contributor-insights-action ENABLE
+
+# Describe kinesis streaming destination
+aws dynamodb describe-kinesis-streaming-destination \
+    --table-name Users
+
+# Enable kinesis streaming
+aws dynamodb enable-kinesis-streaming-destination \
+    --table-name Users \
+    --stream-arn "arn:aws:kinesis:us-east-1:123456789012:stream/my-stream"
+
+# Disable kinesis streaming
+aws dynamodb disable-kinesis-streaming-destination \
+    --table-name Users \
+    --stream-arn "arn:aws:kinesis:us-east-1:123456789012:stream/my-stream"
+
+# Describe table replica auto scaling
+aws dynamodb describe-table-replica-auto-scaling \
+    --table-name GlobalUsers
+
+# Update table replica auto scaling
+aws dynamodb update-table-replica-auto-scaling \
+    --table-name GlobalUsers \
+    --replica-updates '[
+        {
+            "RegionName": "us-west-2",
+            "ReplicaGlobalSecondaryIndexUpdates": [
+                {
+                    "IndexName": "EmailIndex",
+                    "ProvisionedReadCapacityAutoScalingUpdate": {
+                        "MinimumUnits": 5,
+                        "MaximumUnits": 100,
+                        "AutoScalingRoleArn": "arn:aws:iam::123456789012:role/DynamoDBAutoscaleRole",
+                        "ScalingPolicyUpdate": {
+                            "TargetTrackingScalingPolicyConfiguration": {
+                                "TargetValue": 70.0
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    ]'
 ```
 
 ## Exam Tips

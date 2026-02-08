@@ -15,7 +15,8 @@
 12. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
 13. [Hands-on Labs](#hands-on-labs)
 14. [Best Practices](#best-practices)
-15. [Sample Questions](#sample-questions)
+15. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+16. [Sample Questions](#sample-questions)
 
 ---
 
@@ -1046,6 +1047,434 @@ Phases:
 2. Gradual: Incremental migration of workloads
 3. Full: Complete cutover to new VPN solution
 4. Cleanup: Remove legacy connectivity
+```
+
+---
+
+## AWS CLI Commands Reference
+
+### Create Customer Gateway
+
+```bash
+# Create customer gateway with static IP
+aws ec2 create-customer-gateway \
+    --type ipsec.1 \
+    --public-ip 203.0.113.25 \
+    --bgp-asn 65000 \
+    --tag-specifications \
+        'ResourceType=customer-gateway,Tags=[{Key=Name,Value=OnPremGW},{Key=Location,Value=DataCenter1}]'
+
+# Create customer gateway with device name
+aws ec2 create-customer-gateway \
+    --type ipsec.1 \
+    --public-ip 198.51.100.10 \
+    --bgp-asn 65001 \
+    --device-name "Cisco ASR1000" \
+    --tag-specifications \
+        'ResourceType=customer-gateway,Tags=[{Key=Name,Value=BranchOfficeGW}]'
+
+# Describe customer gateways
+aws ec2 describe-customer-gateways
+
+# Describe specific customer gateway
+aws ec2 describe-customer-gateways \
+    --customer-gateway-ids cgw-1234567890abcdef0
+
+# Delete customer gateway
+aws ec2 delete-customer-gateway \
+    --customer-gateway-id cgw-1234567890abcdef0
+```
+
+### Create Virtual Private Gateway
+
+```bash
+# Create virtual private gateway
+aws ec2 create-vpn-gateway \
+    --type ipsec.1 \
+    --amazon-side-asn 64512 \
+    --tag-specifications \
+        'ResourceType=vpn-gateway,Tags=[{Key=Name,Value=ProductionVGW}]'
+
+# Describe VPN gateways
+aws ec2 describe-vpn-gateways
+
+# Attach VPN gateway to VPC
+aws ec2 attach-vpn-gateway \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --vpc-id vpc-0abcdef1234567890
+
+# Detach VPN gateway from VPC
+aws ec2 detach-vpn-gateway \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --vpc-id vpc-0abcdef1234567890
+
+# Delete VPN gateway
+aws ec2 delete-vpn-gateway \
+    --vpn-gateway-id vgw-1234567890abcdef0
+```
+
+### Create VPN Connections
+
+#### Static Routing VPN Connection
+
+```bash
+# Create VPN connection with static routing
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --options StaticRoutesOnly=true \
+    --tag-specifications \
+        'ResourceType=vpn-connection,Tags=[{Key=Name,Value=StaticVPN}]'
+
+# Add static route to VPN connection
+aws ec2 create-vpn-connection-route \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16
+
+# Add additional static routes
+aws ec2 create-vpn-connection-route \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 172.16.0.0/12
+
+# Delete static route
+aws ec2 delete-vpn-connection-route \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16
+```
+
+#### Dynamic Routing VPN Connection (BGP)
+
+```bash
+# Create VPN connection with BGP (dynamic routing)
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --options \
+        StaticRoutesOnly=false,\
+        TunnelInsideIpVersion=ipv4 \
+    --tag-specifications \
+        'ResourceType=vpn-connection,Tags=[{Key=Name,Value=DynamicBGPVPN}]'
+
+# Create VPN with Transit Gateway
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options StaticRoutesOnly=false \
+    --tag-specifications \
+        'ResourceType=vpn-connection,Tags=[{Key=Name,Value=TransitGatewayVPN}]'
+```
+
+### VPN Tunnel Options
+
+```bash
+# Create VPN with custom tunnel options
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --options file://vpn-tunnel-options.json
+
+# vpn-tunnel-options.json content:
+# {
+#   "StaticRoutesOnly": false,
+#   "TunnelOptions": [
+#     {
+#       "TunnelInsideCidr": "169.254.10.0/30",
+#       "PreSharedKey": "MySecurePreSharedKey123",
+#       "Phase1LifetimeSeconds": 28800,
+#       "Phase2LifetimeSeconds": 3600,
+#       "RekeyMarginTimeSeconds": 540,
+#       "RekeyFuzzPercentage": 100,
+#       "ReplayWindowSize": 1024,
+#       "DPDTimeoutSeconds": 30,
+#       "Phase1EncryptionAlgorithms": [{"Value": "AES256"}],
+#       "Phase2EncryptionAlgorithms": [{"Value": "AES256"}],
+#       "Phase1IntegrityAlgorithms": [{"Value": "SHA2-256"}],
+#       "Phase2IntegrityAlgorithms": [{"Value": "SHA2-256"}],
+#       "Phase1DHGroupNumbers": [{"Value": 14}],
+#       "Phase2DHGroupNumbers": [{"Value": 14}],
+#       "IKEVersions": [{"Value": "ikev2"}],
+#       "StartupAction": "start"
+#     },
+#     {
+#       "TunnelInsideCidr": "169.254.11.0/30",
+#       "PreSharedKey": "MySecurePreSharedKey456",
+#       "Phase1LifetimeSeconds": 28800,
+#       "Phase2LifetimeSeconds": 3600
+#     }
+#   ]
+# }
+
+# Create VPN with accelerated VPN (Global Accelerator)
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-1234567890abcdef0 \
+    --transit-gateway-id tgw-1234567890abcdef0 \
+    --options \
+        EnableAcceleration=true,\
+        StaticRoutesOnly=false
+```
+
+### Modify VPN Connection Options
+
+```bash
+# Modify VPN connection
+aws ec2 modify-vpn-connection \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --customer-gateway-id cgw-9876543210fedcba0
+
+# Modify VPN tunnel options
+aws ec2 modify-vpn-tunnel-options \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --vpn-tunnel-outside-ip-address 203.0.113.25 \
+    --tunnel-options \
+        Phase1LifetimeSeconds=28800,\
+        Phase2LifetimeSeconds=3600,\
+        RekeyMarginTimeSeconds=540,\
+        DPDTimeoutSeconds=30,\
+        StartupAction=start
+
+# Modify VPN tunnel certificate
+aws ec2 modify-vpn-tunnel-certificate \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8 \
+    --vpn-tunnel-outside-ip-address 203.0.113.25
+```
+
+### Download VPN Configuration
+
+```bash
+# Download VPN configuration for generic device
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].CustomerGatewayConfiguration' \
+    --output text > vpn-config.xml
+
+# Get VPN connection details
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8
+
+# Get tunnel status
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].VgwTelemetry' \
+    --output table
+```
+
+### VPN Route Propagation
+
+```bash
+# Enable route propagation for VPN gateway
+aws ec2 enable-vgw-route-propagation \
+    --route-table-id rtb-1234567890abcdef0 \
+    --gateway-id vgw-1234567890abcdef0
+
+# Disable route propagation
+aws ec2 disable-vgw-route-propagation \
+    --route-table-id rtb-1234567890abcdef0 \
+    --gateway-id vgw-1234567890abcdef0
+
+# Describe route propagations
+aws ec2 describe-route-tables \
+    --route-table-ids rtb-1234567890abcdef0 \
+    --query 'RouteTables[0].PropagatingVgws'
+```
+
+### VPN CloudWatch Monitoring
+
+```bash
+# Get VPN connection metrics
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/VPN \
+    --metric-name TunnelState \
+    --dimensions Name=VpnId,Value=vpn-0a1b2c3d4e5f6g7h8 \
+    --start-time 2026-02-07T00:00:00Z \
+    --end-time 2026-02-08T00:00:00Z \
+    --period 300 \
+    --statistics Average
+
+# Get tunnel data in/out metrics
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/VPN \
+    --metric-name TunnelDataIn \
+    --dimensions Name=VpnId,Value=vpn-0a1b2c3d4e5f6g7h8 \
+    --start-time 2026-02-07T00:00:00Z \
+    --end-time 2026-02-08T00:00:00Z \
+    --period 3600 \
+    --statistics Sum \
+    --unit Bytes
+
+aws cloudwatch get-metric-statistics \
+    --namespace AWS/VPN \
+    --metric-name TunnelDataOut \
+    --dimensions Name=VpnId,Value=vpn-0a1b2c3d4e5f6g7h8 \
+    --start-time 2026-02-07T00:00:00Z \
+    --end-time 2026-02-08T00:00:00Z \
+    --period 3600 \
+    --statistics Sum \
+    --unit Bytes
+
+# Create CloudWatch alarm for tunnel state
+aws cloudwatch put-metric-alarm \
+    --alarm-name vpn-tunnel-down \
+    --alarm-description "Alert when VPN tunnel goes down" \
+    --metric-name TunnelState \
+    --namespace AWS/VPN \
+    --statistic Average \
+    --period 300 \
+    --threshold 0.5 \
+    --comparison-operator LessThanThreshold \
+    --evaluation-periods 2 \
+    --dimensions Name=VpnId,Value=vpn-0a1b2c3d4e5f6g7h8
+```
+
+### AWS Client VPN
+
+```bash
+# Create Client VPN endpoint
+aws ec2 create-client-vpn-endpoint \
+    --client-cidr-block 10.100.0.0/22 \
+    --server-certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123 \
+    --authentication-options Type=certificate-authentication,MutualAuthentication={ClientRootCertificateChainArn=arn:aws:acm:us-east-1:123456789012:certificate/def456} \
+    --connection-log-options Enabled=true,CloudwatchLogGroup=ClientVPNLogs,CloudwatchLogStream=ConnectionLogs \
+    --tag-specifications \
+        'ResourceType=client-vpn-endpoint,Tags=[{Key=Name,Value=CorpVPN}]'
+
+# Create Client VPN with Active Directory authentication
+aws ec2 create-client-vpn-endpoint \
+    --client-cidr-block 10.101.0.0/22 \
+    --server-certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123 \
+    --authentication-options Type=directory-service-authentication,ActiveDirectory={DirectoryId=d-1234567890} \
+    --connection-log-options Enabled=true,CloudwatchLogGroup=ClientVPNLogs \
+    --dns-servers 10.0.0.2 10.0.1.2 \
+    --split-tunnel \
+    --tag-specifications \
+        'ResourceType=client-vpn-endpoint,Tags=[{Key=Environment,Value=Production}]'
+
+# Associate Client VPN with subnet
+aws ec2 associate-client-vpn-target-network \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --subnet-id subnet-1234567890abcdef0
+
+# Add authorization rule
+aws ec2 authorize-client-vpn-ingress \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --target-network-cidr 10.0.0.0/16 \
+    --authorize-all-groups
+
+# Add authorization rule for specific AD group
+aws ec2 authorize-client-vpn-ingress \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --target-network-cidr 10.1.0.0/16 \
+    --access-group-id S-1-5-21-123456789-123456789-123456789-1234
+
+# Add Client VPN route
+aws ec2 create-client-vpn-route \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --destination-cidr-block 10.0.0.0/16 \
+    --target-vpc-subnet-id subnet-1234567890abcdef0
+
+# Export Client VPN configuration
+aws ec2 export-client-vpn-client-configuration \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --output text > client-vpn-config.ovpn
+
+# Describe Client VPN endpoints
+aws ec2 describe-client-vpn-endpoints
+
+# Describe Client VPN connections
+aws ec2 describe-client-vpn-connections \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8
+
+# Terminate Client VPN connection
+aws ec2 terminate-client-vpn-connections \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8 \
+    --connection-id cvpn-connection-0123456789abcdef0
+
+# Delete Client VPN endpoint
+aws ec2 delete-client-vpn-endpoint \
+    --client-vpn-endpoint-id cvpn-endpoint-0a1b2c3d4e5f6g7h8
+```
+
+### Tags Management
+
+```bash
+# Tag VPN connection
+aws ec2 create-tags \
+    --resources vpn-0a1b2c3d4e5f6g7h8 \
+    --tags Key=Environment,Value=Production Key=CostCenter,Value=IT Key=BackupVPN,Value=Yes
+
+# Tag customer gateway
+aws ec2 create-tags \
+    --resources cgw-1234567890abcdef0 \
+    --tags Key=Location,Value=DataCenter1 Key=ISP,Value=ATT
+
+# Tag VPN gateway
+aws ec2 create-tags \
+    --resources vgw-1234567890abcdef0 \
+    --tags Key=Environment,Value=Production Key=Region,Value=us-east-1
+
+# Describe tags
+aws ec2 describe-tags \
+    --filters "Name=resource-id,Values=vpn-0a1b2c3d4e5f6g7h8"
+
+# Delete tags
+aws ec2 delete-tags \
+    --resources vpn-0a1b2c3d4e5f6g7h8 \
+    --tags Key=BackupVPN
+```
+
+### VPN Troubleshooting Commands
+
+```bash
+# Check VPN connection state
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].State'
+
+# Get detailed tunnel telemetry
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].VgwTelemetry[*].[OutsideIpAddress,Status,LastStatusChange,StatusMessage]' \
+    --output table
+
+# Check BGP routes
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0a1b2c3d4e5f6g7h8 \
+    --query 'VpnConnections[0].Routes'
+
+# List all VPN connections
+aws ec2 describe-vpn-connections \
+    --query 'VpnConnections[*].[VpnConnectionId,State,Type,VpnGatewayId,CustomerGatewayId]' \
+    --output table
+
+# Get VPN gateway attachment state
+aws ec2 describe-vpn-gateways \
+    --vpn-gateway-ids vgw-1234567890abcdef0 \
+    --query 'VpnGateways[0].VpcAttachments[*].[VpcId,State]' \
+    --output table
+```
+
+### Delete VPN Resources
+
+```bash
+# Delete VPN connection
+aws ec2 delete-vpn-connection \
+    --vpn-connection-id vpn-0a1b2c3d4e5f6g7h8
+
+# Delete VPN gateway (must detach from VPC first)
+aws ec2 detach-vpn-gateway \
+    --vpn-gateway-id vgw-1234567890abcdef0 \
+    --vpc-id vpc-0abcdef1234567890
+
+aws ec2 delete-vpn-gateway \
+    --vpn-gateway-id vgw-1234567890abcdef0
+
+# Delete customer gateway
+aws ec2 delete-customer-gateway \
+    --customer-gateway-id cgw-1234567890abcdef0
 ```
 
 ---

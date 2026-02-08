@@ -7,7 +7,8 @@
 4. [Advanced VPC Features](#advanced-vpc-features)
 5. [VPC Security](#vpc-security)
 6. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
-7. [Exam Tips and Common Scenarios](#exam-tips-and-common-scenarios)
+7. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+8. [Exam Tips and Common Scenarios](#exam-tips-and-common-scenarios)
 
 ---
 
@@ -451,6 +452,969 @@ version account-id interface-id srcaddr dstaddr srcport dstport protocol packets
 - Troubleshoot connectivity issues
 - Validate network configuration changes
 - Security posture assessment
+
+---
+
+## AWS CLI Commands Reference
+
+### VPC Management
+
+#### Create and Delete VPC
+```bash
+# Create a VPC
+aws ec2 create-vpc \
+    --cidr-block 10.0.0.0/16 \
+    --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=MyVPC}]'
+
+# Create VPC with IPv6 CIDR block
+aws ec2 create-vpc \
+    --cidr-block 10.0.0.0/16 \
+    --amazon-provided-ipv6-cidr-block
+
+# Describe VPCs
+aws ec2 describe-vpcs
+
+# Describe specific VPC
+aws ec2 describe-vpcs --vpc-ids vpc-0123456789abcdef0
+
+# Describe VPCs with filters
+aws ec2 describe-vpcs \
+    --filters "Name=tag:Name,Values=MyVPC"
+
+# Add secondary CIDR block to VPC
+aws ec2 associate-vpc-cidr-block \
+    --vpc-id vpc-0123456789abcdef0 \
+    --cidr-block 10.1.0.0/16
+
+# Remove secondary CIDR block
+aws ec2 disassociate-vpc-cidr-block \
+    --association-id vpc-cidr-assoc-0123456789abcdef0
+
+# Enable DNS hostnames
+aws ec2 modify-vpc-attribute \
+    --vpc-id vpc-0123456789abcdef0 \
+    --enable-dns-hostnames
+
+# Enable DNS support
+aws ec2 modify-vpc-attribute \
+    --vpc-id vpc-0123456789abcdef0 \
+    --enable-dns-support
+
+# Delete VPC
+aws ec2 delete-vpc --vpc-id vpc-0123456789abcdef0
+```
+
+### Subnet Management
+
+#### Create and Manage Subnets
+```bash
+# Create a subnet
+aws ec2 create-subnet \
+    --vpc-id vpc-0123456789abcdef0 \
+    --cidr-block 10.0.1.0/24 \
+    --availability-zone us-east-1a \
+    --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=PublicSubnet1}]'
+
+# Create subnet with IPv6
+aws ec2 create-subnet \
+    --vpc-id vpc-0123456789abcdef0 \
+    --cidr-block 10.0.2.0/24 \
+    --ipv6-cidr-block 2600:1f13:fe3:5c00::/64 \
+    --availability-zone us-east-1b
+
+# Describe subnets
+aws ec2 describe-subnets
+
+# Describe subnets in a specific VPC
+aws ec2 describe-subnets \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific subnet
+aws ec2 describe-subnets --subnet-ids subnet-0123456789abcdef0
+
+# Enable auto-assign public IPv4
+aws ec2 modify-subnet-attribute \
+    --subnet-id subnet-0123456789abcdef0 \
+    --map-public-ip-on-launch
+
+# Disable auto-assign public IPv4
+aws ec2 modify-subnet-attribute \
+    --subnet-id subnet-0123456789abcdef0 \
+    --no-map-public-ip-on-launch
+
+# Enable auto-assign IPv6
+aws ec2 modify-subnet-attribute \
+    --subnet-id subnet-0123456789abcdef0 \
+    --assign-ipv6-address-on-creation
+
+# Delete subnet
+aws ec2 delete-subnet --subnet-id subnet-0123456789abcdef0
+```
+
+### Internet Gateway Operations
+
+#### Create and Attach Internet Gateway
+```bash
+# Create Internet Gateway
+aws ec2 create-internet-gateway \
+    --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=MyIGW}]'
+
+# Attach Internet Gateway to VPC
+aws ec2 attach-internet-gateway \
+    --internet-gateway-id igw-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0
+
+# Describe Internet Gateways
+aws ec2 describe-internet-gateways
+
+# Describe specific Internet Gateway
+aws ec2 describe-internet-gateways \
+    --internet-gateway-ids igw-0123456789abcdef0
+
+# Describe Internet Gateways attached to a VPC
+aws ec2 describe-internet-gateways \
+    --filters "Name=attachment.vpc-id,Values=vpc-0123456789abcdef0"
+
+# Detach Internet Gateway from VPC
+aws ec2 detach-internet-gateway \
+    --internet-gateway-id igw-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0
+
+# Delete Internet Gateway
+aws ec2 delete-internet-gateway \
+    --internet-gateway-id igw-0123456789abcdef0
+```
+
+### NAT Gateway Operations
+
+#### Create and Manage NAT Gateway
+```bash
+# Create NAT Gateway (requires Elastic IP)
+aws ec2 create-nat-gateway \
+    --subnet-id subnet-0123456789abcdef0 \
+    --allocation-id eipalloc-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=natgateway,Tags=[{Key=Name,Value=MyNATGateway}]'
+
+# Describe NAT Gateways
+aws ec2 describe-nat-gateways
+
+# Describe specific NAT Gateway
+aws ec2 describe-nat-gateways \
+    --nat-gateway-ids nat-0123456789abcdef0
+
+# Describe NAT Gateways in a specific VPC
+aws ec2 describe-nat-gateways \
+    --filter "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe NAT Gateways by state
+aws ec2 describe-nat-gateways \
+    --filter "Name=state,Values=available"
+
+# Delete NAT Gateway
+aws ec2 delete-nat-gateway \
+    --nat-gateway-id nat-0123456789abcdef0
+```
+
+### Route Table Management
+
+#### Create and Manage Route Tables
+```bash
+# Create route table
+aws ec2 create-route-table \
+    --vpc-id vpc-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=route-table,Tags=[{Key=Name,Value=PublicRouteTable}]'
+
+# Describe route tables
+aws ec2 describe-route-tables
+
+# Describe route tables in a specific VPC
+aws ec2 describe-route-tables \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific route table
+aws ec2 describe-route-tables \
+    --route-table-ids rtb-0123456789abcdef0
+
+# Create route to Internet Gateway
+aws ec2 create-route \
+    --route-table-id rtb-0123456789abcdef0 \
+    --destination-cidr-block 0.0.0.0/0 \
+    --gateway-id igw-0123456789abcdef0
+
+# Create route to NAT Gateway
+aws ec2 create-route \
+    --route-table-id rtb-0123456789abcdef0 \
+    --destination-cidr-block 0.0.0.0/0 \
+    --nat-gateway-id nat-0123456789abcdef0
+
+# Create route to VPC Peering Connection
+aws ec2 create-route \
+    --route-table-id rtb-0123456789abcdef0 \
+    --destination-cidr-block 10.1.0.0/16 \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+
+# Create route to Transit Gateway
+aws ec2 create-route \
+    --route-table-id rtb-0123456789abcdef0 \
+    --destination-cidr-block 10.2.0.0/16 \
+    --transit-gateway-id tgw-0123456789abcdef0
+
+# Delete route
+aws ec2 delete-route \
+    --route-table-id rtb-0123456789abcdef0 \
+    --destination-cidr-block 0.0.0.0/0
+
+# Associate route table with subnet
+aws ec2 associate-route-table \
+    --route-table-id rtb-0123456789abcdef0 \
+    --subnet-id subnet-0123456789abcdef0
+
+# Disassociate route table from subnet
+aws ec2 disassociate-route-table \
+    --association-id rtbassoc-0123456789abcdef0
+
+# Replace route table association
+aws ec2 replace-route-table-association \
+    --association-id rtbassoc-0123456789abcdef0 \
+    --route-table-id rtb-0fedcba9876543210
+
+# Delete route table
+aws ec2 delete-route-table \
+    --route-table-id rtb-0123456789abcdef0
+```
+
+### Security Group Operations
+
+#### Create and Manage Security Groups
+```bash
+# Create security group
+aws ec2 create-security-group \
+    --group-name MySecurityGroup \
+    --description "Security group for web servers" \
+    --vpc-id vpc-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=WebServerSG}]'
+
+# Describe security groups
+aws ec2 describe-security-groups
+
+# Describe security groups in a specific VPC
+aws ec2 describe-security-groups \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific security group
+aws ec2 describe-security-groups \
+    --group-ids sg-0123456789abcdef0
+
+# Add inbound rule (SSH from specific IP)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 203.0.113.0/24
+
+# Add inbound rule (HTTP from anywhere)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 80 \
+    --cidr 0.0.0.0/0
+
+# Add inbound rule (HTTPS from anywhere)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 443 \
+    --cidr 0.0.0.0/0
+
+# Add inbound rule from another security group
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 3306 \
+    --source-group sg-0fedcba9876543210
+
+# Add multiple rules at once using JSON
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}, {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}]'
+
+# Remove inbound rule
+aws ec2 revoke-security-group-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 22 \
+    --cidr 0.0.0.0/0
+
+# Add outbound rule
+aws ec2 authorize-security-group-egress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 443 \
+    --cidr 0.0.0.0/0
+
+# Remove outbound rule
+aws ec2 revoke-security-group-egress \
+    --group-id sg-0123456789abcdef0 \
+    --protocol tcp \
+    --port 443 \
+    --cidr 0.0.0.0/0
+
+# Update security group description
+aws ec2 update-security-group-rule-descriptions-ingress \
+    --group-id sg-0123456789abcdef0 \
+    --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "203.0.113.0/24", "Description": "SSH from office"}]}]'
+
+# Delete security group
+aws ec2 delete-security-group \
+    --group-id sg-0123456789abcdef0
+```
+
+### Network ACL Operations
+
+#### Create and Manage Network ACLs
+```bash
+# Create network ACL
+aws ec2 create-network-acl \
+    --vpc-id vpc-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=network-acl,Tags=[{Key=Name,Value=MyNACL}]'
+
+# Describe network ACLs
+aws ec2 describe-network-acls
+
+# Describe network ACLs in a specific VPC
+aws ec2 describe-network-acls \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific network ACL
+aws ec2 describe-network-acls \
+    --network-acl-ids acl-0123456789abcdef0
+
+# Create inbound rule (allow HTTP)
+aws ec2 create-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 100 \
+    --protocol tcp \
+    --port-range From=80,To=80 \
+    --cidr-block 0.0.0.0/0 \
+    --rule-action allow \
+    --ingress
+
+# Create inbound rule (allow HTTPS)
+aws ec2 create-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 110 \
+    --protocol tcp \
+    --port-range From=443,To=443 \
+    --cidr-block 0.0.0.0/0 \
+    --rule-action allow \
+    --ingress
+
+# Create inbound rule (allow ephemeral ports)
+aws ec2 create-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 120 \
+    --protocol tcp \
+    --port-range From=1024,To=65535 \
+    --cidr-block 0.0.0.0/0 \
+    --rule-action allow \
+    --ingress
+
+# Create outbound rule (allow all)
+aws ec2 create-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 100 \
+    --protocol -1 \
+    --cidr-block 0.0.0.0/0 \
+    --rule-action allow \
+    --egress
+
+# Create rule to deny specific IP
+aws ec2 create-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 50 \
+    --protocol -1 \
+    --cidr-block 203.0.113.100/32 \
+    --rule-action deny \
+    --ingress
+
+# Delete network ACL entry
+aws ec2 delete-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 100 \
+    --ingress
+
+# Replace network ACL entry
+aws ec2 replace-network-acl-entry \
+    --network-acl-id acl-0123456789abcdef0 \
+    --rule-number 100 \
+    --protocol tcp \
+    --port-range From=80,To=80 \
+    --cidr-block 10.0.0.0/16 \
+    --rule-action allow \
+    --ingress
+
+# Associate network ACL with subnet
+aws ec2 replace-network-acl-association \
+    --association-id aclassoc-0123456789abcdef0 \
+    --network-acl-id acl-0123456789abcdef0
+
+# Delete network ACL
+aws ec2 delete-network-acl \
+    --network-acl-id acl-0123456789abcdef0
+```
+
+### VPC Peering Operations
+
+#### Create and Manage VPC Peering Connections
+```bash
+# Create VPC peering connection
+aws ec2 create-vpc-peering-connection \
+    --vpc-id vpc-0123456789abcdef0 \
+    --peer-vpc-id vpc-0fedcba9876543210 \
+    --peer-region us-west-2 \
+    --tag-specifications 'ResourceType=vpc-peering-connection,Tags=[{Key=Name,Value=VPCPeering}]'
+
+# Create VPC peering connection to another account
+aws ec2 create-vpc-peering-connection \
+    --vpc-id vpc-0123456789abcdef0 \
+    --peer-vpc-id vpc-0fedcba9876543210 \
+    --peer-owner-id 123456789012 \
+    --peer-region us-west-2
+
+# Accept VPC peering connection
+aws ec2 accept-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+
+# Reject VPC peering connection
+aws ec2 reject-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+
+# Describe VPC peering connections
+aws ec2 describe-vpc-peering-connections
+
+# Describe specific VPC peering connection
+aws ec2 describe-vpc-peering-connections \
+    --vpc-peering-connection-ids pcx-0123456789abcdef0
+
+# Describe VPC peering connections for a VPC
+aws ec2 describe-vpc-peering-connections \
+    --filters "Name=requester-vpc-info.vpc-id,Values=vpc-0123456789abcdef0"
+
+# Modify VPC peering connection options (requester side)
+aws ec2 modify-vpc-peering-connection-options \
+    --vpc-peering-connection-id pcx-0123456789abcdef0 \
+    --requester-peering-connection-options AllowDnsResolutionFromRemoteVpc=true
+
+# Modify VPC peering connection options (accepter side)
+aws ec2 modify-vpc-peering-connection-options \
+    --vpc-peering-connection-id pcx-0123456789abcdef0 \
+    --accepter-peering-connection-options AllowDnsResolutionFromRemoteVpc=true
+
+# Delete VPC peering connection
+aws ec2 delete-vpc-peering-connection \
+    --vpc-peering-connection-id pcx-0123456789abcdef0
+```
+
+### VPC Endpoint Operations
+
+#### Create and Manage VPC Endpoints
+```bash
+# Create Gateway VPC Endpoint (S3)
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --service-name com.amazonaws.us-east-1.s3 \
+    --route-table-ids rtb-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=S3Endpoint}]'
+
+# Create Gateway VPC Endpoint (DynamoDB)
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --service-name com.amazonaws.us-east-1.dynamodb \
+    --route-table-ids rtb-0123456789abcdef0
+
+# Create Interface VPC Endpoint (EC2)
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.us-east-1.ec2 \
+    --subnet-ids subnet-0123456789abcdef0 subnet-0fedcba9876543210 \
+    --security-group-ids sg-0123456789abcdef0 \
+    --private-dns-enabled
+
+# Create Interface VPC Endpoint (Systems Manager)
+aws ec2 create-vpc-endpoint \
+    --vpc-id vpc-0123456789abcdef0 \
+    --vpc-endpoint-type Interface \
+    --service-name com.amazonaws.us-east-1.ssm \
+    --subnet-ids subnet-0123456789abcdef0 \
+    --security-group-ids sg-0123456789abcdef0
+
+# Describe VPC endpoints
+aws ec2 describe-vpc-endpoints
+
+# Describe VPC endpoints in a specific VPC
+aws ec2 describe-vpc-endpoints \
+    --filters "Name=vpc-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific VPC endpoint
+aws ec2 describe-vpc-endpoints \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+
+# Describe available VPC endpoint services
+aws ec2 describe-vpc-endpoint-services
+
+# Describe VPC endpoint services by name
+aws ec2 describe-vpc-endpoint-services \
+    --filters "Name=service-name,Values=com.amazonaws.us-east-1.s3"
+
+# Modify VPC endpoint (add route table)
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-route-table-ids rtb-0fedcba9876543210
+
+# Modify VPC endpoint (remove route table)
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --remove-route-table-ids rtb-0123456789abcdef0
+
+# Modify VPC endpoint (add subnet)
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-subnet-ids subnet-0fedcba9876543210
+
+# Modify VPC endpoint (add security group)
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --add-security-group-ids sg-0fedcba9876543210
+
+# Enable private DNS for VPC endpoint
+aws ec2 modify-vpc-endpoint \
+    --vpc-endpoint-id vpce-0123456789abcdef0 \
+    --private-dns-enabled
+
+# Delete VPC endpoint
+aws ec2 delete-vpc-endpoints \
+    --vpc-endpoint-ids vpce-0123456789abcdef0
+```
+
+### Elastic IP Operations
+
+#### Allocate and Manage Elastic IPs
+```bash
+# Allocate Elastic IP for VPC
+aws ec2 allocate-address \
+    --domain vpc \
+    --tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Name,Value=MyEIP}]'
+
+# Describe Elastic IPs
+aws ec2 describe-addresses
+
+# Describe specific Elastic IP
+aws ec2 describe-addresses \
+    --allocation-ids eipalloc-0123456789abcdef0
+
+# Describe Elastic IPs by filter
+aws ec2 describe-addresses \
+    --filters "Name=domain,Values=vpc"
+
+# Associate Elastic IP with instance
+aws ec2 associate-address \
+    --instance-id i-0123456789abcdef0 \
+    --allocation-id eipalloc-0123456789abcdef0
+
+# Associate Elastic IP with network interface
+aws ec2 associate-address \
+    --network-interface-id eni-0123456789abcdef0 \
+    --allocation-id eipalloc-0123456789abcdef0
+
+# Associate Elastic IP with private IP address
+aws ec2 associate-address \
+    --instance-id i-0123456789abcdef0 \
+    --allocation-id eipalloc-0123456789abcdef0 \
+    --private-ip-address 10.0.1.100
+
+# Disassociate Elastic IP
+aws ec2 disassociate-address \
+    --association-id eipassoc-0123456789abcdef0
+
+# Release Elastic IP
+aws ec2 release-address \
+    --allocation-id eipalloc-0123456789abcdef0
+
+# Move Elastic IP to another account (Step 1: Enable transfer)
+aws ec2 enable-address-transfer \
+    --allocation-id eipalloc-0123456789abcdef0 \
+    --transfer-account-id 123456789012
+
+# Move Elastic IP to another account (Step 2: Accept transfer)
+aws ec2 accept-address-transfer \
+    --address eipalloc-0123456789abcdef0
+```
+
+### VPC Flow Logs
+
+#### Create and Manage VPC Flow Logs
+```bash
+# Create VPC Flow Logs to CloudWatch Logs
+aws ec2 create-flow-logs \
+    --resource-type VPC \
+    --resource-ids vpc-0123456789abcdef0 \
+    --traffic-type ALL \
+    --log-destination-type cloud-watch-logs \
+    --log-group-name /aws/vpc/flowlogs \
+    --deliver-logs-permission-arn arn:aws:iam::123456789012:role/flowlogsRole \
+    --tag-specifications 'ResourceType=vpc-flow-log,Tags=[{Key=Name,Value=VPCFlowLogs}]'
+
+# Create VPC Flow Logs to S3
+aws ec2 create-flow-logs \
+    --resource-type VPC \
+    --resource-ids vpc-0123456789abcdef0 \
+    --traffic-type ALL \
+    --log-destination-type s3 \
+    --log-destination arn:aws:s3:::my-flow-logs-bucket/vpc-flow-logs/
+
+# Create Flow Logs for subnet
+aws ec2 create-flow-logs \
+    --resource-type Subnet \
+    --resource-ids subnet-0123456789abcdef0 \
+    --traffic-type ALL \
+    --log-destination-type cloud-watch-logs \
+    --log-group-name /aws/vpc/flowlogs
+
+# Create Flow Logs for network interface
+aws ec2 create-flow-logs \
+    --resource-type NetworkInterface \
+    --resource-ids eni-0123456789abcdef0 \
+    --traffic-type ALL \
+    --log-destination-type cloud-watch-logs \
+    --log-group-name /aws/vpc/flowlogs
+
+# Create Flow Logs with custom format
+aws ec2 create-flow-logs \
+    --resource-type VPC \
+    --resource-ids vpc-0123456789abcdef0 \
+    --traffic-type ALL \
+    --log-destination-type s3 \
+    --log-destination arn:aws:s3:::my-flow-logs-bucket/ \
+    --log-format '${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${bytes} ${action}'
+
+# Create Flow Logs for ACCEPT traffic only
+aws ec2 create-flow-logs \
+    --resource-type VPC \
+    --resource-ids vpc-0123456789abcdef0 \
+    --traffic-type ACCEPT \
+    --log-destination-type cloud-watch-logs \
+    --log-group-name /aws/vpc/flowlogs-accept
+
+# Create Flow Logs for REJECT traffic only
+aws ec2 create-flow-logs \
+    --resource-type VPC \
+    --resource-ids vpc-0123456789abcdef0 \
+    --traffic-type REJECT \
+    --log-destination-type cloud-watch-logs \
+    --log-group-name /aws/vpc/flowlogs-reject
+
+# Describe Flow Logs
+aws ec2 describe-flow-logs
+
+# Describe Flow Logs for specific VPC
+aws ec2 describe-flow-logs \
+    --filter "Name=resource-id,Values=vpc-0123456789abcdef0"
+
+# Describe specific Flow Log
+aws ec2 describe-flow-logs \
+    --flow-log-ids fl-0123456789abcdef0
+
+# Delete Flow Logs
+aws ec2 delete-flow-logs \
+    --flow-log-ids fl-0123456789abcdef0
+```
+
+### Network Interface Operations
+
+#### Create and Manage Network Interfaces (ENIs)
+```bash
+# Create network interface
+aws ec2 create-network-interface \
+    --subnet-id subnet-0123456789abcdef0 \
+    --description "Primary network interface" \
+    --groups sg-0123456789abcdef0 \
+    --private-ip-address 10.0.1.100 \
+    --tag-specifications 'ResourceType=network-interface,Tags=[{Key=Name,Value=MyENI}]'
+
+# Create network interface with secondary private IPs
+aws ec2 create-network-interface \
+    --subnet-id subnet-0123456789abcdef0 \
+    --groups sg-0123456789abcdef0 \
+    --secondary-private-ip-address-count 2
+
+# Describe network interfaces
+aws ec2 describe-network-interfaces
+
+# Describe network interfaces in a subnet
+aws ec2 describe-network-interfaces \
+    --filters "Name=subnet-id,Values=subnet-0123456789abcdef0"
+
+# Describe specific network interface
+aws ec2 describe-network-interfaces \
+    --network-interface-ids eni-0123456789abcdef0
+
+# Attach network interface to instance
+aws ec2 attach-network-interface \
+    --network-interface-id eni-0123456789abcdef0 \
+    --instance-id i-0123456789abcdef0 \
+    --device-index 1
+
+# Detach network interface
+aws ec2 detach-network-interface \
+    --attachment-id eni-attach-0123456789abcdef0 \
+    --force
+
+# Modify network interface attribute (description)
+aws ec2 modify-network-interface-attribute \
+    --network-interface-id eni-0123456789abcdef0 \
+    --description "Updated description"
+
+# Modify network interface attribute (security groups)
+aws ec2 modify-network-interface-attribute \
+    --network-interface-id eni-0123456789abcdef0 \
+    --groups sg-0123456789abcdef0 sg-0fedcba9876543210
+
+# Modify network interface attribute (source/dest check)
+aws ec2 modify-network-interface-attribute \
+    --network-interface-id eni-0123456789abcdef0 \
+    --no-source-dest-check
+
+# Assign private IP addresses
+aws ec2 assign-private-ip-addresses \
+    --network-interface-id eni-0123456789abcdef0 \
+    --private-ip-addresses 10.0.1.101 10.0.1.102
+
+# Assign private IP addresses (let AWS choose)
+aws ec2 assign-private-ip-addresses \
+    --network-interface-id eni-0123456789abcdef0 \
+    --secondary-private-ip-address-count 2
+
+# Unassign private IP addresses
+aws ec2 unassign-private-ip-addresses \
+    --network-interface-id eni-0123456789abcdef0 \
+    --private-ip-addresses 10.0.1.101
+
+# Assign IPv6 addresses
+aws ec2 assign-ipv6-addresses \
+    --network-interface-id eni-0123456789abcdef0 \
+    --ipv6-address-count 1
+
+# Unassign IPv6 addresses
+aws ec2 unassign-ipv6-addresses \
+    --network-interface-id eni-0123456789abcdef0 \
+    --ipv6-addresses 2001:db8:1234:1a00::123
+
+# Delete network interface
+aws ec2 delete-network-interface \
+    --network-interface-id eni-0123456789abcdef0
+```
+
+### Transit Gateway Operations
+
+#### Create and Manage Transit Gateway
+```bash
+# Create Transit Gateway
+aws ec2 create-transit-gateway \
+    --description "My Transit Gateway" \
+    --options AmazonSideAsn=64512,AutoAcceptSharedAttachments=enable,DefaultRouteTableAssociation=enable,DefaultRouteTablePropagation=enable \
+    --tag-specifications 'ResourceType=transit-gateway,Tags=[{Key=Name,Value=MyTGW}]'
+
+# Describe Transit Gateways
+aws ec2 describe-transit-gateways
+
+# Describe specific Transit Gateway
+aws ec2 describe-transit-gateways \
+    --transit-gateway-ids tgw-0123456789abcdef0
+
+# Create Transit Gateway VPC attachment
+aws ec2 create-transit-gateway-vpc-attachment \
+    --transit-gateway-id tgw-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0 \
+    --subnet-ids subnet-0123456789abcdef0 subnet-0fedcba9876543210 \
+    --tag-specifications 'ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=VPCAttachment}]'
+
+# Describe Transit Gateway attachments
+aws ec2 describe-transit-gateway-attachments
+
+# Describe Transit Gateway VPC attachments
+aws ec2 describe-transit-gateway-vpc-attachments
+
+# Accept Transit Gateway VPC attachment
+aws ec2 accept-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0123456789abcdef0
+
+# Delete Transit Gateway VPC attachment
+aws ec2 delete-transit-gateway-vpc-attachment \
+    --transit-gateway-attachment-id tgw-attach-0123456789abcdef0
+
+# Delete Transit Gateway
+aws ec2 delete-transit-gateway \
+    --transit-gateway-id tgw-0123456789abcdef0
+```
+
+### VPN Connection Operations
+
+#### Create and Manage VPN Connections
+```bash
+# Create Customer Gateway
+aws ec2 create-customer-gateway \
+    --type ipsec.1 \
+    --public-ip 203.0.113.12 \
+    --bgp-asn 65000 \
+    --tag-specifications 'ResourceType=customer-gateway,Tags=[{Key=Name,Value=MyCGW}]'
+
+# Create Virtual Private Gateway
+aws ec2 create-vpn-gateway \
+    --type ipsec.1 \
+    --amazon-side-asn 64512 \
+    --tag-specifications 'ResourceType=vpn-gateway,Tags=[{Key=Name,Value=MyVGW}]'
+
+# Attach Virtual Private Gateway to VPC
+aws ec2 attach-vpn-gateway \
+    --vpn-gateway-id vgw-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0
+
+# Create VPN Connection
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-0123456789abcdef0 \
+    --vpn-gateway-id vgw-0123456789abcdef0 \
+    --tag-specifications 'ResourceType=vpn-connection,Tags=[{Key=Name,Value=MyVPN}]'
+
+# Create VPN Connection with static routing
+aws ec2 create-vpn-connection \
+    --type ipsec.1 \
+    --customer-gateway-id cgw-0123456789abcdef0 \
+    --vpn-gateway-id vgw-0123456789abcdef0 \
+    --options StaticRoutesOnly=true
+
+# Describe Customer Gateways
+aws ec2 describe-customer-gateways
+
+# Describe Virtual Private Gateways
+aws ec2 describe-vpn-gateways
+
+# Describe VPN Connections
+aws ec2 describe-vpn-connections
+
+# Describe specific VPN Connection
+aws ec2 describe-vpn-connections \
+    --vpn-connection-ids vpn-0123456789abcdef0
+
+# Create static route for VPN connection
+aws ec2 create-vpn-connection-route \
+    --vpn-connection-id vpn-0123456789abcdef0 \
+    --destination-cidr-block 192.168.0.0/16
+
+# Delete static route
+aws ec2 delete-vpn-connection-route \
+    --vpn-connection-id vpn-0123456789abcdef0 \
+    --destination-cidr-block 192.168.0.0/16
+
+# Enable route propagation
+aws ec2 enable-vgw-route-propagation \
+    --route-table-id rtb-0123456789abcdef0 \
+    --gateway-id vgw-0123456789abcdef0
+
+# Disable route propagation
+aws ec2 disable-vgw-route-propagation \
+    --route-table-id rtb-0123456789abcdef0 \
+    --gateway-id vgw-0123456789abcdef0
+
+# Delete VPN Connection
+aws ec2 delete-vpn-connection \
+    --vpn-connection-id vpn-0123456789abcdef0
+
+# Detach Virtual Private Gateway
+aws ec2 detach-vpn-gateway \
+    --vpn-gateway-id vgw-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0
+
+# Delete Virtual Private Gateway
+aws ec2 delete-vpn-gateway \
+    --vpn-gateway-id vgw-0123456789abcdef0
+
+# Delete Customer Gateway
+aws ec2 delete-customer-gateway \
+    --customer-gateway-id cgw-0123456789abcdef0
+```
+
+### DHCP Options
+
+#### Create and Manage DHCP Options Sets
+```bash
+# Create DHCP options set
+aws ec2 create-dhcp-options \
+    --dhcp-configuration \
+        "Key=domain-name,Values=example.com" \
+        "Key=domain-name-servers,Values=10.0.0.2,AmazonProvidedDNS" \
+    --tag-specifications 'ResourceType=dhcp-options,Tags=[{Key=Name,Value=MyDHCPOptions}]'
+
+# Describe DHCP options
+aws ec2 describe-dhcp-options
+
+# Describe specific DHCP options
+aws ec2 describe-dhcp-options \
+    --dhcp-options-ids dopt-0123456789abcdef0
+
+# Associate DHCP options with VPC
+aws ec2 associate-dhcp-options \
+    --dhcp-options-id dopt-0123456789abcdef0 \
+    --vpc-id vpc-0123456789abcdef0
+
+# Associate default DHCP options with VPC
+aws ec2 associate-dhcp-options \
+    --dhcp-options-id default \
+    --vpc-id vpc-0123456789abcdef0
+
+# Delete DHCP options
+aws ec2 delete-dhcp-options \
+    --dhcp-options-id dopt-0123456789abcdef0
+```
+
+### Prefix Lists
+
+#### Create and Manage Prefix Lists
+```bash
+# Create managed prefix list
+aws ec2 create-managed-prefix-list \
+    --prefix-list-name my-prefix-list \
+    --address-family IPv4 \
+    --max-entries 10 \
+    --entries Cidr=10.0.0.0/16,Description="VPC CIDR" \
+    --tag-specifications 'ResourceType=prefix-list,Tags=[{Key=Name,Value=MyPrefixList}]'
+
+# Describe managed prefix lists
+aws ec2 describe-managed-prefix-lists
+
+# Describe specific prefix list
+aws ec2 describe-managed-prefix-lists \
+    --prefix-list-ids pl-0123456789abcdef0
+
+# Get prefix list entries
+aws ec2 get-managed-prefix-list-entries \
+    --prefix-list-id pl-0123456789abcdef0
+
+# Modify prefix list (add entries)
+aws ec2 modify-managed-prefix-list \
+    --prefix-list-id pl-0123456789abcdef0 \
+    --add-entries Cidr=10.1.0.0/16,Description="Additional CIDR"
+
+# Modify prefix list (remove entries)
+aws ec2 modify-managed-prefix-list \
+    --prefix-list-id pl-0123456789abcdef0 \
+    --remove-entries Cidr=10.1.0.0/16
+
+# Delete managed prefix list
+aws ec2 delete-managed-prefix-list \
+    --prefix-list-id pl-0123456789abcdef0
+```
 
 ---
 

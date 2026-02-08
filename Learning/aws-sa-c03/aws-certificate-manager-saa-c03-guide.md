@@ -11,7 +11,8 @@
 8. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
 9. [Best Practices for SAA-C03](#best-practices-for-saa-c03)
 10. [Exam Tips](#exam-tips)
-11. [Hands-on Labs](#hands-on-labs)
+11. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+12. [Hands-on Labs](#hands-on-labs)
 
 ---
 
@@ -521,6 +522,324 @@ Internet → CloudFront (ACM) → ALB (ACM) → Backend Instances
 #### Certificate Management
 - ❌ Manual certificate management for scalable applications
 - ✅ Use ACM automation features
+
+---
+
+## AWS CLI Commands Reference
+
+### Request Certificate with DNS Validation
+
+```bash
+# Request a single domain certificate with DNS validation
+aws acm request-certificate \
+  --domain-name example.com \
+  --validation-method DNS \
+  --region us-east-1 \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+
+# Request a wildcard certificate
+aws acm request-certificate \
+  --domain-name "*.example.com" \
+  --validation-method DNS \
+  --region us-east-1
+
+# Request certificate with Subject Alternative Names (multiple domains)
+aws acm request-certificate \
+  --domain-name example.com \
+  --subject-alternative-names www.example.com api.example.com \
+  --validation-method DNS \
+  --region us-east-1
+
+# Request certificate for CloudFront (must be in us-east-1)
+aws acm request-certificate \
+  --domain-name cdn.example.com \
+  --validation-method DNS \
+  --region us-east-1 \
+  --idempotency-token $(uuidgen)
+```
+
+### Request Certificate with Email Validation
+
+```bash
+# Request certificate with email validation
+aws acm request-certificate \
+  --domain-name example.com \
+  --validation-method EMAIL \
+  --region us-west-2
+
+# Request certificate with specific domain validation options
+aws acm request-certificate \
+  --domain-name example.com \
+  --validation-method EMAIL \
+  --domain-validation-options DomainName=example.com,ValidationDomain=example.com \
+  --region us-west-2
+```
+
+### Import Existing Certificate
+
+```bash
+# Import certificate with private key and certificate chain
+aws acm import-certificate \
+  --certificate fileb://certificate.pem \
+  --private-key fileb://private-key.pem \
+  --certificate-chain fileb://certificate-chain.pem \
+  --region us-east-1
+
+# Import certificate with tags
+aws acm import-certificate \
+  --certificate fileb://certificate.pem \
+  --private-key fileb://private-key.pem \
+  --certificate-chain fileb://certificate-chain.pem \
+  --tags Key=Name,Value=ImportedCert Key=Team,Value=DevOps \
+  --region us-east-1
+
+# Re-import certificate to update expiring certificate
+aws acm import-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --certificate fileb://new-certificate.pem \
+  --private-key fileb://new-private-key.pem \
+  --certificate-chain fileb://new-certificate-chain.pem \
+  --region us-east-1
+```
+
+### Describe Certificate Details
+
+```bash
+# Get detailed information about a certificate
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+
+# Get certificate details and extract specific fields using jq
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1 \
+  --query 'Certificate.[DomainName,Status,NotAfter]' \
+  --output table
+
+# Check certificate validation status
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[*].[DomainName,ValidationStatus]' \
+  --output table
+```
+
+### List Certificates
+
+```bash
+# List all certificates in a region
+aws acm list-certificates \
+  --region us-east-1
+
+# List certificates with specific status
+aws acm list-certificates \
+  --certificate-statuses ISSUED \
+  --region us-east-1
+
+# List pending validation certificates
+aws acm list-certificates \
+  --certificate-statuses PENDING_VALIDATION \
+  --region us-east-1
+
+# List certificates with pagination
+aws acm list-certificates \
+  --max-items 50 \
+  --region us-east-1
+
+# List certificates and format output
+aws acm list-certificates \
+  --region us-east-1 \
+  --query 'CertificateSummaryList[*].[DomainName,CertificateArn]' \
+  --output table
+
+# List certificates by multiple statuses
+aws acm list-certificates \
+  --certificate-statuses ISSUED PENDING_VALIDATION EXPIRED \
+  --region us-east-1
+```
+
+### Add Tags to Certificate
+
+```bash
+# Add tags to existing certificate
+aws acm add-tags-to-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --tags Key=Environment,Value=Production Key=CostCenter,Value=Engineering \
+  --region us-east-1
+
+# Add multiple tags
+aws acm add-tags-to-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --tags Key=Owner,Value=john@example.com Key=Project,Value=WebApp Key=Compliance,Value=PCI-DSS \
+  --region us-east-1
+```
+
+### List Certificate Tags
+
+```bash
+# List all tags for a certificate
+aws acm list-tags-for-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+### Remove Tags from Certificate
+
+```bash
+# Remove specific tags from certificate
+aws acm remove-tags-from-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --tags Key=OldTag Key=DeprecatedTag \
+  --region us-east-1
+```
+
+### Resend Validation Email
+
+```bash
+# Resend validation email for email-validated certificate
+aws acm resend-validation-email \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --domain example.com \
+  --validation-domain example.com \
+  --region us-east-1
+```
+
+### Export Certificate (Private CA Only)
+
+```bash
+# Export certificate issued by ACM Private CA
+aws acm export-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --passphrase $(echo -n "MySecurePassphrase" | base64) \
+  --region us-east-1
+
+# Export and save to files
+aws acm export-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --passphrase $(echo -n "MySecurePassphrase" | base64) \
+  --region us-east-1 \
+  --query 'Certificate' \
+  --output text > certificate.pem
+
+aws acm export-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --passphrase $(echo -n "MySecurePassphrase" | base64) \
+  --region us-east-1 \
+  --query 'PrivateKey' \
+  --output text > private-key.pem
+```
+
+### Delete Certificate
+
+```bash
+# Delete a certificate (only if not in use)
+aws acm delete-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1
+```
+
+### Get Certificate Validation Records
+
+```bash
+# Get DNS validation records for Route 53 setup
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[*].ResourceRecord' \
+  --output table
+```
+
+### Automated Certificate Request and Validation with Route 53
+
+```bash
+#!/bin/bash
+# Complete automation script for certificate request and DNS validation
+
+DOMAIN="example.com"
+REGION="us-east-1"
+HOSTED_ZONE_ID="Z1234567890ABC"
+
+# Request certificate
+CERT_ARN=$(aws acm request-certificate \
+  --domain-name $DOMAIN \
+  --validation-method DNS \
+  --region $REGION \
+  --query 'CertificateArn' \
+  --output text)
+
+echo "Certificate ARN: $CERT_ARN"
+
+# Wait for certificate to be issued
+while true; do
+  STATUS=$(aws acm describe-certificate \
+    --certificate-arn $CERT_ARN \
+    --region $REGION \
+    --query 'Certificate.Status' \
+    --output text)
+  
+  if [ "$STATUS" = "PENDING_VALIDATION" ]; then
+    echo "Getting validation records..."
+    
+    # Get validation DNS record
+    VALIDATION_RECORD=$(aws acm describe-certificate \
+      --certificate-arn $CERT_ARN \
+      --region $REGION \
+      --query 'Certificate.DomainValidationOptions[0].ResourceRecord')
+    
+    RECORD_NAME=$(echo $VALIDATION_RECORD | jq -r '.Name')
+    RECORD_VALUE=$(echo $VALIDATION_RECORD | jq -r '.Value')
+    RECORD_TYPE=$(echo $VALIDATION_RECORD | jq -r '.Type')
+    
+    # Create Route 53 change batch
+    cat > change-batch.json <<EOF
+{
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "$RECORD_NAME",
+      "Type": "$RECORD_TYPE",
+      "TTL": 300,
+      "ResourceRecords": [{"Value": "$RECORD_VALUE"}]
+    }
+  }]
+}
+EOF
+    
+    # Add DNS record to Route 53
+    aws route53 change-resource-record-sets \
+      --hosted-zone-id $HOSTED_ZONE_ID \
+      --change-batch file://change-batch.json
+    
+    echo "DNS record added. Waiting for validation..."
+  elif [ "$STATUS" = "ISSUED" ]; then
+    echo "Certificate issued successfully!"
+    break
+  elif [ "$STATUS" = "FAILED" ]; then
+    echo "Certificate validation failed!"
+    exit 1
+  fi
+  
+  sleep 10
+done
+```
+
+### Monitor Certificate Expiration
+
+```bash
+# List certificates expiring in next 30 days
+aws acm list-certificates \
+  --region us-east-1 \
+  --query "CertificateSummaryList[?NotAfter<='$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%S)'].[DomainName,NotAfter]" \
+  --output table
+
+# Check specific certificate expiration
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+  --region us-east-1 \
+  --query 'Certificate.[DomainName,NotAfter,RenewalEligibility]' \
+  --output table
+```
 
 ---
 

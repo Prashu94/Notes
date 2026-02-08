@@ -13,7 +13,8 @@
 9. [Common Use Cases and Architectures](#common-use-cases-and-architectures)
 10. [Troubleshooting](#troubleshooting)
 11. [SAA-C03 Exam Focus Areas](#saa-c03-exam-focus-areas)
-12. [Practice Questions](#practice-questions)
+12. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+13. [Practice Questions](#practice-questions)
 
 ---
 
@@ -1119,6 +1120,831 @@ Monitor WAF and Shield API calls and configuration changes.
 - Health check failures during attacks
 - Unusual geographic traffic patterns
 - Cost protection thresholds exceeded
+
+---
+
+## AWS CLI Commands Reference
+
+### 1. Create Web ACLs
+
+#### Create Web ACL for CloudFront (Global)
+```bash
+# Create a Web ACL for CloudFront distribution
+aws wafv2 create-web-acl \
+  --name MyCloudFrontWebACL \
+  --scope CLOUDFRONT \
+  --region us-east-1 \
+  --default-action Allow={} \
+  --description "Web ACL for CloudFront distributions" \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=MyCloudFrontWebACL
+
+# Create Web ACL with rules
+aws wafv2 create-web-acl \
+  --name ProductionWebACL \
+  --scope CLOUDFRONT \
+  --region us-east-1 \
+  --default-action Block={} \
+  --description "Production Web ACL with managed rules" \
+  --rules file://web-acl-rules.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=ProductionWebACL
+```
+
+#### Create Web ACL for Regional Resources (ALB/API Gateway)
+```bash
+# Create regional Web ACL for ALB
+aws wafv2 create-web-acl \
+  --name MyRegionalWebACL \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --default-action Allow={} \
+  --description "Web ACL for Application Load Balancer" \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=MyRegionalWebACL
+
+# Create Web ACL with custom response
+aws wafv2 create-web-acl \
+  --name APIGatewayACL \
+  --scope REGIONAL \
+  --region us-west-2 \
+  --default-action Block={CustomResponse={ResponseCode=403,CustomResponseBodyKey=blocked}} \
+  --custom-response-bodies blocked='{"ContentType":"APPLICATION_JSON","Content":"{\"error\":\"Access denied\"}"}' \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=APIGatewayACL
+```
+
+#### List and Describe Web ACLs
+```bash
+# List all Web ACLs (CloudFront)
+aws wafv2 list-web-acls \
+  --scope CLOUDFRONT \
+  --region us-east-1
+
+# List all Web ACLs (Regional)
+aws wafv2 list-web-acls \
+  --scope REGIONAL \
+  --region us-east-1
+
+# Get Web ACL details
+aws wafv2 get-web-acl \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <web-acl-id> \
+  --name MyRegionalWebACL
+```
+
+### 2. Create Rule Groups
+
+#### Create Custom Rule Group
+```bash
+# Create a custom rule group
+aws wafv2 create-rule-group \
+  --name MyCustomRuleGroup \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --capacity 100 \
+  --description "Custom rules for application protection" \
+  --rules file://rule-group-rules.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=MyCustomRuleGroup
+
+# Example rule group rules JSON file (rule-group-rules.json)
+cat > rule-group-rules.json <<'EOF'
+[
+  {
+    "Name": "BlockSQLInjection",
+    "Priority": 1,
+    "Statement": {
+      "SqliMatchStatement": {
+        "FieldToMatch": {
+          "AllQueryArguments": {}
+        },
+        "TextTransformations": [
+          {
+            "Priority": 0,
+            "Type": "URL_DECODE"
+          }
+        ]
+      }
+    },
+    "Action": {
+      "Block": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "BlockSQLInjection"
+    }
+  }
+]
+EOF
+```
+
+#### List and Manage Rule Groups
+```bash
+# List available rule groups
+aws wafv2 list-rule-groups \
+  --scope REGIONAL \
+  --region us-east-1
+
+# Get rule group details
+aws wafv2 get-rule-group \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <rule-group-id> \
+  --name MyCustomRuleGroup
+
+# Update rule group
+aws wafv2 update-rule-group \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <rule-group-id> \
+  --name MyCustomRuleGroup \
+  --lock-token <lock-token> \
+  --rules file://updated-rules.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=MyCustomRuleGroup
+
+# Delete rule group
+aws wafv2 delete-rule-group \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <rule-group-id> \
+  --name MyCustomRuleGroup \
+  --lock-token <lock-token>
+```
+
+### 3. IP Sets
+
+#### Create IP Set
+```bash
+# Create IPv4 IP set for blocking
+aws wafv2 create-ip-set \
+  --name BlockedIPsV4 \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --description "List of blocked IPv4 addresses" \
+  --ip-address-version IPV4 \
+  --addresses 203.0.113.0/24 198.51.100.0/24 192.0.2.44/32
+
+# Create IPv6 IP set
+aws wafv2 create-ip-set \
+  --name BlockedIPsV6 \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --description "List of blocked IPv6 addresses" \
+  --ip-address-version IPV6 \
+  --addresses 2001:0db8:85a3::/48
+
+# Create trusted IP set (allowlist)
+aws wafv2 create-ip-set \
+  --name TrustedIPs \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --description "Trusted IP addresses" \
+  --ip-address-version IPV4 \
+  --addresses 10.0.0.0/8 172.16.0.0/12
+```
+
+#### Update and Manage IP Sets
+```bash
+# List IP sets
+aws wafv2 list-ip-sets \
+  --scope REGIONAL \
+  --region us-east-1
+
+# Get IP set details
+aws wafv2 get-ip-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <ip-set-id> \
+  --name BlockedIPsV4
+
+# Update IP set with new addresses
+aws wafv2 update-ip-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <ip-set-id> \
+  --name BlockedIPsV4 \
+  --lock-token <lock-token> \
+  --addresses 203.0.113.0/24 198.51.100.0/24 192.0.2.44/32 192.0.2.99/32
+
+# Delete IP set
+aws wafv2 delete-ip-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <ip-set-id> \
+  --name BlockedIPsV4 \
+  --lock-token <lock-token>
+```
+
+### 4. Regex Pattern Sets
+
+#### Create Regex Pattern Set
+```bash
+# Create regex pattern set for blocking user agents
+aws wafv2 create-regex-pattern-set \
+  --name BadUserAgents \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --description "Patterns for malicious user agents" \
+  --regular-expression-list '{"RegexString":"badbot"},{"RegexString":"scraper.*"},{"RegexString":".*crawler.*"}'
+
+# Create regex pattern set for email validation
+aws wafv2 create-regex-pattern-set \
+  --name EmailPatterns \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --description "Email validation patterns" \
+  --regular-expression-list '{"RegexString":"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"}'
+```
+
+#### Manage Regex Pattern Sets
+```bash
+# List regex pattern sets
+aws wafv2 list-regex-pattern-sets \
+  --scope REGIONAL \
+  --region us-east-1
+
+# Get regex pattern set details
+aws wafv2 get-regex-pattern-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <regex-pattern-set-id> \
+  --name BadUserAgents
+
+# Update regex pattern set
+aws wafv2 update-regex-pattern-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <regex-pattern-set-id> \
+  --name BadUserAgents \
+  --lock-token <lock-token> \
+  --regular-expression-list '{"RegexString":"badbot"},{"RegexString":"scraper.*"},{"RegexString":".*crawler.*"},{"RegexString":"malicious.*"}'
+
+# Delete regex pattern set
+aws wafv2 delete-regex-pattern-set \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --id <regex-pattern-set-id> \
+  --name BadUserAgents \
+  --lock-token <lock-token>
+```
+
+### 5. Rate-Based Rules
+
+#### Create Rate-Based Rule in Web ACL
+```bash
+# Create Web ACL with rate-based rule
+cat > rate-based-rules.json <<'EOF'
+[
+  {
+    "Name": "RateLimitRule",
+    "Priority": 1,
+    "Statement": {
+      "RateBasedStatement": {
+        "Limit": 2000,
+        "AggregateKeyType": "IP"
+      }
+    },
+    "Action": {
+      "Block": {
+        "CustomResponse": {
+          "ResponseCode": 429,
+          "CustomResponseBodyKey": "rate-limit-response"
+        }
+      }
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "RateLimitRule"
+    }
+  }
+]
+EOF
+
+aws wafv2 create-web-acl \
+  --name RateLimitedWebACL \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --default-action Allow={} \
+  --rules file://rate-based-rules.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=RateLimitedWebACL
+```
+
+#### Advanced Rate-Based Rule with Scope-Down Statement
+```bash
+# Rate limit only for specific URI path
+cat > advanced-rate-rule.json <<'EOF'
+[
+  {
+    "Name": "APIRateLimit",
+    "Priority": 1,
+    "Statement": {
+      "RateBasedStatement": {
+        "Limit": 100,
+        "AggregateKeyType": "IP",
+        "ScopeDownStatement": {
+          "ByteMatchStatement": {
+            "SearchString": "/api/",
+            "FieldToMatch": {
+              "UriPath": {}
+            },
+            "TextTransformations": [
+              {
+                "Priority": 0,
+                "Type": "LOWERCASE"
+              }
+            ],
+            "PositionalConstraint": "STARTS_WITH"
+          }
+        }
+      }
+    },
+    "Action": {
+      "Block": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "APIRateLimit"
+    }
+  }
+]
+EOF
+```
+
+### 6. Managed Rule Groups
+
+#### List Available Managed Rule Groups
+```bash
+# List AWS managed rule groups
+aws wafv2 list-available-managed-rule-groups \
+  --scope REGIONAL \
+  --region us-east-1
+
+# List AWS managed rule groups for CloudFront
+aws wafv2 list-available-managed-rule-groups \
+  --scope CLOUDFRONT \
+  --region us-east-1
+
+# Describe managed rule group
+aws wafv2 describe-managed-rule-group \
+  --vendor-name AWS \
+  --name AWSManagedRulesCommonRuleSet \
+  --scope REGIONAL \
+  --region us-east-1
+```
+
+#### Add Managed Rule Groups to Web ACL
+```bash
+# Create Web ACL with AWS managed rules
+cat > managed-rules-config.json <<'EOF'
+[
+  {
+    "Name": "AWSManagedRulesCommonRuleSet",
+    "Priority": 0,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesCommonRuleSet"
+      }
+    },
+    "OverrideAction": {
+      "None": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWSManagedRulesCommonRuleSet"
+    }
+  },
+  {
+    "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+    "Priority": 1,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    },
+    "OverrideAction": {
+      "None": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWSManagedRulesKnownBadInputsRuleSet"
+    }
+  },
+  {
+    "Name": "AWSManagedRulesSQLiRuleSet",
+    "Priority": 2,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesSQLiRuleSet"
+      }
+    },
+    "OverrideAction": {
+      "None": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWSManagedRulesSQLiRuleSet"
+    }
+  }
+]
+EOF
+
+aws wafv2 create-web-acl \
+  --name ManagedRulesWebACL \
+  --scope REGIONAL \
+  --region us-east-1 \
+  --default-action Allow={} \
+  --rules file://managed-rules-config.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=ManagedRulesWebACL
+```
+
+#### Managed Rule Groups with Exclusions
+```bash
+# Create managed rule with specific rule exclusions
+cat > managed-rules-exclusions.json <<'EOF'
+[
+  {
+    "Name": "AWSManagedRulesCommonRuleSet",
+    "Priority": 0,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesCommonRuleSet",
+        "ExcludedRules": [
+          {"Name": "SizeRestrictions_BODY"},
+          {"Name": "GenericRFI_BODY"}
+        ]
+      }
+    },
+    "OverrideAction": {
+      "None": {}
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWSManagedRulesCommonRuleSet"
+    }
+  }
+]
+EOF
+```
+
+### 7. Associate Web ACL with Resources
+
+#### Associate Web ACL with ALB
+```bash
+# Associate Web ACL with Application Load Balancer
+aws wafv2 associate-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/<id>
+
+# List resources associated with Web ACL
+aws wafv2 list-resources-for-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>
+```
+
+#### Associate Web ACL with API Gateway
+```bash
+# Associate Web ACL with API Gateway REST API
+aws wafv2 associate-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --resource-arn arn:aws:apigateway:us-east-1::/restapis/<api-id>/stages/<stage-name>
+
+# Associate with API Gateway V2 (HTTP API)
+aws wafv2 associate-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --resource-arn arn:aws:apigateway:us-east-1::/apis/<api-id>/stages/<stage-name>
+```
+
+#### Associate Web ACL with CloudFront
+```bash
+# Associate Web ACL with CloudFront distribution
+aws wafv2 associate-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:global/webacl/MyCloudFrontWebACL/<id> \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id>
+
+# Alternative: Update CloudFront distribution with Web ACL
+aws cloudfront update-distribution \
+  --id <distribution-id> \
+  --if-match <etag> \
+  --distribution-config file://distribution-config.json
+# (Include WebACLId in the distribution-config.json)
+```
+
+#### Disassociate Web ACL
+```bash
+# Disassociate Web ACL from resource
+aws wafv2 disassociate-web-acl \
+  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/<id>
+
+# Get Web ACL for resource
+aws wafv2 get-web-acl-for-resource \
+  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/<id>
+```
+
+### 8. Logging Configuration
+
+#### Enable WAF Logging to S3
+```bash
+# Create S3 bucket for WAF logs
+BUCKET_NAME="aws-waf-logs-my-app-$(date +%s)"
+aws s3 mb s3://$BUCKET_NAME --region us-east-1
+
+# Put logging configuration
+aws wafv2 put-logging-configuration \
+  --logging-configuration '{
+    "ResourceArn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>",
+    "LogDestinationConfigs": [
+      "arn:aws:s3:::'$BUCKET_NAME'"
+    ]
+  }'
+```
+
+#### Enable WAF Logging to CloudWatch Logs
+```bash
+# Create CloudWatch Logs log group
+LOG_GROUP_NAME="aws-waf-logs-mywebacl"
+aws logs create-log-group --log-group-name $LOG_GROUP_NAME
+
+# Put logging configuration for CloudWatch
+aws wafv2 put-logging-configuration \
+  --logging-configuration '{
+    "ResourceArn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>",
+    "LogDestinationConfigs": [
+      "arn:aws:logs:us-east-1:123456789012:log-group:'$LOG_GROUP_NAME'"
+    ]
+  }'
+```
+
+#### Enable WAF Logging to Kinesis Data Firehose
+```bash
+# Put logging configuration for Kinesis Firehose
+aws wafv2 put-logging-configuration \
+  --logging-configuration '{
+    "ResourceArn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>",
+    "LogDestinationConfigs": [
+      "arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-stream"
+    ],
+    "RedactedFields": [
+      {"SingleHeader": {"Name": "authorization"}},
+      {"SingleHeader": {"Name": "cookie"}}
+    ],
+    "LoggingFilter": {
+      "DefaultBehavior": "KEEP",
+      "Filters": [
+        {
+          "Behavior": "DROP",
+          "Requirement": "MEETS_ALL",
+          "Conditions": [
+            {
+              "ActionCondition": {
+                "Action": "ALLOW"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }'
+
+# Get logging configuration
+aws wafv2 get-logging-configuration \
+  --resource-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>
+
+# Delete logging configuration
+aws wafv2 delete-logging-configuration \
+  --resource-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>
+```
+
+### 9. Shield Advanced Protection
+
+#### Subscribe to Shield Advanced
+```bash
+# Subscribe to Shield Advanced (creates subscription)
+aws shield create-subscription
+
+# Describe subscription
+aws shield describe-subscription
+
+# Get subscription state
+aws shield get-subscription-state
+```
+
+#### Create Shield Advanced Protection
+```bash
+# Protect CloudFront distribution
+aws shield create-protection \
+  --name CloudFrontProtection \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id>
+
+# Protect Application Load Balancer
+aws shield create-protection \
+  --name ALBProtection \
+  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/<id>
+
+# Protect Elastic IP
+aws shield create-protection \
+  --name EIPProtection \
+  --resource-arn arn:aws:ec2:us-east-1:123456789012:eip-allocation/<allocation-id>
+
+# Protect Route 53 hosted zone
+aws shield create-protection \
+  --name Route53Protection \
+  --resource-arn arn:aws:route53:::hostedzone/<hosted-zone-id>
+
+# Protect Global Accelerator
+aws shield create-protection \
+  --name GlobalAcceleratorProtection \
+  --resource-arn arn:aws:globalaccelerator::123456789012:accelerator/<accelerator-id>
+```
+
+#### List and Describe Protections
+```bash
+# List all protections
+aws shield list-protections
+
+# Describe specific protection
+aws shield describe-protection \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id>
+
+# Delete protection
+aws shield delete-protection \
+  --protection-id <protection-id>
+```
+
+#### Shield Protection Groups
+```bash
+# Create protection group
+aws shield create-protection-group \
+  --protection-group-id MyAppProtectionGroup \
+  --aggregation MAX \
+  --pattern ALL \
+  --members \
+    arn:aws:cloudfront::123456789012:distribution/<dist-id> \
+    arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/<id>
+
+# Create protection group by resource type
+aws shield create-protection-group \
+  --protection-group-id ALBProtectionGroup \
+  --aggregation SUM \
+  --pattern BY_RESOURCE_TYPE \
+  --resource-type APPLICATION_LOAD_BALANCER
+
+# List protection groups
+aws shield list-protection-groups
+
+# Describe protection group
+aws shield describe-protection-group \
+  --protection-group-id MyAppProtectionGroup
+
+# Update protection group
+aws shield update-protection-group \
+  --protection-group-id MyAppProtectionGroup \
+  --aggregation MEAN \
+  --pattern ALL
+
+# Delete protection group
+aws shield delete-protection-group \
+  --protection-group-id MyAppProtectionGroup
+```
+
+#### Shield Advanced Attack Details
+```bash
+# List attacks
+aws shield list-attacks \
+  --start-time FromInclusive=2024-01-01T00:00:00Z \
+  --end-time ToExclusive=2024-12-31T23:59:59Z
+
+# List attacks for specific resource
+aws shield list-attacks \
+  --resource-arns arn:aws:cloudfront::123456789012:distribution/<distribution-id> \
+  --start-time FromInclusive=2024-01-01T00:00:00Z \
+  --end-time ToExclusive=2024-12-31T23:59:59Z
+
+# Describe attack details
+aws shield describe-attack \
+  --attack-id <attack-id>
+
+# Describe attack statistics
+aws shield describe-attack-statistics
+```
+
+### 10. Shield DRT Access
+
+#### Configure DRT Access
+```bash
+# Associate DRT log bucket
+aws shield associate-drt-log-bucket \
+  --log-bucket my-shield-logs-bucket
+
+# List DRT log buckets
+aws shield list-drt-log-buckets
+
+# Disassociate DRT log bucket
+aws shield disassociate-drt-log-bucket \
+  --log-bucket my-shield-logs-bucket
+
+# Associate DRT IAM role
+aws shield associate-drt-role \
+  --role-arn arn:aws:iam::123456789012:role/ShieldDRTAccessRole
+
+# Describe DRT access
+aws shield describe-drt-access
+
+# Disassociate DRT role
+aws shield disassociate-drt-role
+```
+
+#### Emergency Contacts
+```bash
+# Associate emergency contacts
+aws shield associate-health-check \
+  --protection-id <protection-id> \
+  --health-check-arn arn:aws:route53:::healthcheck/<healthcheck-id>
+
+# Update emergency contact information
+aws shield update-emergency-contact-settings \
+  --emergency-contact-list '[
+    {
+      "EmailAddress": "security@example.com",
+      "ContactNotes": "Primary security contact",
+      "PhoneNumber": "+1-555-0100"
+    },
+    {
+      "EmailAddress": "ops@example.com",
+      "ContactNotes": "Operations team",
+      "PhoneNumber": "+1-555-0101"
+    }
+  ]'
+
+# Describe emergency contact settings
+aws shield describe-emergency-contact-settings
+```
+
+#### Shield Advanced Application Layer DDoS Configuration
+```bash
+# Enable application layer automatic response
+aws shield enable-application-layer-automatic-response \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id> \
+  --action Block={}
+
+# Update application layer automatic response
+aws shield update-application-layer-automatic-response \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id> \
+  --action Count={}
+
+# Describe application layer automatic response
+aws shield describe-application-layer-automatic-response \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id>
+
+# Disable application layer automatic response
+aws shield disable-application-layer-automatic-response \
+  --resource-arn arn:aws:cloudfront::123456789012:distribution/<distribution-id>
+```
+
+### 11. Additional Useful Commands
+
+#### Get Sampled Requests
+```bash
+# Get sampled requests for Web ACL
+aws wafv2 get-sampled-requests \
+  --web-acl-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --rule-metric-name MyRuleMetric \
+  --scope REGIONAL \
+  --time-window StartTime=2024-01-01T00:00:00Z,EndTime=2024-01-01T23:59:59Z \
+  --max-items 100
+```
+
+#### Check Capacity
+```bash
+# Check capacity usage for rule group
+aws wafv2 check-capacity \
+  --scope REGIONAL \
+  --rules file://rules.json
+```
+
+#### Tags Management
+```bash
+# Tag Web ACL
+aws wafv2 tag-resource \
+  --resource-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --tags Key=Environment,Value=Production Key=Application,Value=WebApp
+
+# List tags
+aws wafv2 list-tags-for-resource \
+  --resource-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id>
+
+# Untag resource
+aws wafv2 untag-resource \
+  --resource-arn arn:aws:wafv2:us-east-1:123456789012:regional/webacl/MyWebACL/<id> \
+  --tag-keys Environment
+```
 
 ---
 

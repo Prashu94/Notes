@@ -17,7 +17,8 @@
 14. [AWS Backup vs Service-Native Backup](#aws-backup-vs-service-native-backup)
 15. [Best Practices](#best-practices)
 16. [Exam Tips and Common Scenarios](#exam-tips-and-common-scenarios)
-17. [Hands-On Labs](#hands-on-labs)
+17. [AWS CLI Commands Reference](#aws-cli-commands-reference)
+18. [Hands-On Labs](#hands-on-labs)
 
 ## Introduction to AWS Backup
 
@@ -1187,6 +1188,824 @@ done
 - **Compliance**: Organizations integration for policy enforcement
 - **Encryption**: KMS integration for all backup vaults
 - **Lifecycle**: Automated cold storage and deletion
+
+---
+
+## AWS CLI Commands Reference
+
+This section provides comprehensive AWS CLI commands for managing AWS Backup resources.
+
+### Backup Plan Management
+
+#### Create Backup Plans
+
+```bash
+# Create a basic backup plan from JSON file
+aws backup create-backup-plan \
+  --backup-plan file://backup-plan.json
+
+# Create backup plan with inline JSON
+aws backup create-backup-plan \
+  --backup-plan '{
+    "BackupPlanName": "daily-backup-plan",
+    "Rules": [{
+      "RuleName": "daily-backups",
+      "TargetBackupVaultName": "Default",
+      "ScheduleExpression": "cron(0 5 ? * * *)",
+      "StartWindowMinutes": 60,
+      "CompletionWindowMinutes": 120,
+      "Lifecycle": {
+        "MoveToColdStorageAfterDays": 30,
+        "DeleteAfterDays": 365
+      }
+    }]
+  }'
+
+# Create backup plan with advanced lifecycle
+aws backup create-backup-plan \
+  --backup-plan '{
+    "BackupPlanName": "production-weekly-backup",
+    "Rules": [{
+      "RuleName": "weekly-full-backup",
+      "TargetBackupVaultName": "ProductionVault",
+      "ScheduleExpression": "cron(0 2 ? * SUN *)",
+      "Lifecycle": {
+        "MoveToColdStorageAfterDays": 90,
+        "DeleteAfterDays": 2555
+      },
+      "RecoveryPointTags": {
+        "BackupType": "Weekly",
+        "Environment": "Production"
+      }
+    }]
+  }'
+
+# Create backup plan with copy to another region
+aws backup create-backup-plan \
+  --backup-plan '{
+    "BackupPlanName": "cross-region-backup-plan",
+    "Rules": [{
+      "RuleName": "daily-with-copy",
+      "TargetBackupVaultName": "Default",
+      "ScheduleExpression": "cron(0 5 ? * * *)",
+      "Lifecycle": {"DeleteAfterDays": 35},
+      "CopyActions": [{
+        "DestinationBackupVaultArn": "arn:aws:backup:us-west-2:123456789012:backup-vault:DR-Vault",
+        "Lifecycle": {"DeleteAfterDays": 90}
+      }]
+    }]
+  }'
+
+# Create backup plan with multiple rules
+aws backup create-backup-plan \
+  --backup-plan '{
+    "BackupPlanName": "multi-tier-backup",
+    "Rules": [
+      {
+        "RuleName": "hourly-backups",
+        "TargetBackupVaultName": "Default",
+        "ScheduleExpression": "cron(0 * ? * * *)",
+        "Lifecycle": {"DeleteAfterDays": 7}
+      },
+      {
+        "RuleName": "daily-backups",
+        "TargetBackupVaultName": "Default",
+        "ScheduleExpression": "cron(0 5 ? * * *)",
+        "Lifecycle": {
+          "MoveToColdStorageAfterDays": 30,
+          "DeleteAfterDays": 90
+        }
+      },
+      {
+        "RuleName": "monthly-backups",
+        "TargetBackupVaultName": "LongTermVault",
+        "ScheduleExpression": "cron(0 5 1 * ? *)",
+        "Lifecycle": {
+          "MoveToColdStorageAfterDays": 90,
+          "DeleteAfterDays": 2555
+        }
+      }
+    ]
+  }'
+```
+
+#### List and Describe Backup Plans
+
+```bash
+# List all backup plans
+aws backup list-backup-plans
+
+# Get backup plan details
+aws backup get-backup-plan \
+  --backup-plan-id <backup-plan-id>
+
+# Get backup plan as JSON
+aws backup get-backup-plan \
+  --backup-plan-id <backup-plan-id> \
+  --output json
+
+# List backup plan versions
+aws backup list-backup-plan-versions \
+  --backup-plan-id <backup-plan-id>
+
+# Get specific backup plan version
+aws backup get-backup-plan \
+  --backup-plan-id <backup-plan-id> \
+  --version-id <version-id>
+```
+
+#### Update Backup Plans
+
+```bash
+# Update backup plan
+aws backup update-backup-plan \
+  --backup-plan-id <backup-plan-id> \
+  --backup-plan file://updated-backup-plan.json
+
+# Update backup plan to add new rule
+aws backup update-backup-plan \
+  --backup-plan-id <backup-plan-id> \
+  --backup-plan '{
+    "BackupPlanName": "updated-plan",
+    "Rules": [{
+      "RuleName": "new-backup-rule",
+      "TargetBackupVaultName": "Default",
+      "ScheduleExpression": "cron(0 12 ? * * *)",
+      "Lifecycle": {"DeleteAfterDays": 30}
+    }]
+  }'
+```
+
+#### Delete Backup Plans
+
+```bash
+# Delete backup plan
+aws backup delete-backup-plan \
+  --backup-plan-id <backup-plan-id>
+
+# Note: Deleting a backup plan does not delete existing recovery points
+```
+
+### Backup Vault Management
+
+#### Create Backup Vaults
+
+```bash
+# Create a basic backup vault
+aws backup create-backup-vault \
+  --backup-vault-name MyBackupVault
+
+# Create backup vault with KMS encryption
+aws backup create-backup-vault \
+  --backup-vault-name EncryptedVault \
+  --encryption-key-arn arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# Create backup vault with tags
+aws backup create-backup-vault \
+  --backup-vault-name ProductionVault \
+  --backup-vault-tags Environment=Production,Department=IT,CostCenter=12345
+```
+
+#### List and Describe Backup Vaults
+
+```bash
+# List all backup vaults
+aws backup list-backup-vaults
+
+# Describe specific backup vault
+aws backup describe-backup-vault \
+  --backup-vault-name MyBackupVault
+
+# List recovery points in a vault
+aws backup list-recovery-points-by-backup-vault \
+  --backup-vault-name MyBackupVault
+
+# List recovery points with filters
+aws backup list-recovery-points-by-backup-vault \
+  --backup-vault-name MyBackupVault \
+  --by-resource-type EC2
+```
+
+#### Backup Vault Access Policies
+
+```bash
+# Set backup vault access policy
+aws backup put-backup-vault-access-policy \
+  --backup-vault-name MyBackupVault \
+  --policy file://vault-policy.json
+
+# Get backup vault access policy
+aws backup get-backup-vault-access-policy \
+  --backup-vault-name MyBackupVault
+
+# Delete backup vault access policy
+aws backup delete-backup-vault-access-policy \
+  --backup-vault-name MyBackupVault
+```
+
+#### Backup Vault Lock Configuration
+
+```bash
+# Put vault lock configuration (compliance mode)
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name ComplianceVault \
+  --min-retention-days 30 \
+  --max-retention-days 365
+
+# Get vault lock configuration
+aws backup describe-backup-vault \
+  --backup-vault-name ComplianceVault
+
+# Delete vault lock configuration
+aws backup delete-backup-vault-lock-configuration \
+  --backup-vault-name ComplianceVault
+```
+
+#### Backup Vault Notifications
+
+```bash
+# Configure SNS notifications for backup vault
+aws backup put-backup-vault-notifications \
+  --backup-vault-name MyBackupVault \
+  --sns-topic-arn arn:aws:sns:us-east-1:123456789012:backup-notifications \
+  --backup-vault-events BACKUP_JOB_STARTED BACKUP_JOB_COMPLETED BACKUP_JOB_FAILED RESTORE_JOB_COMPLETED
+
+# Get backup vault notifications
+aws backup get-backup-vault-notifications \
+  --backup-vault-name MyBackupVault
+
+# Delete backup vault notifications
+aws backup delete-backup-vault-notifications \
+  --backup-vault-name MyBackupVault
+```
+
+#### Delete Backup Vaults
+
+```bash
+# Delete backup vault (must be empty)
+aws backup delete-backup-vault \
+  --backup-vault-name MyBackupVault
+
+# Note: Cannot delete vault with existing recovery points
+```
+
+### Backup Selections (Resource Assignments)
+
+#### Create Backup Selections
+
+```bash
+# Create backup selection by resource IDs
+aws backup create-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --backup-selection '{
+    "SelectionName": "production-ec2-instances",
+    "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupRole",
+    "Resources": [
+      "arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0",
+      "arn:aws:ec2:us-east-1:123456789012:instance/i-0987654321fedcba0"
+    ]
+  }'
+
+# Create backup selection by tags
+aws backup create-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --backup-selection '{
+    "SelectionName": "tagged-resources",
+    "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupRole",
+    "ListOfTags": [{
+      "ConditionType": "STRINGEQUALS",
+      "ConditionKey": "Backup",
+      "ConditionValue": "Daily"
+    }]
+  }'
+
+# Create backup selection with multiple tag conditions
+aws backup create-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --backup-selection '{
+    "SelectionName": "multi-tag-selection",
+    "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupRole",
+    "ListOfTags": [
+      {
+        "ConditionType": "STRINGEQUALS",
+        "ConditionKey": "Environment",
+        "ConditionValue": "Production"
+      },
+      {
+        "ConditionType": "STRINGEQUALS",
+        "ConditionKey": "BackupEnabled",
+        "ConditionValue": "true"
+      }
+    ]
+  }'
+
+# Create backup selection with resource type filter
+aws backup create-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --backup-selection '{
+    "SelectionName": "all-rds-databases",
+    "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupRole",
+    "Resources": ["*"],
+    "Conditions": {
+      "StringEquals": [{
+        "ConditionKey": "aws:ResourceTag/Backup",
+        "ConditionValue": "true"
+      }]
+    }
+  }'
+
+# Create backup selection excluding specific resources
+aws backup create-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --backup-selection '{
+    "SelectionName": "all-except-test",
+    "IamRoleArn": "arn:aws:iam::123456789012:role/AWSBackupRole",
+    "Resources": ["*"],
+    "NotResources": [
+      "arn:aws:ec2:us-east-1:123456789012:instance/i-testinstance"
+    ]
+  }'
+```
+
+#### List and Describe Backup Selections
+
+```bash
+# List backup selections for a plan
+aws backup list-backup-selections \
+  --backup-plan-id <backup-plan-id>
+
+# Get backup selection details
+aws backup get-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --selection-id <selection-id>
+```
+
+#### Delete Backup Selections
+
+```bash
+# Delete backup selection
+aws backup delete-backup-selection \
+  --backup-plan-id <backup-plan-id> \
+  --selection-id <selection-id>
+```
+
+### On-Demand Backups
+
+#### Start On-Demand Backup Jobs
+
+```bash
+# Create on-demand backup for EC2 instance
+aws backup start-backup-job \
+  --backup-vault-name Default \
+  --resource-arn arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0 \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole
+
+# Create on-demand backup with lifecycle
+aws backup start-backup-job \
+  --backup-vault-name Default \
+  --resource-arn arn:aws:rds:us-east-1:123456789012:db:mydb \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --lifecycle MoveToColdStorageAfterDays=30,DeleteAfterDays=365
+
+# Create on-demand backup with tags and metadata
+aws backup start-backup-job \
+  --backup-vault-name Default \
+  --resource-arn arn:aws:dynamodb:us-east-1:123456789012:table/MyTable \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --recovery-point-tags Type=OnDemand,RequestedBy=Admin \
+  --idempotency-token $(uuidgen)
+
+# Create on-demand backup for EBS volume
+aws backup start-backup-job \
+  --backup-vault-name Default \
+  --resource-arn arn:aws:ec2:us-east-1:123456789012:volume/vol-1234567890abcdef0 \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole
+
+# Create on-demand backup for EFS file system
+aws backup start-backup-job \
+  --backup-vault-name Default \
+  --resource-arn arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-12345678 \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole
+```
+
+#### List and Describe Backup Jobs
+
+```bash
+# List all backup jobs
+aws backup list-backup-jobs
+
+# List backup jobs by state
+aws backup list-backup-jobs \
+  --by-state COMPLETED
+
+# List backup jobs by resource type
+aws backup list-backup-jobs \
+  --by-resource-type EC2
+
+# List backup jobs by backup vault
+aws backup list-backup-jobs \
+  --by-backup-vault-name Default
+
+# List backup jobs within date range
+aws backup list-backup-jobs \
+  --by-created-after 2024-01-01T00:00:00Z \
+  --by-created-before 2024-01-31T23:59:59Z
+
+# Describe specific backup job
+aws backup describe-backup-job \
+  --backup-job-id <backup-job-id>
+```
+
+#### Stop Backup Jobs
+
+```bash
+# Stop a running backup job
+aws backup stop-backup-job \
+  --backup-job-id <backup-job-id>
+```
+
+### Restore Jobs
+
+#### Start Restore Jobs
+
+```bash
+# Restore EC2 instance
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:1234567890abcdef0 \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --metadata '{"InstanceType":"t3.medium","SubnetId":"subnet-12345678","SecurityGroupIds":"sg-12345678"}'
+
+# Restore RDS database
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:rds-recovery-point \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --metadata '{"DBInstanceIdentifier":"restored-db","DBInstanceClass":"db.t3.medium"}'
+
+# Restore DynamoDB table
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:dynamodb-recovery \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --metadata '{"targetTableName":"RestoredTable"}'
+
+# Restore EFS file system
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:efs-recovery \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --metadata '{"PerformanceMode":"generalPurpose","newFileSystem":"true"}'
+
+# Restore S3 backup
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:s3-recovery \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --metadata file://restore-metadata.json
+```
+
+#### List and Describe Restore Jobs
+
+```bash
+# List all restore jobs
+aws backup list-restore-jobs
+
+# List restore jobs by state
+aws backup list-restore-jobs \
+  --by-status COMPLETED
+
+# List restore jobs by account ID
+aws backup list-restore-jobs \
+  --by-account-id 123456789012
+
+# List restore jobs within date range
+aws backup list-restore-jobs \
+  --by-created-after 2024-01-01T00:00:00Z \
+  --by-created-before 2024-01-31T23:59:59Z
+
+# Describe specific restore job
+aws backup describe-restore-job \
+  --restore-job-id <restore-job-id>
+```
+
+### Copy Jobs (Cross-Region/Cross-Account)
+
+#### Start Copy Jobs
+
+```bash
+# Copy recovery point to another region
+aws backup start-copy-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:source-recovery-point \
+  --source-backup-vault-name SourceVault \
+  --destination-backup-vault-arn arn:aws:backup:us-west-2:123456789012:backup-vault:DestinationVault \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole
+
+# Copy with lifecycle policy
+aws backup start-copy-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:source-recovery-point \
+  --source-backup-vault-name SourceVault \
+  --destination-backup-vault-arn arn:aws:backup:us-west-2:123456789012:backup-vault:DestinationVault \
+  --iam-role-arn arn:aws:iam::123456789012:role/AWSBackupRole \
+  --lifecycle MoveToColdStorageAfterDays=90,DeleteAfterDays=2555
+```
+
+#### List and Describe Copy Jobs
+
+```bash
+# List all copy jobs
+aws backup list-copy-jobs
+
+# List copy jobs by state
+aws backup list-copy-jobs \
+  --by-state COMPLETED
+
+# List copy jobs by resource type
+aws backup list-copy-jobs \
+  --by-resource-type EC2
+
+# List copy jobs for specific account
+aws backup list-copy-jobs \
+  --by-account-id 123456789012
+
+# Describe specific copy job
+aws backup describe-copy-job \
+  --copy-job-id <copy-job-id>
+```
+
+### Recovery Points Management
+
+#### List and Describe Recovery Points
+
+```bash
+# List recovery points by backup vault
+aws backup list-recovery-points-by-backup-vault \
+  --backup-vault-name Default
+
+# List recovery points by resource
+aws backup list-recovery-points-by-resource \
+  --resource-arn arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0
+
+# Describe recovery point
+aws backup describe-recovery-point \
+  --backup-vault-name Default \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:1234567890abcdef0
+
+# Get recovery point restore metadata
+aws backup get-recovery-point-restore-metadata \
+  --backup-vault-name Default \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:1234567890abcdef0
+```
+
+#### Update Recovery Point Lifecycle
+
+```bash
+# Update recovery point lifecycle
+aws backup update-recovery-point-lifecycle \
+  --backup-vault-name Default \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:1234567890abcdef0 \
+  --lifecycle MoveToColdStorageAfterDays=60,DeleteAfterDays=730
+```
+
+#### Delete Recovery Points
+
+```bash
+# Delete recovery point
+aws backup delete-recovery-point \
+  --backup-vault-name Default \
+  --recovery-point-arn arn:aws:backup:us-east-1:123456789012:recovery-point:1234567890abcdef0
+```
+
+### Backup Policies (AWS Organizations)
+
+#### Create and Manage Backup Policies
+
+```bash
+# Put backup policy (requires AWS Organizations)
+aws backup put-backup-policy \
+  --policy file://backup-policy.json
+
+# Get backup policy
+aws backup get-backup-policy
+
+# Delete backup policy
+aws backup delete-backup-policy
+```
+
+### Protected Resources
+
+#### List Protected Resources
+
+```bash
+# List all protected resources
+aws backup list-protected-resources
+
+# Describe protected resource
+aws backup describe-protected-resource \
+  --resource-arn arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0
+
+# List recovery points by resource
+aws backup list-recovery-points-by-resource \
+  --resource-arn arn:aws:rds:us-east-1:123456789012:db:mydb
+```
+
+### Backup Framework and Reports
+
+#### Create Backup Framework
+
+```bash
+# Create backup framework
+aws backup create-framework \
+  --framework-name compliance-framework \
+  --framework-description "Compliance and governance framework" \
+  --framework-controls file://framework-controls.json
+
+# List frameworks
+aws backup list-frameworks
+
+# Describe framework
+aws backup describe-framework \
+  --framework-name compliance-framework
+
+# Update framework
+aws backup update-framework \
+  --framework-name compliance-framework \
+  --framework-controls file://updated-controls.json
+
+# Delete framework
+aws backup delete-framework \
+  --framework-name compliance-framework
+```
+
+#### Create Backup Reports
+
+```bash
+# Create report plan
+aws backup create-report-plan \
+  --report-plan-name daily-backup-report \
+  --report-delivery-channel '{"S3BucketName":"backup-reports-bucket","Formats":["CSV","JSON"]}' \
+  --report-setting '{"ReportTemplate":"BACKUP_JOB_REPORT"}'
+
+# List report plans
+aws backup list-report-plans
+
+# Describe report plan
+aws backup describe-report-plan \
+  --report-plan-name daily-backup-report
+
+# Start report job
+aws backup start-report-job \
+  --report-plan-name daily-backup-report
+
+# List report jobs
+aws backup list-report-jobs \
+  --by-report-plan-name daily-backup-report
+
+# Describe report job
+aws backup describe-report-job \
+  --report-job-id <report-job-id>
+
+# Delete report plan
+aws backup delete-report-plan \
+  --report-plan-name daily-backup-report
+```
+
+### Tags Management
+
+```bash
+# Tag backup vault
+aws backup tag-resource \
+  --resource-arn arn:aws:backup:us-east-1:123456789012:backup-vault:MyVault \
+  --tags Environment=Production,Owner=DBATeam
+
+# Tag backup plan
+aws backup tag-resource \
+  --resource-arn arn:aws:backup:us-east-1:123456789012:backup-plan:<plan-id> \
+  --tags BackupType=Automated,Schedule=Daily
+
+# List tags for resource
+aws backup list-tags \
+  --resource-arn arn:aws:backup:us-east-1:123456789012:backup-vault:MyVault
+
+# Untag resource
+aws backup untag-resource \
+  --resource-arn arn:aws:backup:us-east-1:123456789012:backup-vault:MyVault \
+  --tag-key-list Environment Owner
+```
+
+### Legal Hold
+
+```bash
+# Create legal hold
+aws backup create-legal-hold \
+  --title "Legal Hold for Audit" \
+  --description "Retain backups for ongoing investigation" \
+  --idempotency-token $(uuidgen) \
+  --recovery-point-selection '{"VaultNames":["Default"],"ResourceIdentifiers":["arn:aws:rds:us-east-1:123456789012:db:mydb"]}'
+
+# List legal holds
+aws backup list-legal-holds
+
+# Describe legal hold
+aws backup describe-legal-hold \
+  --legal-hold-id <legal-hold-id>
+
+# Cancel legal hold
+aws backup cancel-legal-hold \
+  --legal-hold-id <legal-hold-id> \
+  --cancel-description "Investigation completed"
+```
+
+### Automation Scripts
+
+```bash
+# Complete AWS Backup setup script
+#!/bin/bash
+REGION="us-east-1"
+ACCOUNT_ID="123456789012"
+VAULT_NAME="ProductionBackupVault"
+PLAN_NAME="production-backup-plan"
+ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/AWSBackupRole"
+
+# Create backup vault
+echo "Creating backup vault..."
+aws backup create-backup-vault \
+  --backup-vault-name "$VAULT_NAME" \
+  --backup-vault-tags Environment=Production,ManagedBy=Script
+
+# Create backup plan
+echo "Creating backup plan..."
+PLAN_ID=$(aws backup create-backup-plan \
+  --backup-plan "{
+    \"BackupPlanName\": \"$PLAN_NAME\",
+    \"Rules\": [{
+      \"RuleName\": \"daily-backups\",
+      \"TargetBackupVaultName\": \"$VAULT_NAME\",
+      \"ScheduleExpression\": \"cron(0 5 ? * * *)\",
+      \"Lifecycle\": {
+        \"MoveToColdStorageAfterDays\": 30,
+        \"DeleteAfterDays\": 365
+      }
+    }]
+  }" \
+  --query 'BackupPlanId' \
+  --output text)
+
+echo "Backup plan created with ID: $PLAN_ID"
+
+# Create backup selection
+echo "Creating backup selection..."
+aws backup create-backup-selection \
+  --backup-plan-id "$PLAN_ID" \
+  --backup-selection "{
+    \"SelectionName\": \"production-resources\",
+    \"IamRoleArn\": \"$ROLE_ARN\",
+    \"ListOfTags\": [{
+      \"ConditionType\": \"STRINGEQUALS\",
+      \"ConditionKey\": \"Environment\",
+      \"ConditionValue\": \"Production\"
+    }]
+  }"
+
+echo "AWS Backup setup complete"
+```
+
+```bash
+# Backup status monitoring script
+#!/bin/bash
+echo "AWS Backup Status Report - $(date)"
+echo "======================================\n"
+
+echo "Backup Jobs Status:"
+aws backup list-backup-jobs --max-results 10 | \
+  jq -r '.BackupJobs[] | "\(.CreationDate) - \(.ResourceArn) - \(.State)"'
+
+echo "\nRestore Jobs Status:"
+aws backup list-restore-jobs --max-results 10 | \
+  jq -r '.RestoreJobs[] | "\(.CreationDate) - \(.Status)"'
+
+echo "\nRecovery Points by Vault:"
+for vault in $(aws backup list-backup-vaults --query 'BackupVaultList[*].BackupVaultName' --output text); do
+  count=$(aws backup list-recovery-points-by-backup-vault \
+    --backup-vault-name "$vault" \
+    --query 'length(RecoveryPoints)' \
+    --output text)
+  echo "$vault: $count recovery points"
+done
+```
+
+```bash
+# Cross-region backup verification script
+#!/bin/bash
+SOURCE_REGION="us-east-1"
+DEST_REGION="us-west-2"
+VAULT_NAME="ProductionVault"
+
+echo "Checking backup copies from $SOURCE_REGION to $DEST_REGION"
+
+# List copy jobs
+aws backup list-copy-jobs \
+  --by-destination-vault-arn "arn:aws:backup:${DEST_REGION}:${ACCOUNT_ID}:backup-vault:${VAULT_NAME}" \
+  --region "$SOURCE_REGION" | \
+  jq -r '.CopyJobs[] | "\(.CreationDate) - \(.State) - \(.SourceBackupVaultArn)"'
+```
+
+---
 
 ## Hands-On Labs
 
