@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "767b48fb025823ed",
+        "id": "f5568ca3eed7f2d6",
         "type": "tabs",
         "children": [
           {
-            "id": "ff203bc9caf34d50",
+            "id": "d06fdfd738cfdca1",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gcp-ace-cap/gcp-iam-pca-guide.md",
+                "file": "java-se21-1z0-830/module-03/05-datetime-api.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "gcp-iam-pca-guide"
+              "title": "05-datetime-api"
             }
           }
         ]
@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -177,10 +178,15 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "ff203bc9caf34d50",
+  "active": "d06fdfd738cfdca1",
   "lastOpenFiles": [
-    "gcp-ace-cap/gcp-iam-ace-guide.md",
+    "java-se21-1z0-830/module-03/06-timezones-dst.md",
+    "java-se21-1z0-830/module-02/04-text-blocks.md",
+    "java-se21-1z0-830/module-02/03-strings-stringbuilder.md",
+    "java-se21-1z0-830/module-11/29-threads-executors.md",
+    "aws-sa-c03/aws-ebs-saa-c03-guide.md",
     "gcp-ace-cap/gcp-iam-pca-guide.md",
+    "gcp-ace-cap/gcp-iam-ace-guide.md",
     "gcp-ace-cap/gcp-bigquery-pca-guide.md",
     "gcp-ace-cap/gcp-bigquery-ace-guide.md",
     "commands.md",
@@ -207,11 +213,6 @@
     "aws-sa-c03/aws-macie-saa-c03-guide.md",
     "gcp-pca-study-guide/02_Designing_and_Planning_Solution_Architecture.md",
     "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
-    "gcp-pca-study-guide/08_AI_Machine_Learning_and_Data_Analytics.md",
-    "gcp-pca-study-guide/06_Operations_Reliability_and_SRE.md",
-    "gcp-pca-study-guide/05_Security_and_Compliance_by_Design.md",
-    "gcp-pca-study-guide/README.md",
-    "gcp-pca-study-guide/00_Introduction_and_Exam_Overview.md",
     "gcp-pca-study-guide",
     "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
