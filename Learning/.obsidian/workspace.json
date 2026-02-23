@@ -178,8 +178,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "d06fdfd738cfdca1",
+  "active": "e7b58c8acfa50268",
   "lastOpenFiles": [
+    "karapathy-repo/MICROGPT_DEEP_DIVE.md",
     "java-se21-1z0-830/module-03/06-timezones-dst.md",
     "java-se21-1z0-830/module-02/04-text-blocks.md",
     "java-se21-1z0-830/module-02/03-strings-stringbuilder.md",
@@ -212,7 +213,6 @@
     "aws-sa-c03/aws-athena-saa-c03-guide.md",
     "aws-sa-c03/aws-macie-saa-c03-guide.md",
     "gcp-pca-study-guide/02_Designing_and_Planning_Solution_Architecture.md",
-    "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
     "gcp-pca-study-guide",
     "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
