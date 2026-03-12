@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "9a32cfae9d790df4",
+        "id": "0445dd7125959a18",
         "type": "tabs",
         "children": [
           {
-            "id": "be23c80b3b3affe3",
+            "id": "e7adc3971c8d19a8",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
-                "mode": "preview",
+                "file": "system_design_resources/craigslist-system-design/05-high-level-architecture.md",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "07_Google_Cloud_Well_Architected_Framework"
+              "title": "05-high-level-architecture"
             }
           }
         ]
@@ -178,8 +178,22 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "be23c80b3b3affe3",
+  "active": "e7adc3971c8d19a8",
   "lastOpenFiles": [
+    "system_design_resources/instagram-photo-sharing/README.md",
+    "system_design_resources/instagram-photo-sharing/09-sequence-diagrams.md",
+    "system_design_resources/instagram-photo-sharing/08-failure-scenarios.md",
+    "system_design_resources/instagram-photo-sharing/07-tradeoffs.md",
+    "system_design_resources/instagram-photo-sharing/06-detailed-components.md",
+    "system_design_resources/instagram-photo-sharing/05-high-level-architecture.md",
+    "system_design_resources/instagram-photo-sharing/04-database-design.md",
+    "system_design_resources/instagram-photo-sharing/03-api-design.md",
+    "system_design_resources/instagram-photo-sharing/02-traffic-estimation.md",
+    "system_design_resources/instagram-photo-sharing/01-requirements.md",
+    "system_design_resources/instagram-photo-sharing",
+    "system_design_resources/craigslist-system-design/02-traffic-estimation.md",
+    "system_design_resources/craigslist-system-design/01-requirements.md",
+    "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
     "karapathy-repo/MICROGPT_DEEP_DIVE.md",
     "java-se21-1z0-830/module-03/05-datetime-api.md",
     "java-se21-1z0-830/module-03/06-timezones-dst.md",
@@ -193,10 +207,6 @@
     "gcp-ace-cap/gcp-bigquery-ace-guide.md",
     "commands.md",
     "netflix-system-design/02-storage-architecture.md",
-    "netflix-system-design/01-content-ingestion-pipeline.md",
-    "netflix-system-design/03-video-streaming-architecture.md",
-    "aws-sa-c03/aws-storage-gateway-saa-c03-guide.md",
-    "aws-sa-c03/aws-s3-and-glacier-saa-c03-guide.md",
     "sqlalchemy.epub",
     "postgresqlforjobseekers.pdf",
     "annas-arch-59637336a35e.epub",
@@ -204,20 +214,10 @@
     "annas-arch-df49bc55d26e.epub",
     "Neo4j_ The Definitive Guide_ Hands-On Recipes for -- Luanne Misquitta, Christophe Willemsen -- 1st Edition, 2025 -- O'Reilly Media, Incorporated -- 9781098165642 -- 5c282a41a5458fbe4b78410366d50379 -- Anna’s Archive.epub",
     "Microservices with Spring Boot 3.pdf",
-    "bit-manipulation-complete-guide.md",
-    "aws-sa-c03/aws-kinesis-saa-c03-guide.md",
-    "aws-sa-c03/aws-glue-saa-c03-guide.md",
-    "aws-sa-c03/aws-datasync-saa-c03-guide.md",
-    "aws-sa-c03/aws-elasticache-saa-c03-guide.md",
-    "aws-sa-c03/aws-snow-family-saa-c03-guide.md",
-    "aws-sa-c03/aws-ecs-eks-fargate-saa-c03-guide.md",
-    "aws-sa-c03/aws-athena-saa-c03-guide.md",
-    "aws-sa-c03/aws-macie-saa-c03-guide.md",
     "gcp-pca-study-guide",
     "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
-    "gcp-ace-cap/gcp-gke-pca-guide.md.bak",
     "Pasted image 20251012112026.png",
     "Pasted image 20251012111406.png",
     "Pasted image 20251012111355.png",
