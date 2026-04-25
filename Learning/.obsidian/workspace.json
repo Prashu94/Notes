@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "0445dd7125959a18",
+        "id": "c278bb83cf3837fe",
         "type": "tabs",
         "children": [
           {
-            "id": "e7adc3971c8d19a8",
+            "id": "3f3b41173017b488",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "system_design_resources/craigslist-system-design/05-high-level-architecture.md",
-                "mode": "source",
+                "file": "commands.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "05-high-level-architecture"
+              "title": "commands"
             }
           }
         ]
@@ -78,8 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5,
-    "collapsed": true
+    "width": 459.5
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -178,8 +177,35 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "e7adc3971c8d19a8",
+  "active": "3f3b41173017b488",
   "lastOpenFiles": [
+    "aikit/inputs/requirements/well-production/well-production-requirements.md",
+    "aikit/inputs/requirements/well-production/config.yaml",
+    "aikit/inputs/requirements/safety-permit/safety-permit-requirements.md",
+    "aikit/inputs/requirements/safety-permit/config.yaml",
+    "aikit/inputs/requirements/well-production",
+    "aikit/inputs/requirements/safety-permit",
+    "aikit/inputs/requirements",
+    "aikit/inputs",
+    "aikit/blueprint/cross-cutting.yaml",
+    "aikit/blueprint/module-registry.yaml",
+    "aikit/blueprint",
+    "aikit/logs/stage-tracker.yaml",
+    "aikit/README.md",
+    "sqlalchemypractice.md",
+    "aws-sa-c03/aws-vpn-gateway-saa-c03-guide.md",
+    "aws-sa-c03/aws-snow-family-saa-c03-guide.md",
+    "aws-sa-c03/aws-directory-services-saa-c03-guide.md",
+    "aws-sa-c03/aws-networking-saa-c03-guide.md",
+    "system_design_resources/craigslist-system-design/09-sequence-diagrams.md",
+    "system_design_resources/craigslist-system-design/08-failure-scenarios.md",
+    "system_design_resources/craigslist-system-design/07-tradeoffs.md",
+    "system_design_resources/craigslist-system-design/06-detailed-components.md",
+    "system_design_resources/craigslist-system-design/05-high-level-architecture.md",
+    "system_design_resources/craigslist-system-design/04-database-design.md",
+    "system_design_resources/craigslist-system-design/03-api-design.md",
+    "system_design_resources/craigslist-system-design/02-traffic-estimation.md",
+    "system_design_resources/craigslist-system-design/01-requirements.md",
     "system_design_resources/instagram-photo-sharing/README.md",
     "system_design_resources/instagram-photo-sharing/09-sequence-diagrams.md",
     "system_design_resources/instagram-photo-sharing/08-failure-scenarios.md",
@@ -189,33 +215,6 @@
     "system_design_resources/instagram-photo-sharing/04-database-design.md",
     "system_design_resources/instagram-photo-sharing/03-api-design.md",
     "system_design_resources/instagram-photo-sharing/02-traffic-estimation.md",
-    "system_design_resources/instagram-photo-sharing/01-requirements.md",
-    "system_design_resources/instagram-photo-sharing",
-    "system_design_resources/craigslist-system-design/02-traffic-estimation.md",
-    "system_design_resources/craigslist-system-design/01-requirements.md",
-    "gcp-pca-study-guide/07_Google_Cloud_Well_Architected_Framework.md",
-    "karapathy-repo/MICROGPT_DEEP_DIVE.md",
-    "java-se21-1z0-830/module-03/05-datetime-api.md",
-    "java-se21-1z0-830/module-03/06-timezones-dst.md",
-    "java-se21-1z0-830/module-02/04-text-blocks.md",
-    "java-se21-1z0-830/module-02/03-strings-stringbuilder.md",
-    "java-se21-1z0-830/module-11/29-threads-executors.md",
-    "aws-sa-c03/aws-ebs-saa-c03-guide.md",
-    "gcp-ace-cap/gcp-iam-pca-guide.md",
-    "gcp-ace-cap/gcp-iam-ace-guide.md",
-    "gcp-ace-cap/gcp-bigquery-pca-guide.md",
-    "gcp-ace-cap/gcp-bigquery-ace-guide.md",
-    "commands.md",
-    "netflix-system-design/02-storage-architecture.md",
-    "sqlalchemy.epub",
-    "postgresqlforjobseekers.pdf",
-    "annas-arch-59637336a35e.epub",
-    "Java21Guide.pdf",
-    "annas-arch-df49bc55d26e.epub",
-    "Neo4j_ The Definitive Guide_ Hands-On Recipes for -- Luanne Misquitta, Christophe Willemsen -- 1st Edition, 2025 -- O'Reilly Media, Incorporated -- 9781098165642 -- 5c282a41a5458fbe4b78410366d50379 -- Anna’s Archive.epub",
-    "Microservices with Spring Boot 3.pdf",
-    "gcp-pca-study-guide",
-    "gcp-ace-cap/mindmaps",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
     "Pasted image 20251012112026.png",

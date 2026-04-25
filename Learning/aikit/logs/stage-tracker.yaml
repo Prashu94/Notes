@@ -1,0 +1,58 @@
+# Stage Tracker — managed automatically by each kit
+# Tracks pipeline stage status per module run.
+# -----------------------------------------------------------------------
+# This file is auto-updated by each kit agent.
+# Do not edit manually unless recovering from a failure.
+
+module_id: ""
+last_run: ""
+
+stages:
+  requirement_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  review_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  design_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  plan_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  dev_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  test_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null
+
+  deploy_kit:
+    status: "not-started"
+    started_at: null
+    completed_at: null
+    run_count: 0
+    last_error: null

@@ -1,0 +1,7 @@
+# Place your requirement source files here.
+# Supported formats: .docx, .xlsx, .csv, .pdf (text-based), .txt, .md
+#
+# Naming convention (recommended):
+#   <module-id>-requirements.docx
+#   <module-id>-data-model.xlsx
+#   <module-id>-business-rules.csv

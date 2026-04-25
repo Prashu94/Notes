@@ -1,0 +1,8 @@
+# AIKit Audit Log — append-only
+# Format: [ISO-8601 timestamp] [KIT] [MODULE] [ACTION] [STATUS] [detail]
+# -----------------------------------------------------------------------
+# Example entries:
+# [2026-04-25T10:00:00Z] [REQUIREMENT-KIT] [order-service] [START] [in-progress] Processing 3 requirement files
+# [2026-04-25T10:02:15Z] [REQUIREMENT-KIT] [order-service] [FILE] [completed] Parsed requirements.docx → requirements.md
+# [2026-04-25T10:03:00Z] [REQUIREMENT-KIT] [order-service] [ARTIFACT] [completed] Generated BRD.md
+# [2026-04-25T10:04:00Z] [REQUIREMENT-KIT] [order-service] [COMPLETE] [completed] Stage completed successfully

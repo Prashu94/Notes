@@ -1,0 +1,19 @@
+# Module Registry — managed by plan-kit
+# Lists all modules processed through aikit and their current pipeline status.
+# -----------------------------------------------------------------------
+modules: []
+# Example entry (added automatically by plan-kit):
+# - id: order-service
+#   name: Order Service
+#   type: greenfield
+#   version: "1.0.0"
+#   config: aikit/config.yaml
+#   pipeline_status:
+#     requirement_kit: completed
+#     review_kit: completed
+#     design_kit: completed
+#     plan_kit: completed
+#     dev_kit: in-progress
+#     test_kit: not-started
+#     deploy_kit: not-started
+#   last_updated: "2026-04-25T00:00:00Z"

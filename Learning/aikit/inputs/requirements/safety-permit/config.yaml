@@ -1,0 +1,131 @@
+# ============================================================
+# AIKit Config — Permit to Work & Safety Management
+# Module: safety-permit
+# ============================================================
+
+module:
+  id: "safety-permit"
+  name: "Permit to Work & Safety Management"
+  description: "Digital PTW lifecycle, SIMOPS conflict detection, safety certificates, and near-miss management for Meridian Energy Corp."
+  type: "greenfield"
+  version: "1.0.0"
+  created_at: ""
+  updated_at: ""
+
+inputs:
+  requirements_dir: "aikit/inputs/requirements/safety-permit"
+  existing_codebase: null
+
+tools:
+  converter_script: "aikit/tools/convert_requirements.py"
+  converter_deps:   "aikit/tools/requirements.txt"
+  converted_dir:    "aikit/inputs/requirements/safety-permit/converted"
+
+outputs:
+  base_dir: "aikit/outputs/safety-permit"
+
+  requirements:
+    dir:              "aikit/outputs/safety-permit/requirements"
+    requirements_md:  "aikit/outputs/safety-permit/requirements/requirements.md"
+    business_rules:   "aikit/outputs/safety-permit/requirements/business-rules.md"
+    workflows:        "aikit/outputs/safety-permit/requirements/workflows.md"
+    brd_file:         "aikit/outputs/safety-permit/requirements/BRD.md"
+
+  review:
+    dir:                 "aikit/outputs/safety-permit/review"
+    epics_file:          "aikit/outputs/safety-permit/review/epics.md"
+    features_file:       "aikit/outputs/safety-permit/review/features.md"
+    stories_file:        "aikit/outputs/safety-permit/review/stories.md"
+    tech_stack_file:     "aikit/outputs/safety-permit/review/tech-stack.md"
+    clarifications_file: "aikit/outputs/safety-permit/review/clarifications.md"
+
+  design:
+    dir:                "aikit/outputs/safety-permit/design"
+    architecture_file:  "aikit/outputs/safety-permit/design/architecture.md"
+    diagrams_dir:       "aikit/outputs/safety-permit/design/diagrams"
+    scaffold_dir:       "aikit/outputs/safety-permit/design/scaffold"
+    ux_stubs_dir:       "aikit/outputs/safety-permit/design/ux-stubs"
+    db_design_file:     "aikit/outputs/safety-permit/design/db-design.md"
+
+  plan:
+    dir:             "aikit/outputs/safety-permit/plan"
+    blueprint_file:  "aikit/outputs/safety-permit/plan/blueprint.yaml"
+    tech_decisions:  "aikit/outputs/safety-permit/plan/tech-decisions.yaml"
+    db_schema:       "aikit/outputs/safety-permit/plan/db-schema.yaml"
+    api_contracts:   "aikit/outputs/safety-permit/plan/api-contracts.yaml"
+
+  dev:
+    dir:          "aikit/outputs/safety-permit/dev"
+    src_dir:      "aikit/outputs/safety-permit/dev/src"
+    build_report: "aikit/outputs/safety-permit/dev/build-report.md"
+    build_log:    "aikit/outputs/safety-permit/dev/build.log"
+
+  test:
+    dir:             "aikit/outputs/safety-permit/test"
+    test_cases_dir:  "aikit/outputs/safety-permit/test/test-cases"
+    test_report:     "aikit/outputs/safety-permit/test/test-report.md"
+    coverage_report: "aikit/outputs/safety-permit/test/coverage-report.md"
+    gate_report:     "aikit/outputs/safety-permit/test/gate-report.md"
+
+  deploy:
+    dir:            "aikit/outputs/safety-permit/deploy"
+    terraform_dir:  "aikit/outputs/safety-permit/deploy/terraform"
+    helm_dir:       "aikit/outputs/safety-permit/deploy/helm"
+    deploy_guide:   "aikit/outputs/safety-permit/deploy/deployment-guide.md"
+
+blueprint:
+  dir:           "aikit/blueprint"
+  modules_dir:   "aikit/blueprint/modules"
+  registry_file: "aikit/blueprint/module-registry.yaml"
+  snapshot_file: "aikit/blueprint/modules/safety-permit.yaml"
+  cross_cutting: "aikit/blueprint/cross-cutting.yaml"
+
+logs:
+  dir:           "aikit/logs"
+  audit_log:     "aikit/logs/audit.log"
+  stage_tracker: "aikit/logs/stage-tracker.yaml"
+
+technology:
+  backend: ""          # To be decided in review-kit
+  frontend: ""
+  database: ""
+  cloud: "azure"       # Azure — existing company cloud
+  message_broker: ""
+  cache: ""
+
+stages:
+  requirement_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  review_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  design_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  plan_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  dev_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  test_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  deploy_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""

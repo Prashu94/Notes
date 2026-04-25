@@ -1,0 +1,131 @@
+# ============================================================
+# AIKit Config — Well Production Monitoring & Allocation
+# Module: well-production
+# ============================================================
+
+module:
+  id: "well-production"
+  name: "Well Production Monitoring & Allocation"
+  description: "Real-time production data acquisition, hydrocarbon allocation, regulatory reporting for Meridian Energy Corp."
+  type: "greenfield"
+  version: "1.0.0"
+  created_at: ""
+  updated_at: ""
+
+inputs:
+  requirements_dir: "aikit/inputs/requirements/well-production"
+  existing_codebase: null
+
+tools:
+  converter_script: "aikit/tools/convert_requirements.py"
+  converter_deps:   "aikit/tools/requirements.txt"
+  converted_dir:    "aikit/inputs/requirements/well-production/converted"
+
+outputs:
+  base_dir: "aikit/outputs/well-production"
+
+  requirements:
+    dir:              "aikit/outputs/well-production/requirements"
+    requirements_md:  "aikit/outputs/well-production/requirements/requirements.md"
+    business_rules:   "aikit/outputs/well-production/requirements/business-rules.md"
+    workflows:        "aikit/outputs/well-production/requirements/workflows.md"
+    brd_file:         "aikit/outputs/well-production/requirements/BRD.md"
+
+  review:
+    dir:                 "aikit/outputs/well-production/review"
+    epics_file:          "aikit/outputs/well-production/review/epics.md"
+    features_file:       "aikit/outputs/well-production/review/features.md"
+    stories_file:        "aikit/outputs/well-production/review/stories.md"
+    tech_stack_file:     "aikit/outputs/well-production/review/tech-stack.md"
+    clarifications_file: "aikit/outputs/well-production/review/clarifications.md"
+
+  design:
+    dir:                "aikit/outputs/well-production/design"
+    architecture_file:  "aikit/outputs/well-production/design/architecture.md"
+    diagrams_dir:       "aikit/outputs/well-production/design/diagrams"
+    scaffold_dir:       "aikit/outputs/well-production/design/scaffold"
+    ux_stubs_dir:       "aikit/outputs/well-production/design/ux-stubs"
+    db_design_file:     "aikit/outputs/well-production/design/db-design.md"
+
+  plan:
+    dir:             "aikit/outputs/well-production/plan"
+    blueprint_file:  "aikit/outputs/well-production/plan/blueprint.yaml"
+    tech_decisions:  "aikit/outputs/well-production/plan/tech-decisions.yaml"
+    db_schema:       "aikit/outputs/well-production/plan/db-schema.yaml"
+    api_contracts:   "aikit/outputs/well-production/plan/api-contracts.yaml"
+
+  dev:
+    dir:          "aikit/outputs/well-production/dev"
+    src_dir:      "aikit/outputs/well-production/dev/src"
+    build_report: "aikit/outputs/well-production/dev/build-report.md"
+    build_log:    "aikit/outputs/well-production/dev/build.log"
+
+  test:
+    dir:             "aikit/outputs/well-production/test"
+    test_cases_dir:  "aikit/outputs/well-production/test/test-cases"
+    test_report:     "aikit/outputs/well-production/test/test-report.md"
+    coverage_report: "aikit/outputs/well-production/test/coverage-report.md"
+    gate_report:     "aikit/outputs/well-production/test/gate-report.md"
+
+  deploy:
+    dir:            "aikit/outputs/well-production/deploy"
+    terraform_dir:  "aikit/outputs/well-production/deploy/terraform"
+    helm_dir:       "aikit/outputs/well-production/deploy/helm"
+    deploy_guide:   "aikit/outputs/well-production/deploy/deployment-guide.md"
+
+blueprint:
+  dir:           "aikit/blueprint"
+  modules_dir:   "aikit/blueprint/modules"
+  registry_file: "aikit/blueprint/module-registry.yaml"
+  snapshot_file: "aikit/blueprint/modules/well-production.yaml"
+  cross_cutting: "aikit/blueprint/cross-cutting.yaml"
+
+logs:
+  dir:           "aikit/logs"
+  audit_log:     "aikit/logs/audit.log"
+  stage_tracker: "aikit/logs/stage-tracker.yaml"
+
+technology:
+  backend: ""          # To be decided in review-kit
+  frontend: ""
+  database: ""
+  cloud: "azure"       # Azure — existing company cloud
+  message_broker: ""
+  cache: ""
+
+stages:
+  requirement_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  review_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  design_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  plan_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  dev_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  test_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""
+  deploy_kit:
+    status: "not-started"
+    run_count: 0
+    started_at: ""
+    completed_at: ""

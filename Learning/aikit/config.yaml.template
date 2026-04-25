@@ -1,0 +1,188 @@
+# ============================================================
+# AIKit Master Config — copy this file to config.yaml and edit
+# ============================================================
+# One config.yaml per module/project.
+# The entire kit pipeline reads from and writes to paths defined here.
+# ============================================================
+
+# ── Module Identity ──────────────────────────────────────────
+module:
+  id: "my-module"                # Unique slug: kebab-case, no spaces
+  name: "My Module"              # Human-readable module name
+  description: "Describe the module purpose in one sentence."
+  type: "greenfield"             # greenfield | brownfield
+  version: "1.0.0"
+  created_at: ""                 # Filled automatically by requirement-kit
+  updated_at: ""                 # Updated on each kit run
+
+# ── Input Sources ────────────────────────────────────────────
+inputs:
+  requirements_dir: "aikit/inputs/requirements"   # Drop .pdf/.docx/.xlsx/.csv here (module subfolder)
+  existing_codebase: null                          # BF only: path to existing src root
+
+# ── Tooling ──────────────────────────────────────────────────
+tools:
+  # Cross-platform Python converter for .pdf/.xlsx/.docx/.doc/.csv → .md
+  converter_script: "aikit/tools/convert_requirements.py"
+  converter_deps:   "aikit/tools/requirements.txt"
+  # Converted output lives here before req-parser reads it
+  converted_dir: "aikit/inputs/requirements/converted"
+
+# ── Output Paths ─────────────────────────────────────────────
+outputs:
+  base_dir: "aikit/outputs"
+
+  requirements:
+    dir: "aikit/outputs/requirements"
+    requirements_md:  "aikit/outputs/requirements/requirements.md"
+    business_rules:   "aikit/outputs/requirements/business-rules.md"
+    workflows:        "aikit/outputs/requirements/workflows.md"
+    brd_file:         "aikit/outputs/requirements/BRD.md"
+
+  review:
+    dir: "aikit/outputs/review"
+    epics_file:         "aikit/outputs/review/epics.md"
+    features_file:      "aikit/outputs/review/features.md"
+    stories_file:       "aikit/outputs/review/stories.md"
+    tech_stack_file:    "aikit/outputs/review/tech-stack.md"
+    clarifications_file: "aikit/outputs/review/clarifications.md"
+
+  design:
+    dir: "aikit/outputs/design"
+    architecture_file:  "aikit/outputs/design/architecture.md"
+    diagrams_dir:       "aikit/outputs/design/diagrams"
+    scaffold_dir:       "aikit/outputs/design/scaffold"
+    ux_stubs_dir:       "aikit/outputs/design/ux-stubs"
+    db_design_file:     "aikit/outputs/design/db-design.md"
+
+  plan:
+    dir: "aikit/outputs/plan"
+    blueprint_file:  "aikit/outputs/plan/blueprint.yaml"
+    tech_decisions:  "aikit/outputs/plan/tech-decisions.yaml"
+    db_schema:       "aikit/outputs/plan/db-schema.yaml"
+    api_contracts:   "aikit/outputs/plan/api-contracts.yaml"
+
+  dev:
+    dir: "aikit/outputs/dev"
+    src_dir:        "aikit/outputs/dev/src"
+    build_report:   "aikit/outputs/dev/build-report.md"
+    build_log:      "aikit/outputs/dev/build.log"
+
+  test:
+    dir: "aikit/outputs/test"
+    test_cases_dir: "aikit/outputs/test/test-cases"
+    test_report:    "aikit/outputs/test/test-report.md"
+    coverage_report: "aikit/outputs/test/coverage-report.md"
+    gate_report:    "aikit/outputs/test/gate-report.md"
+
+  deploy:
+    dir: "aikit/outputs/deploy"
+    terraform_dir:  "aikit/outputs/deploy/terraform"
+    helm_dir:       "aikit/outputs/deploy/helm"
+    deploy_guide:   "aikit/outputs/deploy/deployment-guide.md"
+
+# ── Blueprint (cross-module shared state) ────────────────────
+blueprint:
+  dir:              "aikit/blueprint"
+  modules_dir:      "aikit/blueprint/modules"
+  registry_file:    "aikit/blueprint/module-registry.yaml"
+  cross_cutting_file: "aikit/blueprint/cross-cutting.yaml"
+
+# ── Logs & Audit ─────────────────────────────────────────────
+logs:
+  dir:           "aikit/logs"
+  audit_log:     "aikit/logs/audit.log"
+  stage_tracker: "aikit/logs/stage-tracker.yaml"
+
+# ── Technology Stack ─────────────────────────────────────────
+# Filled in by review-kit. Leave null to be prompted interactively.
+technology:
+  backend: null           # springboot | fastapi | express-js | django | laravel | nestjs | dotnet
+  backend_language: null  # java | python | typescript | javascript | csharp
+  frontend: null          # react | angular | vue | null (if API-only)
+  frontend_type: null     # spa | microfrontend | null
+  database: null          # postgresql | mysql | mssql | mongodb | dynamodb | firestore
+  ui_library: null        # material-ui | ant-design | bootstrap | chakra-ui | tailwind | primeng | angular-material
+  cloud: null             # aws | gcp | azure | none
+  container: "docker"
+  orchestration: "kubernetes"  # kubernetes | ecs | cloud-run | none
+
+# ── Stage Completion Gates ────────────────────────────────────
+# Managed automatically by each kit. Do not edit manually.
+stages:
+  requirement_kit:
+    status: "not-started"       # not-started | in-progress | completed | failed
+    completed_at: null
+    run_count: 0
+    artifacts:
+      - requirements_md
+      - brd_file
+      - business_rules
+      - workflows
+
+  review_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - requirement_kit
+    artifacts:
+      - epics_file
+      - features_file
+      - stories_file
+      - tech_stack_file
+
+  design_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - review_kit
+    artifacts:
+      - architecture_file
+      - diagrams_dir
+      - scaffold_dir
+      - ux_stubs_dir
+
+  plan_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - design_kit
+    artifacts:
+      - blueprint_file
+      - tech_decisions
+      - db_schema
+
+  dev_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - plan_kit
+    artifacts:
+      - src_dir
+      - build_report
+
+  test_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - dev_kit
+    artifacts:
+      - test_cases_dir
+      - test_report
+      - gate_report
+
+  deploy_kit:
+    status: "not-started"
+    completed_at: null
+    run_count: 0
+    prerequisites:
+      - plan_kit
+    artifacts:
+      - terraform_dir
+      - helm_dir
+      - deploy_guide
