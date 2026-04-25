@@ -25,10 +25,25 @@ Invoke `@review-clarifier` (mode: requirement-clarification).
 Present questions category by category. Wait for user answers.
 Write answers to `clarifications.md`.
 
-### Step 3 — Tech Stack
-If technology fields in config.yaml are null:
-- Invoke `@review-clarifier` (mode: tech-stack)
-- Record decisions in `tech-stack.md` and `config.yaml`
+### Step 3 — Tech Stack (ALWAYS interactive — user must choose)
+**MANDATORY**: Always present tech stack options to the user for explicit selection, even if technology fields in config.yaml are already filled. Never auto-decide the tech stack.
+
+Procedure:
+1. Read `aikit/config.yaml` technology fields and the [Tech Stack Guide](./references/tech-stack-guide.md).
+2. Present the user with a numbered menu of options for **each** of the following layers, one at a time. Wait for the user's answer before presenting the next layer:
+   - **Backend framework**: e.g. Spring Boot / FastAPI / NestJS / Express.js / Django REST / ASP.NET Core — show pros/cons from the Tech Stack Guide for the top 3 most relevant to this module
+   - **Frontend framework**: React / Angular / Vue.js — note MFE vs SPA recommendation
+   - **Mobile** (if mobile requirement exists in BRD): React Native / Flutter / PWA / Native (Swift+Kotlin) — show offline capability comparison
+   - **Primary database**: PostgreSQL / MySQL / MSSQL / MongoDB — focus on top 2–3 relevant choices
+   - **Time-series / special store** (if high-frequency data ingestion exists): ADX / InfluxDB / TimescaleDB / none
+   - **Cache**: Redis / Memcached / none
+   - **Message broker** (if async/event-driven exists in BRD): Azure Service Bus / RabbitMQ / Kafka / AWS SQS / none
+   - **Cloud / deployment**: Azure / AWS / GCP / on-premise
+3. After each user answer, confirm the choice and acknowledge any implications (e.g., "Spring Boot chosen — SAP RFC BAPI integration will use the SAP JCo library").
+4. Once all layers are answered, display a **full stack summary table** and ask the user: "Confirm this tech stack? (yes / edit [layer name])"
+5. On confirmation, record all decisions in `tech-stack.md` and update `config.yaml` technology fields.
+
+**Do NOT skip this step or infer choices silently. If the user has not answered, pause and ask.**
 
 ### Step 4 — Generate Epics
 Invoke `@review-stories` (mode: generate-epics).

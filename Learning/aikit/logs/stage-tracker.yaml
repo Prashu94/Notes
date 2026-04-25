@@ -4,22 +4,22 @@
 # This file is auto-updated by each kit agent.
 # Do not edit manually unless recovering from a failure.
 
-module_id: ""
-last_run: ""
+module_id: "well-production"
+last_run: "2026-04-25T00:00:00Z"
 
 stages:
   requirement_kit:
-    status: "not-started"
-    started_at: null
-    completed_at: null
-    run_count: 0
+    status: "completed"
+    started_at: "2026-04-25T00:00:00Z"
+    completed_at: "2026-04-25T00:10:00Z"
+    run_count: 1
     last_error: null
 
   review_kit:
-    status: "not-started"
-    started_at: null
-    completed_at: null
-    run_count: 0
+    status: "completed"
+    started_at: "2026-04-25T01:00:00Z"
+    completed_at: "2026-04-25T01:45:00Z"
+    run_count: 1
     last_error: null
 
   design_kit:
