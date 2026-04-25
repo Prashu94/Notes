@@ -2,6 +2,8 @@
 
 AIKit is a GitHub Copilot agent orchestration framework that guides your product from raw requirements through review, design, planning, development, testing, and deployment. Each "kit" is a specialized Copilot agent backed by dedicated skills and sub-agents.
 
+> **Pipeline flow, stage gates, and kit I/O reference → [PIPELINE.md](PIPELINE.md)**
+
 ---
 
 ## Architecture Overview

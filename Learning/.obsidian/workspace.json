@@ -177,8 +177,11 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "3f3b41173017b488",
+  "active": "e7b58c8acfa50268",
   "lastOpenFiles": [
+    "aikit/PIPELINE.md",
+    "Archive",
+    "Archive.zip",
     "aikit/inputs/requirements/well-production/well-production-requirements.md",
     "aikit/inputs/requirements/well-production/config.yaml",
     "aikit/inputs/requirements/safety-permit/safety-permit-requirements.md",
@@ -189,8 +192,6 @@
     "aikit/inputs",
     "aikit/blueprint/cross-cutting.yaml",
     "aikit/blueprint/module-registry.yaml",
-    "aikit/blueprint",
-    "aikit/logs/stage-tracker.yaml",
     "aikit/README.md",
     "sqlalchemypractice.md",
     "aws-sa-c03/aws-vpn-gateway-saa-c03-guide.md",
@@ -214,7 +215,6 @@
     "system_design_resources/instagram-photo-sharing/05-high-level-architecture.md",
     "system_design_resources/instagram-photo-sharing/04-database-design.md",
     "system_design_resources/instagram-photo-sharing/03-api-design.md",
-    "system_design_resources/instagram-photo-sharing/02-traffic-estimation.md",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
     "Pasted image 20251012112026.png",
