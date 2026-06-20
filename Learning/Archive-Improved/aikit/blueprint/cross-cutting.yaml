@@ -1,0 +1,51 @@
+# Cross-Cutting Concerns Registry — managed by plan-kit
+# Captures shared components, APIs, data models, and utilities across all modules.
+# The dev-kit reads this before generating code to avoid duplication.
+# -----------------------------------------------------------------------
+
+shared_data_models: []
+# Example:
+# - name: User
+#   module_origin: user-service
+#   fields: [id, email, roles, created_at]
+#   db_table: users
+#   used_by: [order-service, product-service]
+
+shared_apis: []
+# Example:
+# - name: User Authentication API
+#   module_origin: auth-service
+#   base_path: /api/v1/auth
+#   endpoints: [POST /login, POST /logout, POST /refresh]
+#   consumers: [order-service, product-service]
+
+shared_components: []
+# Example (frontend MFE):
+# - name: NavigationBar
+#   module_origin: shell-app
+#   type: microfrontend-component
+#   consumers: [product-ui, order-ui]
+
+shared_utilities: []
+# Example:
+# - name: DateTimeUtils
+#   module_origin: common-lib
+#   language: java
+#   artifact: com.company.common:datetime-utils:1.0.0
+#   used_by: [order-service, inventory-service]
+
+shared_database_schemas: []
+# Example:
+# - name: audit_log
+#   module_origin: audit-service
+#   db: postgresql
+#   tables: [audit_events]
+#   used_by: [order-service, product-service]
+
+infrastructure_decisions: []
+# Example:
+# - concern: message-broker
+#   choice: kafka
+#   version: "3.6"
+#   decided_by: review-kit
+#   modules_affected: [order-service, notification-service]

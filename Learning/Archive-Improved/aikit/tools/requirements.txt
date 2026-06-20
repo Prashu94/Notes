@@ -1,0 +1,18 @@
+# aikit/tools/requirements.txt
+# Dependencies for convert_requirements.py
+# Install: pip install -r aikit/tools/requirements.txt
+
+# PDF extraction (pure Python, works on macOS + Windows)
+pdfplumber>=0.11.0
+
+# Excel .xlsx (pure Python)
+openpyxl>=3.1.0
+
+# Excel .xls legacy format
+xlrd>=2.0.1
+
+# Word .docx — primary converter (produces clean Markdown)
+mammoth>=1.8.0
+
+# Word .docx — fallback with table support
+python-docx>=1.1.0
