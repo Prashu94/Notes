@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "aws-sa-c03/aws-networking-saa-c03-guide.md",
+                "file": "commands.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "aws-networking-saa-c03-guide"
+              "title": "commands"
             }
           }
         ]
@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5
+    "width": 459.5,
+    "collapsed": true
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -179,6 +180,11 @@
   },
   "active": "3f3b41173017b488",
   "lastOpenFiles": [
+    "AWS Commands.md",
+    "aws-sa-c03/aws-ecs-eks-fargate-saa-c03-guide.md",
+    "aws-sa-c03/aws-api-gateway-saa-c03-guide.md",
+    "aws-sa-c03/aws-glue-saa-c03-guide.md",
+    "aws-sa-c03/aws-networking-saa-c03-guide.md",
     "commands.md",
     "Archive-Improved",
     "Archive-Improved.zip",
@@ -207,14 +213,9 @@
     "aws-sa-c03/aws-vpn-gateway-saa-c03-guide.md",
     "aws-sa-c03/aws-snow-family-saa-c03-guide.md",
     "aws-sa-c03/aws-directory-services-saa-c03-guide.md",
-    "aws-sa-c03/aws-networking-saa-c03-guide.md",
     "system_design_resources/craigslist-system-design/09-sequence-diagrams.md",
     "system_design_resources/craigslist-system-design/08-failure-scenarios.md",
     "system_design_resources/craigslist-system-design/07-tradeoffs.md",
-    "system_design_resources/craigslist-system-design/06-detailed-components.md",
-    "system_design_resources/craigslist-system-design/05-high-level-architecture.md",
-    "system_design_resources/craigslist-system-design/04-database-design.md",
-    "system_design_resources/craigslist-system-design/03-api-design.md",
     "NotebookLM Mind Map.png",
     "NotebookLM Mind Map (1).png",
     "Pasted image 20251012112026.png",

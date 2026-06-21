@@ -143,6 +143,88 @@ Amazon DynamoDB is a fully managed NoSQL database service that provides fast and
 - **Access Patterns**: Design keys based on how you'll query the data
 - **Avoid Hot Partitions**: Prevent all requests going to the same partition
 
+### Access Pattern Design — Deep Dive
+
+DynamoDB performance depends entirely on **how you design keys and indexes for your access patterns**. Unlike relational databases, you cannot efficiently run ad-hoc queries — you must know your queries upfront.
+
+#### Step 1: List Your Access Patterns
+
+Before creating a table, document every query your application needs:
+
+| Access pattern | Key needed | Index needed |
+|---------------|-----------|--------------|
+| Get user by userId | PK: userId | Primary table |
+| Get orders for a user | PK: userId, SK: orderDate | Primary table (composite key) |
+| Find users by email | GSI on email | Global Secondary Index |
+| Get top products by category | GSI: PK=category, SK=salesRank | GSI with sort key |
+
+#### Step 2: Choose Partition Key for Even Distribution
+
+**Bad partition key** (hot partition):
+```
+PK = "status:active"   → All active users in ONE partition → throttling
+PK = "2024-01-01"      → All orders from one day in ONE partition
+```
+
+**Good partition key** (high cardinality, even distribution):
+```
+PK = userId (UUID)     → Each user in different partition
+PK = orderId (UUID)    → Each order in different partition
+PK = deviceId          → Millions of devices spread evenly
+```
+
+**Technique for uneven access:** Add a random suffix or use write sharding:
+```
+PK = userId#shard_{random 0-N}  → Spread hot user across N partitions
+```
+
+#### Step 3: Use Sort Keys for Range Queries
+
+Composite keys (PK + SK) enable querying a **subset** of items within a partition:
+
+```json
+// Table: Orders — PK = userId, SK = orderTimestamp
+// Query: All orders for user123 in date range
+KeyConditionExpression: "userId = :uid AND orderTimestamp BETWEEN :start AND :end"
+```
+
+#### Step 4: GSIs for Alternate Access Patterns
+
+When you need to query by an attribute that isn't the primary key:
+
+```
+Primary Table:           GSI "EmailIndex":
+PK: userId               PK: email
+SK: createdAt            SK: userId
+Attributes: email, name  (projects email + userId)
+```
+
+**GSI considerations:**
+- GSIs have **separate throughput** (must provision or use on-demand separately)
+- Updates to GSIs are **eventually consistent**
+- Maximum **20 GSIs** per table
+- Choose GSI partition key with good cardinality
+
+#### Hot Partition Symptoms and Fixes
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `ProvisionedThroughputExceededException` on one key | Hot partition | Redesign partition key; add sharding suffix |
+| Uneven CloudWatch consumed capacity | Poor key design | Use high-cardinality partition key |
+| Throttling at low overall usage | Celebrity/key popular item problem | Write sharding, DAX caching, or split into multiple items |
+
+#### Query vs Scan — Critical Distinction
+
+| Operation | How it works | Cost | Use when |
+|-----------|-------------|------|----------|
+| **GetItem** | Direct key lookup | 1 RCU (strongly consistent: 2 RCU) | You know exact PK (+ SK) |
+| **Query** | Key condition on PK (+ SK range) | RCUs for items returned | Query within a partition |
+| **Scan** | Reads **every item** in table/index | RCUs for entire table | Avoid in production; use for migration/admin only |
+
+> **Exam trap:** "Find all users older than 30" without a GSI requires a **Scan** (expensive). Correct design adds a GSI or uses a different access pattern.
+
+See also: [Concepts Deep Dive — Database Selection](CONCEPTS-DEEP-DIVE.md#database-selection-decision-tree)
+
 ## Read and Write Operations
 
 ### Read Operations

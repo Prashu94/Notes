@@ -16,6 +16,18 @@
 ### What is Amazon S3?
 Amazon Simple Storage Service (S3) is an object storage service that offers industry-leading scalability, data availability, security, and performance. It's designed for 99.999999999% (11 9's) of durability.
 
+### Strong Consistency (Important Update)
+
+As of December 2020, Amazon S3 provides **strong read-after-write consistency** for all operations — including overwrites and deletes — without performance or cost impact. Previously, S3 was eventually consistent for overwrites and deletes, which caused confusion on older exam materials.
+
+**What this means:**
+- After a successful PUT, a subsequent GET immediately returns the new object
+- After a DELETE, a subsequent GET immediately returns "not found"
+- After a PUT to a new object, LIST immediately includes the object
+- No code changes required — this is automatic for all S3 operations in all regions
+
+> **Exam note:** If you encounter older practice questions about "eventual consistency delays after overwrite," the current correct answer is that S3 provides **strong consistency** for all operations.
+
 ### Key Concepts
 
 #### Buckets

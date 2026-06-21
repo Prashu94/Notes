@@ -239,6 +239,94 @@ aws rds modify-db-instance \
 - Used for disaster recovery
 - Applications need DNS update
 
+### Multi-AZ vs Read Replicas — Deep Dive
+
+This is one of the most tested RDS concepts on SAA-C03. They solve **different problems** and are often used together.
+
+#### What Each Pattern Solves
+
+| Pattern | Primary goal | Replication type | Failover |
+|---------|-------------|------------------|----------|
+| **Multi-AZ** | High availability (survive AZ failure) | **Synchronous** | **Automatic** (~60–120 sec) |
+| **Read Replica** | Read scaling + optional DR | **Asynchronous** | **Manual** promotion required |
+
+#### Multi-AZ in Detail
+
+```
+                    ┌─────────────────┐
+                    │  Same DNS Name  │
+                    │  (db.example)   │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                              ▼
+     ┌─────────────────┐           ┌─────────────────┐
+     │  Primary (AZ-a) │◄──sync──►│  Standby (AZ-b) │
+     │  READ + WRITE   │           │  STANDBY ONLY   │
+     └─────────────────┘           │  (not readable) │
+                                   └─────────────────┘
+```
+
+**Key facts:**
+- Standby is **not accessible** for reads or writes — it exists purely for failover
+- Failover updates the DNS CNAME to point to the standby (same endpoint for apps)
+- Used for: AZ outages, primary hardware failure, maintenance failover, instance class changes
+- **Does NOT** scale read capacity — all reads and writes go to primary
+
+#### Read Replica in Detail
+
+```
+     ┌─────────────────┐
+     │  Primary (AZ-a) │
+     │  READ + WRITE   │
+     └────────┬────────┘
+              │ async replication
+     ┌────────┼────────┬──────────────┐
+     ▼        ▼        ▼              ▼
+  Replica  Replica  Cross-Region   Cross-Region
+  (AZ-b)   (AZ-c)   Replica (EU)   Replica (AP)
+  READ     READ     READ (DR)      READ (DR)
+```
+
+**Key facts:**
+- Each replica has its **own endpoint** — apps must connect explicitly
+- Replicas are **readable** — offload reporting, analytics, read-heavy queries
+- Replication lag exists (monitor `ReplicaLag` in CloudWatch) — replicas may be slightly behind
+- **Cross-region replicas** provide DR capability but require manual promotion
+- Aurora replicas are faster to promote and support automatic failover in Aurora clusters
+
+#### Using Both Together (Common Production Pattern)
+
+```
+Multi-AZ Primary (HA for writes)
+    └── Read Replicas (scale reads)
+            └── Cross-Region Replica (DR)
+```
+
+#### Exam Decision Guide
+
+| Requirement | Answer |
+|-------------|--------|
+| "Survive AZ failure with automatic failover" | Multi-AZ |
+| "Offload reporting queries from production" | Read Replica |
+| "Scale read traffic horizontally" | Read Replicas (up to 15) |
+| "Disaster recovery in another region" | Cross-Region Read Replica |
+| "Same connection endpoint after failover" | Multi-AZ |
+| "Minimize write latency impact of replication" | Multi-AZ (sync, within region) |
+| "Aurora with automatic failover + read scaling" | Aurora cluster (Multi-AZ by default + Aurora Replicas) |
+
+> **Exam trap:** Read Replicas do **not** provide automatic write failover. Multi-AZ does **not** scale reads. Don't confuse them.
+
+#### Aurora-Specific Notes
+
+Aurora differs from standard RDS:
+- **Storage layer** replicates 6 copies across 3 AZs automatically (10 GB segments)
+- **Aurora Replicas** share the same storage volume — faster replication, lower lag
+- Aurora supports **automatic failover** among Aurora Replicas (not just Multi-AZ standby)
+- **Aurora Global Database** provides cross-region DR with RPO typically < 1 second
+
+See [Aurora Guide](aws-aurora-saa-c03-guide.md) for Aurora-specific patterns.
+
 ### Configuration
 ```bash
 # Create read replica

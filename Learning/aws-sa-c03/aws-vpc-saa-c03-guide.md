@@ -273,30 +273,54 @@ Inbound:
 
 ### VPC Endpoints
 
-#### Interface Endpoints (PrivateLink)
-**Characteristics:**
-- Elastic Network Interface with private IP
-- DNS names for service access
-- Security group support
-- Charges per hour and data processed
+VPC endpoints allow resources in **private subnets** to reach AWS services without traversing the public internet or a NAT Gateway — reducing cost, latency, and exposure.
 
-**Supported Services:**
-- S3, DynamoDB, Lambda, SNS, SQS
-- EC2, CloudFormation, Systems Manager
-- Third-party services via PrivateLink
+There are **two distinct types**. The exam frequently tests which type applies to which service.
 
-#### Gateway Endpoints
+#### Gateway Endpoints (Route-Based, Free)
+
 **Characteristics:**
-- Route table entry (not ENI)
-- No additional charges
-- Only supports S3 and DynamoDB
+- Implemented as a **route table entry** (prefix list destination → VPC endpoint)
+- **No ENI** is created in your subnet
+- **No hourly charge** and **no data processing charge**
+- **Only two services:** Amazon S3 and Amazon DynamoDB
+- Access control via **IAM policies** and **S3 bucket policies / DynamoDB resource policies** (not security groups on the endpoint itself)
+- Attach to route tables — affects all resources using those route tables
 
 **Configuration:**
 ```
 Route Table Entry:
-Destination: pl-xxxxx (S3 prefix list)
-Target: vpce-xxxxx (VPC Endpoint)
+Destination: pl-xxxxxxxx (S3 or DynamoDB prefix list)
+Target: vpce-xxxxxxxx (Gateway VPC Endpoint)
 ```
+
+**When to use:** Any private subnet that accesses S3 or DynamoDB frequently — eliminates NAT Gateway data processing charges for that traffic.
+
+#### Interface Endpoints (PrivateLink, ENI-Based)
+
+**Characteristics:**
+- Creates an **Elastic Network Interface (ENI)** with a private IP in your subnet
+- Uses **AWS PrivateLink** technology
+- **Charged** per hour per AZ (~$0.01/hr) plus per-GB data processed (~$0.01/GB)
+- Requires a **security group** on the endpoint ENI
+- **Private DNS** enabled by default — service DNS resolves to the private IP
+- Supports **most AWS services**: SNS, SQS, Lambda, EC2 API, CloudWatch, Systems Manager, KMS, Secrets Manager, and many more
+- Also used for **third-party SaaS** via AWS Marketplace PrivateLink offerings
+
+**When to use:** Private access to AWS APIs other than S3/DynamoDB, or when on-premises needs to consume your VPC-hosted service.
+
+#### Gateway vs Interface — Quick Reference
+
+| Feature | Gateway Endpoint | Interface Endpoint |
+|---------|-----------------|-------------------|
+| Services | S3, DynamoDB only | Most AWS services |
+| Implementation | Route table entry | ENI in subnet |
+| Cost | Free | Hourly + data charges |
+| Security | IAM + resource policies | Security group + IAM |
+| DNS | Route table based | Private DNS (optional) |
+| On-premises access | No | Yes (via Direct Connect / VPN) |
+
+> **Exam trap:** S3 uses a **Gateway** endpoint, not an Interface endpoint. Choosing "Interface endpoint for S3" is always wrong.
 
 ### VPC Flow Logs
 

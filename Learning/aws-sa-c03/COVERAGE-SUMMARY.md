@@ -4,6 +4,13 @@
 
 This repository now provides **comprehensive coverage of 49+ AWS services** for SAA-C03 exam preparation with detailed guides and diagrams.
 
+### 🆕 Latest Improvements
+
+- **[README.md](README.md)** — Master study guide with 4-week plan, domain mapping, and exam strategy
+- **[CONCEPTS-DEEP-DIVE.md](CONCEPTS-DEEP-DIVE.md)** — 20 cross-cutting concepts explained in depth (Multi-AZ vs replicas, SG vs NACL, endpoints, DR tiers, etc.)
+- **[Well-Architected Framework Guide](aws-well-architected-framework-saa-c03-guide.md)** — Six pillars mapped to exam domains
+- **Enhanced service guides** — VPC endpoints, RDS Multi-AZ vs Read Replicas, DynamoDB access patterns, S3 strong consistency
+
 ---
 
 ## 📚 NEW: Recently Added Service Guides
