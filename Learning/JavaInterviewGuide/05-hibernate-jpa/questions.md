@@ -2316,6 +2316,651 @@ Local dev works; CI tests fail LazyInitializationException on same code — enha
 
 ---
 
+### 59. Spring Data JPA derived query methods — naming conventions, `First`, `Top`, `IgnoreCase`.
+
+**Short answer:** Derived query methods are parsed from the method name: `findBy`, `readBy`, `queryBy`, `countBy`, `deleteBy` + property path + keywords (`And`, `Or`, `Between`, `LessThan`, `Like`, `In`, `OrderBy`). `First`/`Top` limit result size (`findFirst3ByStatus`); `IgnoreCase` applies case-insensitive matching on string properties. Trade-off: rapid prototyping versus opaque SQL — long method names become unreadable and can generate inefficient joins; switch to `@Query` or Specifications when predicates exceed three clauses.
+
+#### What it is
+Spring Data JPA convention-over-configuration layer that translates repository method names into JPQL/SQL without handwritten queries. Sits above `EntityManager` and below your service layer — the eazybytes Spring course (Section 5, 15) uses derived queries for Contact APIs before introducing JPQL.
+
+#### How it works (internals)
+`PartTreeJpaQuery` parses the method name into a query tree: subject (`find`), criteria (`StatusAndCreatedDate`), sort (`OrderByCreatedDateDesc`), limit (`First`, `Top`). `IgnoreCase` wraps string comparisons with `LOWER()`. `Distinct` deduplicates. Spring generates `SELECT e FROM Entity e WHERE ...` at startup — failures appear at context refresh, not first runtime call. `deleteBy` requires `@Transactional` on the service or repository.
+
+#### When to use / when NOT to use
+Use for simple lookups on indexed columns (`findByEmailIgnoreCase`, `findTop10ByOrderByCreatedDateDesc`). Avoid for dynamic admin filters (use Specifications), aggregate reports (use `@Query`), or deep association paths (`findByOrderCustomerAddressCity`) — implicit joins may lack indexes. Never expose unbounded `findByStatus` on million-row tables without `Pageable`.
+
+#### Production example
+Job portal course pattern: `Optional<User> findByEmailIgnoreCase(String email)` for login lookup with unique index on `LOWER(email)`. Admin dashboard uses `Page<Job> findByStatusAndLocationIgnoreCase(Status status, String location, Pageable page)` — verified with datasource-proxy that exactly one query runs per page request.
+
+#### Common mistakes
+- `findByName` without index — full table scan at scale.
+- `First` without `OrderBy` — non-deterministic row returned.
+- `deleteByStatus` without TX — `TransactionRequiredException` or partial delete.
+- Confusing `findByCustomerId` (FK scalar) with `findByCustomer_Id` (nested path).
+
+#### Interview follow-ups (with model answers)
+
+**Q:** `findFirstBy` vs `findTopBy` — any difference?
+**A:** Functionally equivalent in Spring Data JPA — both apply `LIMIT`. `Top` reads more naturally for "top N by revenue"; `First` for "first matching row." On some stores `First` implies `ORDER BY` should be present for determinism. In interviews I mention I always add explicit `OrderBy` and integration-test the SQL shape.
+
+**Q:** Can derived queries use `JOIN FETCH`?
+**A:** No — derived queries do not support fetch joins. Use `@Query` with `join fetch`, `@EntityGraph`, or `@BatchSize` for association loading. This is a common trap when developers rename a JPQL method to derived form and reintroduce N+1.
+
+#### Scenario probe
+Team adds `List<Order> findByCustomerEmail(String email)` — works in dev (500 orders), production checkout times out.
+
+**Model answer:** Implicit join from `Order` to `Customer` on unindexed `email` column scans millions of orders. Fix: query `Customer` first by indexed email, then `findByCustomerId` with composite index on `(customer_id, status)`. Add query-count test in CI. Derived query was convenient but wrong access path.
+
+#### Code / config (when useful)
+
+```java
+public interface JobRepository extends JpaRepository<Job, Long> {
+    Optional<Job> findFirstByStatusOrderByPostedDateDesc(JobStatus status);
+    Page<Job> findByTitleContainingIgnoreCaseAndLocation(
+            String title, String location, Pageable pageable);
+    long countByEmployerIdAndStatus(Long employerId, JobStatus status);
+}
+```
+
+---
+
+### 60. `@Query` JPQL vs native — when native, parameter binding, DTO projections in queries.
+
+**Short answer:** JPQL queries the entity model (`SELECT o FROM Order o`) — portable, participates in persistence context, respects `@SqlResultSetMapping`. Native SQL hits tables directly — use for vendor features (window functions, `FOR UPDATE SKIP LOCKED`, CTEs), reporting, or bulk ops JPQL cannot express. Always bind parameters (`:id`, `?1`) — never string concatenation. DTO projections via constructor expression (`SELECT new com.app.OrderDto(o.id, o.total)`) or interface/class projections keep list endpoints off the entity graph.
+
+#### What it is
+Explicit query declaration on repository methods, overriding derived-name parsing. Eazybytes Section 15 covers JPQL and native queries for advanced reporting and N+1 fixes.
+
+#### How it works (internals)
+`@Query("...")` with `nativeQuery=false` (default) goes through Hibernate query translator. `nativeQuery=true` bypasses entity mapping for the SELECT shape unless you use `SqlResultSetMapping` or Spring Data interface projection with column aliases matching getter names. Named parameters preferred over positional. `countQuery` attribute required for custom `@Query` on `Page` return types. Hibernate 6 improves SQM — still validate generated SQL per dialect in CI.
+
+#### When to use / when NOT to use
+JPQL for domain queries returning entities or DTOs tied to the object model. Native for Postgres `DISTINCT ON`, Oracle hints, recursive CTEs, or tuning EXPLAIN plans the ORM cannot emit. Avoid native for simple CRUD — loses portability and skips `@Filter`/tenant guards unless you duplicate predicates.
+
+#### Production example
+Inventory reservation uses native `UPDATE stock SET qty = qty - :n WHERE sku = :sku AND qty >= :n` with `rowsUpdated` check — atomic and faster than load-merge. List API uses JPQL `SELECT new com.shop.OrderCardDto(o.id, o.status, c.name) FROM Order o JOIN o.customer c WHERE o.tenantId = :tid` — one round-trip, no lazy load.
+
+#### Common mistakes
+- Native query without `tenant_id` predicate — multi-tenant leak.
+- `SELECT *` native mapping to entity — breaks on column order change.
+- Forgetting `countQuery` on paginated `@Query` — broken totals.
+- Constructor expression DTO without matching constructor — startup failure.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** SpEL in `@Query` — when useful?
+**A:** `#{#entityName}` for generic base repositories; `?#{principal.tenantId}` for tenant scoping — use cautiously because it couples queries to security context. I prefer explicit `:tenantId` parameter from a trusted service layer. SpEL errors surface at query creation time — test all profiles.
+
+**Q:** Interface projection `select o.id as id, o.total as total` — closed vs open?
+**A:** Closed interface with matching getters — Spring Data generates implementation, no entity load. Open projection with `@Value("#{target.customer.name}")` may trigger lazy loads and N+1. For hot paths I use closed interface or explicit DTO constructor in JPQL.
+
+#### Scenario probe
+Developer copies SQL from DBA into `@Query(nativeQuery=true)` with `WHERE status = '` + status + `'` pattern from legacy code.
+
+**Model answer:** SQL injection and full table scan. Refactor to `@Param("status")`, add index on `status`, integration test with malicious input. Code review gate blocks string-built SQL in repositories. If dynamic status list needed, use `IN :statuses` with bound collection.
+
+#### Code / config (when useful)
+
+```java
+@Query("""
+    SELECT new com.acme.OrderSummary(o.id, o.status, SUM(l.amount))
+    FROM Order o JOIN o.lines l
+    WHERE o.customerId = :cid
+    GROUP BY o.id, o.status
+    """)
+List<OrderSummary> summarizeForCustomer(@Param("cid") Long customerId);
+
+@Modifying
+@Query(value = """
+    UPDATE orders SET status = 'EXPIRED'
+    WHERE created_at < :cutoff AND status = 'OPEN'
+    """, nativeQuery = true)
+int expireOpenOrders(@Param("cutoff") Instant cutoff);
+```
+
+---
+
+### 61. `@Modifying` queries — clear persistence context, `@Transactional` requirement.
+
+**Short answer:** `@Modifying` marks a `@Query` as `executeUpdate()` — INSERT/UPDATE/DELETE bypassing entity lifecycle callbacks and dirty checking. Requires `@Transactional` (typically on service layer). `clearAutomatically=true` (default since Spring Data 2.x) clears persistence context after update so subsequent reads are fresh; `flushAutomatically=true` flushes pending changes before bulk SQL. Failure mode: stale managed entities and L2 cache after bulk update without eviction.
+
+#### What it is
+Spring Data JPA bridge between repository convenience and bulk DML that JPA bulk operations provide. Complements eazybytes cart-expiry and admin batch patterns.
+
+#### How it works (internals)
+Without `@Modifying`, Spring Data treats `@Query` as SELECT. With it, `Query.executeUpdate()` runs — no entities returned, `@PreUpdate`/`@LastModifiedDate` on loaded instances not fired for rows not in PC. `clearAutomatically` calls `EntityManager.clear()`. Transaction boundary mandatory — modifying query outside TX throws `TransactionRequiredException`. Return `int` for rows affected — assert in tests.
+
+#### When to use / when NOT to use
+Use for batch status flips, TTL expiry, soft-delete sweeps, counter increments. Prefer single-row domain logic in entity/service with optimistic lock when business rules are complex. Avoid `@Modifying` in same service method that returns entities loaded before update without clear — stale state bugs.
+
+#### Production example
+Nightly job: `@Modifying @Query("UPDATE Cart c SET c.status = EXPIRED WHERE c.updatedAt < :cutoff")` returns 12k rows; service calls `entityManager.getEntityManagerFactory().getCache().evict(Cart.class)` when L2 enabled. API `getCart` after job sees correct status. Metrics on `rowsUpdated` alert if zero when backlog expected.
+
+#### Common mistakes
+- Missing `@Transactional` on calling service.
+- Expecting `@LastModifiedDate` to update on bulk JPQL.
+- Bulk delete without orphan FK handling — constraint violation.
+- `clearAutomatically=false` then `findById` returns stale entity in same TX.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** `@Modifying` delete vs `deleteById`?
+**A:** `deleteById` loads entity (or issues DELETE by id depending on impl) and may cascade — participates in lifecycle. `@Modifying` bulk delete is one SQL statement — faster, no cascade, no Envers audit row per entity unless triggers exist. Pick bulk for housekeeping; pick entity delete when audit and cascades matter.
+
+**Q:** Can you combine `@Modifying` and `@EntityGraph`?
+**A:** No — modifying queries do not return entities. If you need update-then-read, run modifying query, rely on `clearAutomatically`, then separate `find` method or `refresh` on known ids.
+
+#### Scenario probe
+Admin bulk-deactivates 50k promotions; storefront still shows active prices for ten minutes.
+
+**Model answer:** Bulk JPQL updated DB but L2 cache and in-memory instances stale. Fix: `clearAutomatically=true`, evict L2 region for `Promotion`, publish `PromotionDeactivated` events for edge cache invalidation. Integration test: after bulk update, `findById` returns inactive without pod restart.
+
+#### Code / config (when useful)
+
+```java
+@Modifying(clearAutomatically = true, flushAutomatically = true)
+@Transactional
+@Query("UPDATE Promotion p SET p.active = false WHERE p.endDate < :now")
+int deactivateExpired(@Param("now") Instant now);
+```
+
+---
+
+### 62. Spring Data JPA Specifications (`JpaSpecificationExecutor`) — dynamic filters for admin search.
+
+**Short answer:** Specifications compose type-safe, reusable `Predicate` trees for dynamic WHERE clauses — ideal for admin search with optional filters (date range, status, text). Implement `Specification<T>` or static factory methods; repository extends `JpaSpecificationExecutor<T>`. Trade-off: verbose Java versus flexibility; pair with indexed columns and `Pageable` — unindexed `LIKE '%foo%'` on Specifications still scans tables.
+
+#### What it is
+JPA Criteria API wrapped in Spring Data's fluent composition (`Specification.where(a).and(b).or(c)`). Eazybytes advanced query sections lead here when derived method names explode.
+
+#### How it works (internals)
+`Specification.toPredicate(root, query, cb)` builds Criteria predicates. `JpaSpecificationExecutor.findAll(Specification, Pageable)` executes count + data queries. `distinct` may be needed when joining collections to avoid duplicate roots. Specifications are composable and testable unit-by-unit without database. `Sort` can be embedded or passed via `Pageable`.
+
+#### When to use / when NOT to use
+Use for admin grids with optional filters, security-aware query scoping (`hasTenant(tenantId)` always AND-ed). Avoid for simple static queries — `@Query` is clearer. For full-text search at scale, push to Elasticsearch/OpenSearch and keep Specifications for relational filters only.
+
+#### Production example
+`OrderAdminSpec` combines `statusIn`, `createdBetween`, `customerEmailLike` — controller builds spec from query params, caps page size at 50, requires `hasTenant` from JWT. Integration test: each optional filter alone and combined produces expected SQL via p6spy. Index on `(tenant_id, status, created_at)`.
+
+#### Common mistakes
+- `LIKE %term%` on unindexed column — prod timeout.
+- Forgetting `distinct(true)` on join specs — inflated counts.
+- Building specs from raw user input without validation — SQL injection via Criteria is rare but logic bugs abound.
+- N+1 when spec joins associations displayed in grid — use projection or entity graph.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Specification vs Querydsl?
+**A:** Both type-safe. Specifications are built-in, Criteria-backed, no extra dependency. Querydsl generates metamodel classes, often more readable for complex joins. I pick Specifications for moderate dynamic admin filters; Querydsl when team already invested or queries exceed 200 lines of Criteria.
+
+**Q:** How do you test Specifications without DB?
+**A:** Unit-test predicate building with `CriteriaQuery` mock is brittle — prefer `@DataJpaTest` with Testcontainers and assert result counts. For pure logic, test static factory methods that return `Specification` by executing against H2/Postgres container with known seed data.
+
+#### Scenario probe
+Support portal search across orders, customers, and line items — team generates dynamic SQL strings in service layer.
+
+**Model answer:** Replace string SQL with composable Specifications per filter, mandatory tenant spec, pagination, and query timeout. Code review bans string concatenation in repositories. Add ArchUnit rule: repositories must not use `StringBuilder` for SQL. Measure p95 before/after on staging with 10M rows.
+
+#### Code / config (when useful)
+
+```java
+public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {}
+
+public final class OrderSpecs {
+    public static Specification<Order> hasTenant(UUID tenantId) {
+        return (root, q, cb) -> cb.equal(root.get("tenantId"), tenantId);
+    }
+    public static Specification<Order> statusIn(Collection<Status> statuses) {
+        return (root, q, cb) -> root.get("status").in(statuses);
+    }
+}
+
+// service
+var spec = Specification.where(OrderSpecs.hasTenant(tid)).and(OrderSpecs.statusIn(statuses));
+return orderRepo.findAll(spec, PageRequest.of(page, 20, Sort.by("createdAt").descending()));
+```
+
+---
+
+### 63. Spring Data REST — hypermedia exporters, when to use vs custom controllers.
+
+**Short answer:** Spring Data REST auto-exposes repository interfaces as HATEOAS JSON (`_links`, `self`, `collection`) via `RepositoryRestController` exporters. Enable with `@RepositoryRestResource` and Boot starter — great for internal admin prototypes and OData-like CRUD. In production APIs you usually prefer explicit `@RestController` + DTOs for versioning, authz field filtering, and stable contracts. Trade-off: minutes to expose CRUD versus leaking entity schema and uncontrolled fetch graphs.
+
+#### What it is
+Hypermedia-driven REST layer on top of Spring Data repositories — part of Spring HATEOAS ecosystem. Not emphasized in eazybytes (they build explicit REST controllers in Section 3) but appears in enterprise brownfield and rapid internal tooling.
+
+#### How it works (internals)
+`RepositoryEntityController` maps `GET /orders/{id}` to `findById`, supports pagination, sorting, and association resources if exported. `BasePathAwareControllerEndpoint` customizes base URI. Projections and `@JsonIgnore` partially shape output — still entity-centric. CORS, security, and method security apply via Spring Security. `search` links expose exported query methods following naming conventions.
+
+#### When to use / when NOT to use
+Use for internal ops consoles, spike APIs, or hypermedia-first designs with disciplined entity exposure. Do NOT use for public mobile/BFF contracts, PCI-adjacent resources, or when OpenAPI-first codegen is standard. Never export repositories returning full entity graphs with lazy associations — OSIV makes this worse.
+
+#### Production example
+Internal `AdminOrderRepository` exported only on `management` port behind VPN and `@PreAuthorize("hasRole('ADMIN')")` — saves two weeks for ops tooling. Customer-facing `OrderController` remains DTO-based with explicit versioning. ALB routes `/admin/data/**` to restricted network path.
+
+#### Common mistakes
+- Exporting all repositories via `spring.data.rest.base-path` without security.
+- Exposing `delete` on aggregate roots without business validation.
+- Clients coupling to `_links` URLs that change with refactors.
+- N+1 via lazy associations in exported JSON.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** How do you secure Spring Data REST?
+**A:** Spring Security method security on exported methods, disable HTTP verbs via `RepositoryRestConfiguration`, or don't export sensitive repos. Run on separate port/profile. I prefer not exporting write operations — read-only export at most. Audit access logs for `/search/*` endpoints.
+
+**Q:** Spring Data REST vs GraphQL?
+**A:** Both risk over-fetching. GraphQL gives client field selection with DataLoader batching; Data REST gives hypermedia navigation. For public APIs neither replaces intentional DTO design. GraphQL when many clients need flexible reads; neither when you need strict contract versioning.
+
+#### Scenario probe
+Team exposes `UserRepository` via Data REST for mobile app — password hash field leaks in JSON.
+
+**Model answer:** Immediate disable export, rotate credentials, add `@JsonIgnore` insufficient — use DTO controller, never export security entities. Post-incident: ban Data REST on user-facing profiles; OpenAPI review for all endpoints. `@Projection` DTOs help but explicit controllers are clearer for authz.
+
+#### Code / config (when useful)
+
+```java
+@RepositoryRestResource(path = "orders", collectionResourceRel = "orders")
+public interface AdminOrderRepository extends JpaRepository<Order, Long> {}
+
+// application.yml — disable in prod customer API
+spring.data.rest.detection-strategy: annotated
+```
+
+---
+
+### 64. DTO pattern with Spring Data — interface projections, class projections, MapStruct integration.
+
+**Short answer:** Never return entities at API boundaries — use DTOs via closed interface projections (alias matching getters), class-based DTOs with JPQL constructor expressions, or MapStruct mappers from entity to record in the service layer. Spring Data projections avoid loading unused columns; MapStruct handles complex nested mapping post-fetch. Trade-off: projection for read hot paths; MapStruct when mapping spans services or multiple aggregates.
+
+#### What it is
+Data Transfer Object pattern as taught in eazybytes Section 5 (DTO pattern blog) — decouple persistence model from API contract. Spring Data adds projection machinery; MapStruct generates mapping implementations at compile time.
+
+#### How it works (internals)
+Closed interface: `interface UserSummary { String getEmail(); String getName(); }` with `@Query("SELECT u.email AS email, u.name AS name FROM User u ...")`. Class DTO: `SELECT new com.app.UserDto(u.id, u.email) FROM User u u`. MapStruct `@Mapper` component maps `User` → `UserDto` after `findById` — two-step but flexible for writes and validation. Blazed Persistence or jOOQ are alternatives for read models.
+
+#### When to use / when NOT to use
+Interface/class projection for list and detail reads with stable fields. MapStruct when service orchestrates multiple entities, applies formatting, or maps command DTO → entity on writes. Avoid ModelMapper reflection in hot paths — startup-friendly but slower and fails silently on rename.
+
+#### Production example
+Job listing API: `Page<JobCardProjection>` from repository query selecting title, company, salary band only — 3x smaller payload than entity. Application submission uses MapStruct `JobApplicationMapper.toEntity(dto)` with validation in service `@Transactional` method. CI ArchUnit: controllers never return types annotated `@Entity`.
+
+#### Common mistakes
+- Open projection with SpEL touching lazy associations — N+1.
+- MapStruct mapping entities inside controller — belongs in service.
+- DTO and entity field drift without contract tests.
+- Using ModelMapper singleton without strict configuration — null surprises.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** MapStruct vs manual constructor in `@Query`?
+**A:** Constructor in `@Query` is zero-mapping-overhead for reads — best for hot list endpoints. MapStruct when same entity maps to multiple DTO shapes or write path needs inverse mapping. I use both: projection for reads, MapStruct for commands.
+
+**Q:** How do you version DTOs?
+**A:** `/v2` controllers with separate DTO types; never mutate shared DTO used by mobile v1. MapStruct mappers per API version. Deprecation headers on v1 responses.
+
+#### Scenario probe
+Mobile team reports 800ms list API — payload 2MB because service returns `List<Job>` entities with lazy collections serialized.
+
+**Model answer:** Replace with `JobCardDto` projection query; disable OSIV; measure query count (target ≤2). Add response size metric in gateway. Regression test fails if controller return type is entity.
+
+#### Code / config (when useful)
+
+```java
+public interface JobCardProjection {
+    String getTitle();
+    String getCompanyName();
+    BigDecimal getSalaryMax();
+}
+
+@Query("""
+    SELECT j.title AS title, e.name AS companyName, j.salaryMax AS salaryMax
+    FROM Job j JOIN j.employer e WHERE j.status = 'OPEN'
+    """)
+Page<JobCardProjection> findOpenJobCards(Pageable pageable);
+
+@Mapper(componentModel = "spring")
+public interface JobApplicationMapper {
+    JobApplication toEntity(JobApplicationDto dto);
+}
+```
+
+---
+
+### 65. Sorting and Pageable — `Sort`, multi-field sort, security-aware pagination.
+
+**Short answer:** `Pageable` combines page index, size, and `Sort` — Spring Data translates to `LIMIT/OFFSET` (or keyset when you implement it). Multi-field sort via `Sort.by("priority").descending().and(Sort.by("createdAt").ascending())`. Never pass raw client `sort` strings to query without allowlisting — sort injection and unindexed column sorts are production incidents. Cap `pageSize` (e.g., max 100) and default sensible ordering.
+
+#### What it is
+Pagination abstraction in Spring Data, covered in eazybytes Section 16 (Sorting & Pagination). Bridges repository layer and API `?page=0&size=20&sort=createdAt,desc`.
+
+#### How it works (internals)
+`PageRequest.of(page, size, sort)` → `Query.setFirstResult`, `setMaxResults`, `orderBy`. `Page<T>` returns content, total elements, total pages. Sort property paths traverse associations (`customer.name`) — implicit join cost. `Slice` avoids count query when next-page existence suffices. Keyset pagination requires custom `@Query` with `WHERE id > :cursor ORDER BY id LIMIT :n` — Spring Data 3+ `ScrollPosition` APIs emerging.
+
+#### When to use / when NOT to use
+Offset pagination for admin UIs with moderate depth. Keyset for infinite scroll feeds at depth >1000 — offset scans become O(n). Always allowlist sort fields mapping API names to entity properties. Security: scope queries by tenant/user in Specification or service, not only hiding rows in JSON.
+
+#### Production example
+`GET /jobs?page=0&size=20&sort=postedDate,desc` — controller maps `sort` param through `SortWhitelist` enum; rejects `sort=salary` (unindexed). Repository `findAll(spec, pageable)` with tenant spec. Metrics on slow queries when page >50 alerts product to switch to cursor API.
+
+#### Common mistakes
+- Unbounded `size=10000` export via API — OOM and DB pain.
+- Client-controlled `sort` on PII columns — data enumeration.
+- `Page` on `@EntityGraph` join fetch — duplicate rows, wrong count.
+- Deep offset on 50M row table — 30s queries.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** How implement keyset pagination in Spring Data?
+**A:** Custom repository method with `@Query` and `WHERE (postedDate, id) < (:date, :id) ORDER BY postedDate DESC, id DESC LIMIT :limit` passing last seen tuple from previous page. Return `List` + next cursor token in response wrapper — not `Page` total count. Document no jump-to-page-500 UX.
+
+**Q:** `Sort` vs `@OrderBy` on entity?
+**A:** `@OrderBy` on collection is static mapping default — rarely what REST API needs. API sort should be per-request via `Pageable`. Static `@OrderBy` on `OneToMany` affects all loads — surprising in unrelated use cases.
+
+#### Scenario probe
+Competitor scrapes catalog via `page=0..10000&size=100` — DB CPU pegged.
+
+**Model answer:** Rate limit at gateway, max page 100, max offset or switch to cursor, require API key, add caching for public catalog. DB: index on sort column. Consider read replica for catalog queries. Alert on abnormal page depth per client id.
+
+#### Code / config (when useful)
+
+```java
+private static final Map<String, Sort> ALLOWED_SORTS = Map.of(
+    "postedDate", Sort.by("postedDate").descending(),
+    "title", Sort.by("title").ascending());
+
+public Page<Job> list(String sortKey, int page, int size, UUID tenantId) {
+    int safeSize = Math.min(size, 100);
+    Sort sort = ALLOWED_SORTS.getOrDefault(sortKey, ALLOWED_SORTS.get("postedDate"));
+    var spec = Specification.where(JobSpecs.hasTenant(tenantId));
+    return jobRepo.findAll(spec, PageRequest.of(page, safeSize, sort));
+}
+```
+
+---
+
+### 66. `@EntityGraph` with Spring Data — repository method vs attribute paths.
+
+**Short answer:** `@EntityGraph` on repository methods applies a fetch plan (LOAD or FETCH type) to that query — use named graphs on the entity or `attributePaths` inline (`@EntityGraph(attributePaths = {"lines", "lines.product"})`). Prefer `type = LOAD` with pagination; `FETCH` join can duplicate rows. Alternative to ad-hoc `join fetch` in JPQL for repeatable fetch plans across methods.
+
+#### What it is
+Spring Data integration of JPA entity graphs (eazybytes Section 15 N+1 solutions, Section 9 relationships). Declares which associations initialize for a specific repository call.
+
+#### How it works (internals)
+Named: `@NamedEntityGraph` on entity + `@EntityGraph("Order.withLines")` on repo method. Inline: `@EntityGraph(attributePaths = {"customer"})`. `EntityGraphType.FETCH` uses join fetch; `LOAD` uses separate query or batch per JPA provider. Hibernate 6 honors batch fetching with LOAD. Dynamic graphs possible via `JpaEntityGraph` entity manager API in custom repo code.
+
+#### When to use / when NOT to use
+Detail endpoints needing bounded association tree inside `@Transactional` service. List endpoints — prefer DTO projection over graph. Multiple methods same graph — named graph for DRY. Do not stack `@EntityGraph` on every method — explicit query per use case clearer in code review.
+
+#### Production example
+`findWithLinesById` uses `@EntityGraph(attributePaths = {"lines"})` — integration test asserts ≤2 queries. List `findByCustomerId` uses no graph — returns ids only via projection. Fulfillment service uses named subgraph `Order.fulfillment` adding `lines.product` only where warehouse needs SKU.
+
+#### Common mistakes
+- `@EntityGraph` on `Page` with FETCH type — duplicate content.
+- Graph path typo — silent N+1 fallback.
+- Graph fetching collections + pagination — cartesian product.
+- Using graph to fix OSIV serialization smell instead of DTOs.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** `@EntityGraph` vs `@BatchSize`?
+**A:** Graph plans specific query fetch; batch size is global safety net for lazy loads in loop. Hot detail path: graph or join fetch. Unpredictable traversal: default batch fetch size 16. Measure — don't guess.
+
+**Q:** attributePaths vs `type=FETCH`?
+**A:** FETCH generates join — watch row multiplication with bags. LOAD lets Hibernate batch-select associations — often safer with `Page`. Spring Data docs recommend LOAD for paginated queries.
+
+#### Scenario probe
+Paginated order list returns duplicate orders after adding `@EntityGraph(attributePaths = "lines")`.
+
+**Model answer:** Join fetch + Page known issue. Switch to LOAD type, or remove graph from list endpoint and use `OrderListDto` query without lines. Keep graph only on `findById` detail. Add query-count regression test.
+
+#### Code / config (when useful)
+
+```java
+@Entity
+@NamedEntityGraph(name = "Order.withLines", attributeNodes = @NamedAttributeNode("lines"))
+class Order { /* ... */ }
+
+interface OrderRepository extends JpaRepository<Order, Long> {
+    @EntityGraph(value = "Order.withLines", type = EntityGraph.EntityGraphType.LOAD)
+    Optional<Order> findWithLinesById(Long id);
+
+    @EntityGraph(attributePaths = {"customer"})
+    Page<Order> findByStatus(Status status, Pageable pageable);
+}
+```
+
+---
+
+### 67. Spring Data JPA auditing events — `AuditingEntityListener`, custom auditor.
+
+**Short answer:** Enable with `@EnableJpaAuditing` and `@EntityListeners(AuditingEntityListener.class)` on entities using `@CreatedDate`, `@LastModifiedDate`, `@CreatedBy`, `@LastModifiedBy`. `AuditorAware<T>` supplies current principal for `*By` fields. Works via JPA lifecycle callbacks before persist/update — bulk `@Modifying` queries skip it. For audit events beyond columns, publish domain events from `@PreUpdate` or separate audit log table.
+
+#### What it is
+Automatic population of audit metadata on entities — eazybytes Section 8 (JPA Auditing). `AuditingEntityListener` is Spring Data's bridge between security context and entity fields.
+
+#### How it works (internals)
+On `persist`, listener sets created/lastModified timestamps and auditor if null. On update, lastModified fields refresh; created fields immutable if configured. `AuditorAware.getCurrentAuditor()` called per operation — must return non-empty for required fields. `DateTimeProvider` customizes clock (UTC). `@CreatedBy` type must match auditor type (String username or `UserId`). Async and batch jobs need `TaskDecorator` or explicit auditor override.
+
+#### When to use / when NOT to use
+Use for CRUD entities needing who/when on rows. Compliance requiring immutable append-only audit trail — add Envers or event sourcing, not only `@CreatedDate`. High-volume events — DB default `now()` and application actor in Kafka may suffice.
+
+#### Production example
+`@CreatedBy String createdBy` populated from JWT `sub` via `SecurityAuditorAware`. Kafka consumer sets `AuditorContext.set("system-replay")` in listener before save. Support finds orders with null `createdBy` — traced to missing context propagation; fixed with MDC + holder pattern.
+
+#### Common mistakes
+- Auditing disabled in `@DataJpaTest` without `@Import` auditing config — null assertions.
+- `@Modifying` bulk update skips `@LastModifiedDate`.
+- Mutable `createdBy` on update — use `updatable = false`.
+- Same auditor for human and system without distinction in forensics.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** AuditorAware in `@Async` method?
+**A:** SecurityContext not inherited by default — use `DelegatingSecurityContextAsyncTaskExecutor` or pass actor explicitly into async method parameters. AuditorAware reads empty → null `createdBy`. Test async path explicitly.
+
+**Q:** Difference from Hibernate Envers?
+**A:** Spring Data auditing mutates columns on entity row — lightweight who/when. Envers writes history rows per revision — full audit trail. Use auditing for operational metadata; Envers or CDC for compliance replay.
+
+#### Scenario probe
+Peak traffic orders have `created_by = null` — only from Kafka consumer path.
+
+**Model answer:** Consumer thread lacks security context. Fix: extract `userId` from event payload into scoped `AuditorAware` holder at listener entry; reject events missing actor. Backfill with `migration-job` label. Alert on null rate >0.1%.
+
+#### Code / config (when useful)
+
+```java
+@EnableJpaAuditing(auditorAwareRef = "auditorAware")
+@Configuration
+class JpaAuditingConfig {}
+
+@Component
+class SecurityAuditorAware implements AuditorAware<String> {
+    public Optional<String> getCurrentAuditor() {
+        return Optional.ofNullable(SecurityContextHolder.getContext())
+            .map(SecurityContext::getAuthentication)
+            .filter(Authentication::isAuthenticated)
+            .map(Authentication::getName);
+    }
+}
+
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+class Order {
+    @CreatedDate private Instant createdAt;
+    @CreatedBy private String createdBy;
+}
+```
+
+---
+
+### 68. Custom repository implementation — `CustomRepo` + `CustomRepoImpl` pattern.
+
+**Short answer:** Extend Spring Data with custom methods by defining `OrderRepositoryCustom` interface, implementing `OrderRepositoryCustomImpl` (class name must be `Impl` suffix or configured postfix), and having main `OrderRepository extends JpaRepository, OrderRepositoryCustom`. Spring wires custom impl as fragment — inject `EntityManager` for Criteria, native SQL, or bulk operations not expressible in derived queries.
+
+#### What it is
+Repository fragment pattern for team-specific persistence logic without abandoning Spring Data. Common for complex reports, pessimistic locking helpers, and upsert semantics.
+
+#### How it works (internals)
+`RepositoryComposition` scans `*Impl` classes alongside repository interface package. Custom impl constructor receives `EntityManager` if `@PersistenceContext` field. Main repository inherits custom methods transparently. Alternative: `@Query` in custom interface with default methods — limited. `JpaContext` provides EM in older patterns.
+
+#### When to use / when NOT to use
+Use when Specifications, `@Query`, and derived methods are insufficient — e.g., `upsert`, `FOR UPDATE SKIP LOCKED` queue poll, native reporting. Avoid dumping business rules in custom repo — keep domain logic in service; repo is persistence only. One custom fragment per concern (`OrderRepositoryCustom`, `OrderLockingRepository`).
+
+#### Production example
+`OrderRepositoryCustomImpl.claimNextForProcessing()` runs native `SELECT id FROM orders WHERE status='QUEUED' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED` — worker pool scales without double processing. Unit-tested with Testcontainers Postgres concurrency test (10 threads, 10 orders → 10 distinct claims).
+
+#### Common mistakes
+- Wrong impl class name (`OrderCustomRepository` not picked up).
+- Custom impl in different package without `@EnableJpaRepositories(basePackages)`.
+- Business validation inside custom repo — belongs in service.
+- Missing `@Transactional` on custom modifying methods.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Custom repository vs separate DAO class?
+**A:** Custom fragment keeps single injection point `OrderRepository` — cohesive API. Separate `@Repository` DAO is fine for legacy or non-JPA stores. I use fragments when >50% of methods are Spring Data generated and few need custom SQL.
+
+**Q:** Can custom impl use `JdbcTemplate`?
+**A:** Yes — inject `JdbcTemplate` for pure SQL performance while interface remains Spring Data repo. Document which methods bypass JPA cache. Evict L2 if mixing JDBC update with JPA reads on same entity.
+
+#### Scenario probe
+Team adds 400-line native SQL report to `@Query` on main repository — merge conflicts weekly.
+
+**Model answer:** Extract to `OrderReportingRepositoryCustom` + impl; report queries versioned in one class. Service calls `orderRepository.runRevenueReport(params)`. PR review requires EXPLAIN plan screenshot for new SQL.
+
+#### Code / config (when useful)
+
+```java
+public interface OrderRepository extends JpaRepository<Order, Long>, OrderRepositoryCustom {}
+
+public interface OrderRepositoryCustom {
+    Optional<Long> claimNextQueuedOrder();
+}
+
+public class OrderRepositoryCustomImpl implements OrderRepositoryCustom {
+    @PersistenceContext private EntityManager em;
+
+    public Optional<Long> claimNextQueuedOrder() {
+        var ids = em.createNativeQuery(
+            "SELECT id FROM orders WHERE status='QUEUED' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED")
+            .getResultList();
+        return ids.isEmpty() ? Optional.empty() : Optional.of(((Number) ids.get(0)).longValue());
+    }
+}
+```
+
+---
+
+### 69. Flyway vs Liquibase in Spring Boot — expand-contract with JPA entities.
+
+**Short answer:** Both are database migration tools — Flyway uses ordered SQL/Java migrations; Liquibase uses changelog XML/YAML with preconditions and rollbacks. With JPA, always `ddl-auto=validate` (or `none`) in prod and let migrations own schema. **Expand-contract** pattern: deploy additive migration (new column nullable) → dual-write or backfill job → switch app to new column → contract migration drops old — avoids downtime with `validate` catching entity drift.
+
+#### What it is
+Schema versioning discipline pairing ORM entities with reviewed SQL — eazybytes uses Hibernate `ddl-auto` in dev but production requires Flyway (Section 6 Docker MySQL, job portal). Interviewers test whether you trust Hibernate to alter prod schema (never).
+
+#### How it works (internals)
+Flyway: `V1__init.sql`, `V2__add_email.sql` in `classpath:db/migration`. Liquibase: `db.changelog-master.yaml` changesets with `rollback` blocks. Spring Boot auto-runs on startup. `validate` compares Hibernate mapping to DB — fails deploy if entity has `phone` column but no migration. Expand: `ALTER ADD new_col`; migrate data; contract: `ALTER DROP old_col` in later release.
+
+#### When to use / when NOT to use
+Flyway — team prefers plain SQL, simpler mental model. Liquibase — need conditional migrations across Oracle/MSSQL/Postgres with rollbacks. Neither replaces ER modeling — JPA entities document intent; migrations are source of truth for prod.
+
+#### Production example
+Rename `customer_email` → `email`: V3 adds `email`, app writes both; backfill; V4 switches reads; V5 drops `customer_email`. Entity updated in V3 with both fields mapped via `@Column` transitional — or single field after V4. CI: Testcontainers + Flyway + `ddl-auto=validate` on every PR.
+
+#### Common mistakes
+- `ddl-auto=update` in prod — unreviewed schema changes.
+- Entity renamed field without migration — validate fails at 2 a.m. deploy.
+- Long-running migration without `lock_timeout` — blocks traffic.
+- Forgetting Envers `_AUD` table when entity audited.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Flyway baseline brownfield database?
+**A:** `flyway baseline` marks existing schema version without running V1..Vn — then forward migrations only. Document baseline version in runbook. Hibernate `validate` still required. Never baseline without DBA review of drift.
+
+**Q:** Zero-downtime column type change?
+**A:** Expand-contract: add new column, backfill async, dual-read, switch writes, stop old reads, drop old column across multiple deploys. Cannot `ALTER COLUMN TYPE` blocking on huge table in one step — use new column + copy.
+
+#### Scenario probe
+Deploy fails: `validate` reports missing index on entity `@Index` annotation — DBA never got migration.
+
+**Model answer:** Hibernate `validate` checks columns and some indexes depending on config — treat `@Index` as requiring Flyway `CREATE INDEX CONCURRENTLY`. PR checklist: entity diff → migration script. No merge without paired files.
+
+#### Code / config (when useful)
+
+```yaml
+spring.jpa.hibernate.ddl-auto: validate
+spring.flyway.enabled: true
+spring.flyway.locations: classpath:db/migration
+```
+
+```sql
+-- V10__expand_add_email_normalized.sql
+ALTER TABLE customers ADD COLUMN email_normalized VARCHAR(255);
+CREATE INDEX CONCURRENTLY idx_customers_email_norm ON customers (email_normalized);
+```
+
+---
+
+### 70. Testing Spring Data — `@DataJpaTest`, `@Sql`, Testcontainers MySQL/Postgres.
+
+**Short answer:** `@DataJpaTest` loads JPA slice (repositories, EM, transactions rollback by default) — fast persistence tests without full web context. `@Sql` seeds or cleans data per test method. Testcontainers runs real Postgres/MySQL in Docker — catches dialect-specific bugs H2 misses (JSON, `SKIP LOCKED`, enum types). Combine: `@DataJpaTest` + `@Testcontainers` + `@ServiceConnection` for Boot 3.2+ — production parity without embedded H2 false confidence.
+
+#### What it is
+Testing strategy for repository layer — eazybytes Section 6 Docker MySQL aligns with Testcontainers approach. Senior teams reject H2-only CI for JPA apps targeting Postgres.
+
+#### How it works (internals)
+`@DataJpaTest` uses `@AutoConfigureTestDatabase(replace = NONE)` when Testcontainers provides datasource. Default rollback after each test — use `@Commit` or `@Transactional(propagation = NOT_SUPPORTED)` when testing `@Modifying` visible across transactions. `@Sql(scripts="/seed-orders.sql", executionPhase=BEFORE_TEST_METHOD)` runs Flyway-compatible SQL. `@Import` auditing/security if needed. Query count assertions via datasource-proxy or Hibernate statistics.
+
+#### When to use / when NOT to use
+`@DataJpaTest` for repository, Specification, `@Query` correctness. `@SpringBootTest` for full integration including controllers — fewer, slower. Testcontainers for every CI pipeline targeting specific DB. H2 only for local quick unit experiments with documented gaps.
+
+#### Production example
+CI GitHub Actions: Postgres 16 container, Flyway migrate, `@DataJpaTest` runs 80 repository tests in 90s. Test `claimNextQueuedOrder` with 5 parallel threads — asserts no duplicate claims. `@Sql` loads tenant fixtures; test asserts cross-tenant isolation on `findAll(spec)`.
+
+#### Common mistakes
+- H2 `MODE=PostgreSQL` assumed identical — still diverges.
+- `@DataJpaTest` without `@Import` custom repository impl — context fails or wrong bean.
+- `@Modifying` test without clearing EM — false pass on stale read.
+- Not reusing container (`withReuse(true)`) — slow CI (balance with isolation).
+
+#### Interview follow-ups (with model answers)
+
+**Q:** `@Sql` vs Flyway in tests?
+**A:** Flyway runs once per container start — schema truth. `@Sql` per-test data setup/teardown — keep small. Do not duplicate schema in `@Sql` — drift risk. I use Flyway migrations from main `db/migration` in tests for fidelity.
+
+**Q:** How assert query count in `@DataJpaTest`?
+**A:** p6spy, datasource-proxy, or Hibernate `Statistics#getPrepareStatementCount` enabled in test config. Assert `≤3` queries for list projection test. Fails CI on N+1 regression.
+
+#### Scenario probe
+All tests pass on H2; prod Postgres fails on `jsonb` column and `FOR UPDATE SKIP LOCKED`.
+
+**Model answer:** Migrate CI to Testcontainers Postgres; delete H2 dependency for repository tests. Add native-query tests for locking and JSON types. Document dialect features not portable. On-call time saved exceeds 90s CI cost.
+
+#### Code / config (when useful)
+
+```java
+@DataJpaTest
+@Testcontainers
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class OrderRepositoryIT {
+    @Container @ServiceConnection
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @Autowired OrderRepository orders;
+
+    @Test
+    @Sql("/sql/tenant-a-orders.sql")
+    void findsOnlyTenantOrders() {
+        var spec = OrderSpecs.hasTenant(TENANT_A);
+        assertThat(orders.findAll(spec)).hasSize(3);
+    }
+}
+```
+
+---
+
 ## Scenario-based interview drills
 
 ### S1. Order API p95 latency spike after Spring Boot upgrade

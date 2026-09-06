@@ -7,9 +7,9 @@ All topics have **senior-level Q&A** per [ANSWER-FORMAT.md](./ANSWER-FORMAT.md):
 | 01-java-core | **85** | ~4011 | 33 | done |
 | 02-multithreading | **62** | ~2715 | 33 | done |
 | 03-design-patterns | 50 + [181-pattern catalog](./03-design-patterns/pattern-catalog.md) | ~2820 + ~7529 | 28 | done |
-| 04-spring-boot | **62** | ~2774 | 33 | done |
-| 05-hibernate-jpa | **58** | ~2512 | 33 | done |
-| 06-microservices | **58** | ~2861 | 33 | done |
+| 04-spring-boot | **92** (incl. Spring Security Q79–92) | ~4471 | 43 | done |
+| 05-hibernate-jpa | **70** | ~3157 | 38 | done |
+| 06-microservices | **72** | ~3636 | 38 | done |
 | 07-rest-api | **55** | ~2784 | 33 | done |
 | 08-sql-oracle-plsql | **58** | ~2902 | 33 | done |
 | 09-kafka | **55** | ~2582 | 33 | done |

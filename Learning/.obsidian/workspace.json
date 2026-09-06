@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "0b47ebeefce8a0e4",
+        "id": "054bf130aba37080",
         "type": "tabs",
         "children": [
           {
-            "id": "1057dd46285a024d",
+            "id": "fa560a467b62c15a",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "JavaInterviewGuide/Concurrency.md",
-                "mode": "preview",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "Concurrency"
+              "title": "New tab"
             }
           }
         ]
@@ -180,11 +176,12 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "1057dd46285a024d",
+  "active": "fa560a467b62c15a",
   "lastOpenFiles": [
+    "JavaInterviewGuide/01-java-core/questions.md",
+    "JavaInterviewGuide/Concurrency.md",
     "Pasted image 20260905130019.png",
     "Untitled.md",
-    "JavaInterviewGuide/Concurrency.md",
     "JavaInterviewGuide",
     "claude-certitication-learning/01-claude-api-fundamentals.md",
     "commands.md",

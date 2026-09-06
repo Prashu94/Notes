@@ -1622,6 +1622,184 @@ class ModuleBoundaryTest {
 
 ---
 
+## Exercise 34 — Spring Data Specification admin search
+
+**Difficulty:** Intermediate
+
+**Task:** In `order-service`, implement admin search API with optional filters (status, date range) via `JpaSpecificationExecutor` + mandatory tenant spec. Cap page size at 50.
+
+**Solution:**
+
+```java
+@RestController
+@RequestMapping("/admin/orders")
+class OrderAdminController {
+    @GetMapping
+    Page<OrderDto> search(@RequestParam(required = false) Status status,
+                          @RequestParam(required = false) Instant from,
+                          @AuthenticationPrincipal Jwt jwt,
+                          Pageable pageable) {
+        UUID tenantId = UUID.fromString(jwt.getClaim("tenant_id"));
+        int size = Math.min(pageable.getPageSize(), 50);
+        var page = PageRequest.of(pageable.getPageNumber(), size, pageable.getSort());
+        return adminService.search(tenantId, status, from, page);
+    }
+}
+```
+
+```java
+var spec = Specification.where(OrderSpecs.hasTenant(tenantId));
+if (status != null) spec = spec.and(OrderSpecs.statusEq(status));
+return orderRepo.findAll(spec, pageable).map(orderMapper::toDto);
+```
+
+**Senior takeaway:** Admin search belongs behind role check + tenant-scoped Specification — same pattern as JPA topic Exercise 34.
+
+---
+
+## Exercise 35 — `@Modifying` bulk status update
+
+**Difficulty:** Intermediate
+
+**Task:** Batch-expire `PENDING` payments older than 1h via `@Modifying` JPQL in `payment-service`. Log rows updated; integration test with `@DataJpaTest`.
+
+**Solution:**
+
+```java
+@Modifying(clearAutomatically = true)
+@Query("UPDATE Payment p SET p.status = EXPIRED WHERE p.status = PENDING AND p.createdAt < :cutoff")
+int expirePending(@Param("cutoff") Instant cutoff);
+```
+
+```java
+@Test
+void expiresOnlyStalePending() {
+    save(pendingFrom(2, ChronoUnit.HOURS));
+    save(pendingFrom(10, ChronoUnit.MINUTES));
+    assertThat(repo.expirePending(Instant.now().minus(1, ChronoUnit.HOURS))).isEqualTo(1);
+}
+```
+
+**Senior takeaway:** Scheduled `@Modifying` jobs need metrics on `rowsUpdated` — zero rows when backlog expected is an alert.
+
+---
+
+## Exercise 36 — Feign client to accounts service
+
+**Difficulty:** Hard
+
+**Task:** `loans-service` calls `accounts-service` via OpenFeign for customer validation. Add correlation id interceptor, timeouts, and circuit breaker. Contract test with WireMock.
+
+**Solution:**
+
+```java
+@FeignClient(name = "ACCOUNTS")
+public interface AccountsClient {
+    @GetMapping("/accounts/{id}")
+    AccountDto getAccount(@PathVariable Long id);
+}
+
+@Bean
+RequestInterceptor correlationId() {
+    return template -> template.header("X-Correlation-ID", MDC.get("traceId"));
+}
+```
+
+```java
+@Test
+void feignPropagatesCorrelationId() {
+    stubFor(get(urlPathEqualTo("/accounts/1"))
+        .withHeader("X-Correlation-ID", matching(".+"))
+        .willReturn(okJson("{\"id\":1}")));
+    client.getAccount(1L);
+    verify(getRequestedFor(urlPathEqualTo("/accounts/1")));
+}
+```
+
+**Senior takeaway:** Feign is the course default for inter-service sync calls — always add observability headers and failure boundaries.
+
+---
+
+## Exercise 37 — Spring Cloud Config refresh workflow
+
+**Difficulty:** Intermediate
+
+**Task:** Run local Config Server + `accounts` client. Change `build.version` in git-backed config; trigger `/actuator/refresh` (or Bus refresh) and verify `@RefreshScope` `BuildInfoController` returns new value.
+
+**Solution:**
+
+```java
+@RestController
+@RefreshScope
+class BuildInfoController {
+    @Value("${build.version}")
+    private String version;
+    @GetMapping("/build-info") String version() { return version; }
+}
+```
+
+```bash
+docker run -d -p 8071:8071 configserver-image
+# edit config-repo accounts.yml build.version: 2.1
+curl -X POST http://localhost:8080/actuator/refresh
+curl http://localhost:8080/build-info
+```
+
+Optional Bus: `curl -X POST http://localhost:8080/actuator/busrefresh` after RabbitMQ linked.
+
+**Senior takeaway:** Config refresh is powerful — pair with PR review and staging validation before fleet-wide Bus broadcast.
+
+---
+
+## Exercise 38 — Gateway route + JWT filter (eazybank pattern)
+
+**Difficulty:** Hard
+
+**Task:** Configure `gatewayserver` route `/eazybank/cards/**` → `lb://CARDS` with rewrite. Secure with Keycloak JWT. Add Redis rate limiter 50 req/s per API key header.
+
+**Solution:**
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: cards
+          uri: lb://CARDS
+          predicates:
+            - Path=/eazybank/cards/**
+          filters:
+            - RewritePath=/eazybank/cards/(?<segment>.*), /${segment}
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                key-resolver: "#{@apiKeyResolver}"
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+```
+
+```java
+@Bean
+KeyResolver apiKeyResolver() {
+    return ex -> Mono.justOrEmpty(ex.getRequest().getHeaders().getFirst("X-API-KEY"))
+        .switchIfEmpty(Mono.just(ex.getRequest().getRemoteAddress().getAddress().getHostAddress()));
+}
+```
+
+```bash
+ab -n 100 -c 10 -H "Authorization: Bearer $TOKEN" -H "X-API-KEY: demo" \
+  http://localhost:8072/eazybank/cards/api/contact-info
+# expect 429 after burst exceeded
+```
+
+**Senior takeaway:** Gateway owns edge auth and rate limits — course Stripe pattern protects cards/loans services from traffic spikes.
+
+---
+
 ## Weekend drill
 
 1. Implement the full order saga with outbox + compensation; kill payment mid-flow and prove stock released.

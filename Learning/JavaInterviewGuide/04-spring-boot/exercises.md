@@ -2,7 +2,7 @@
 
 Type these. Run them. Break them. Reading is not practice.
 
-**28 exercises:** Part A Basic (12) · Part B Intermediate (12) · Part C Hard (9) · Weekend challenge
+**43 exercises:** Part A Basic (14) · Part B Intermediate (14) · Part C Hard (10) · Part D Security (5) · Weekend challenge
 
 Scaffold once:
 
@@ -1642,6 +1642,710 @@ ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
 
 ---
 
+## Exercise 34 — AOP performance logging aspect
+
+**Difficulty:** Intermediate
+
+**Task:** Add `@Timed` annotation and an `@Around` aspect that logs method name and duration in ms. Prove aspect runs on controller-injected service call but **not** on `this.pay()` self-invocation.
+
+**Solution:**
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Timed {
+    String value() default "";
+}
+
+@Aspect
+@Component
+class PerformanceLoggingAspect {
+    private static final Logger log = LoggerFactory.getLogger(PerformanceLoggingAspect.class);
+
+    @Around("@annotation(timed)")
+    Object around(ProceedingJoinPoint pjp, Timed timed) throws Throwable {
+        long start = System.nanoTime();
+        try {
+            return pjp.proceed();
+        } finally {
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            log.info("timed method={} label={} tookMs={}", pjp.getSignature().getName(), timed.value(), ms);
+        }
+    }
+}
+
+@Service
+class PaymentService {
+    @Timed("pay")
+    public void pay(String id) { /* mark paid */ }
+
+    public void payManyBroken(List<String> ids) {
+        ids.forEach(this::pay); // no aspect — self-invocation
+    }
+}
+```
+
+```java
+@SpringBootTest
+class AopTimingTest {
+    @Autowired PaymentService payments;
+
+    @Test
+    void externalCallIsAdvised() {
+        payments.pay("P1"); // check log output contains tookMs=
+    }
+
+    @Test
+    void selfInvocationSkipsAspect() {
+        payments.payManyBroken(List.of("A", "B")); // aspect not applied per internal call
+    }
+}
+```
+
+**Senior takeaway:** Narrow pointcuts to `@annotation(Timed)` — package-wide `execution(*..*Service.*)` adds noise and measures the wrong layer.
+
+---
+
+## Exercise 35 — Logback JSON + MDC correlation id
+
+**Difficulty:** Basic
+
+**Task:** Configure `logback-spring.xml` with JSON appender for `prod` profile. Add a filter that sets `correlationId` in MDC from `X-Request-Id` header and clears it in `finally`.
+
+**Solution:**
+
+```xml
+<!-- logback-spring.xml -->
+<configuration>
+  <springProperty name="APP" source="spring.application.name"/>
+  <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <customFields>{"service":"${APP}"}</customFields>
+    </encoder>
+  </appender>
+  <springProfile name="prod">
+    <root level="INFO"><appender-ref ref="JSON"/></root>
+  </springProfile>
+</configuration>
+```
+
+```java
+@Component
+class CorrelationIdFilter extends OncePerRequestFilter {
+    @Override
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
+            throws ServletException, IOException {
+        String id = Optional.ofNullable(req.getHeader("X-Request-Id")).orElse(UUID.randomUUID().toString());
+        MDC.put("correlationId", id);
+        res.setHeader("X-Request-Id", id);
+        try { chain.doFilter(req, res); } finally { MDC.clear(); }
+    }
+}
+```
+
+```java
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+@ActiveProfiles("prod")
+class CorrelationFilterTest {
+    @Autowired TestRestTemplate rest;
+
+    @Test
+    void echoesRequestId() {
+        var headers = new HttpHeaders();
+        headers.set("X-Request-Id", "test-corr-1");
+        var entity = new HttpEntity<>(headers);
+        var resp = rest.exchange("/api/hello", HttpMethod.GET, entity, Map.class);
+        assertEquals("test-corr-1", resp.getHeaders().getFirst("X-Request-Id"));
+    }
+}
+```
+
+**Senior takeaway:** Always `MDC.clear()` in `finally` — thread pool reuse without clear swaps customer correlation ids under load.
+
+---
+
+## Exercise 36 — MapStruct entity → DTO mapper
+
+**Difficulty:** Basic
+
+**Task:** Map `OrderEntity` to `OrderSummaryDto` with `customerEmail` from nested `customer.email`. Fail compile on unmapped fields (`ReportingPolicy.ERROR`).
+
+**Solution:**
+
+```xml
+<dependency>
+  <groupId>org.mapstruct</groupId><artifactId>mapstruct</artifactId><version>1.6.3</version>
+</dependency>
+<dependency>
+  <groupId>org.mapstruct</groupId><artifactId>mapstruct-processor</artifactId><version>1.6.3</version><scope>provided</scope>
+</dependency>
+```
+
+```java
+@Entity
+class OrderEntity {
+    @Id String id;
+    String status;
+    @ManyToOne CustomerEntity customer;
+}
+
+@Entity
+class CustomerEntity {
+    @Id Long id;
+    String email;
+}
+
+record OrderSummaryDto(String id, String status, String customerEmail) {}
+
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
+interface OrderMapper {
+    @Mapping(target = "customerEmail", source = "customer.email")
+    OrderSummaryDto toSummary(OrderEntity entity);
+}
+```
+
+```java
+@SpringBootTest
+class OrderMapperTest {
+    @Autowired OrderMapper mapper;
+
+    @Test
+    void mapsNestedEmail() {
+        var c = new CustomerEntity();
+        c.setEmail("a@example.com");
+        var o = new OrderEntity();
+        o.setId("O1");
+        o.setStatus("PLACED");
+        o.setCustomer(c);
+        var dto = mapper.toSummary(o);
+        assertEquals("a@example.com", dto.customerEmail());
+    }
+}
+```
+
+**Senior takeaway:** MapStruct errors at compile time when fields rename — ModelMapper would fail silently at runtime on hot paths.
+
+---
+
+## Exercise 37 — HTTP Service Client interface
+
+**Difficulty:** Intermediate
+
+**Task:** Declare `@HttpExchange` client for inventory API. Wire with `RestClient` + `HttpServiceProxyFactory`. Integration test with MockWebServer.
+
+**Solution:**
+
+```java
+@HttpExchange(url = "/api")
+public interface InventoryClient {
+    @GetExchange("/stock/{sku}")
+    StockDto getStock(@PathVariable String sku);
+}
+
+record StockDto(String sku, int quantity) {}
+
+@Configuration
+class InventoryClientConfig {
+    @Bean
+    InventoryClient inventoryClient(RestClient.Builder builder,
+                                    @Value("${inventory.base-url}") String baseUrl) {
+        RestClient client = builder.baseUrl(baseUrl).build();
+        return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(client))
+                .build().createClient(InventoryClient.class);
+    }
+}
+```
+
+```java
+@SpringBootTest
+class InventoryClientTest {
+    static MockWebServer server;
+
+    @BeforeAll
+    static void start() throws IOException {
+        server = new MockWebServer();
+        server.start();
+    }
+
+    @DynamicPropertySource
+    static void props(DynamicPropertyRegistry r) {
+        r.add("inventory.base-url", () -> server.url("/").toString());
+    }
+
+    @Autowired InventoryClient client;
+
+    @Test
+    void fetchesStock() throws Exception {
+        server.enqueue(new MockResponse()
+                .setBody("{\"sku\":\"ABC\",\"quantity\":42}")
+                .addHeader("Content-Type", "application/json"));
+        assertEquals(42, client.getStock("ABC").quantity());
+        assertEquals("/api/stock/ABC", server.takeRequest().getPath());
+    }
+}
+```
+
+**Senior takeaway:** Set read/connect timeouts on `RestClient.Builder` — default hang ties up servlet threads during downstream outages.
+
+---
+
+## Exercise 38 — `@Primary` / `@Qualifier` bean resolution bug fix
+
+**Difficulty:** Hard
+
+**Task:** App fails startup with `NoUniqueBeanDefinitionException` for `NotificationSender`. Two beans implement the interface — fix with `@Primary` + `@Qualifier` without removing the test double.
+
+**Solution:**
+
+```java
+interface NotificationSender { void send(String msg); }
+
+@Primary
+@Service
+class EmailNotificationSender implements NotificationSender {
+    public void send(String msg) { /* SMTP */ }
+}
+
+@Service
+@Qualifier("sms")
+class SmsNotificationSender implements NotificationSender {
+    public void send(String msg) { /* Twilio */ }
+}
+
+@Service
+class AlertService {
+    private final NotificationSender defaultSender;
+    private final NotificationSender smsSender;
+
+    AlertService(NotificationSender defaultSender,
+                 @Qualifier("sms") NotificationSender smsSender) {
+        this.defaultSender = defaultSender; // resolves to @Primary Email
+        this.smsSender = smsSender;
+    }
+
+    void pageOnCall(String msg) { smsSender.send(msg); }
+}
+```
+
+```java
+@TestConfiguration
+static class TestSmsConfig {
+    @Bean @Qualifier("sms")
+    NotificationSender fakeSms() {
+        return msg -> { /* no-op */ };
+    }
+}
+
+@SpringBootTest
+@Import(TestSmsConfig.class)
+class NotificationWiringTest {
+    @Autowired AlertService alerts;
+    @Autowired List<NotificationSender> allSenders;
+
+    @Test
+    void twoSendersExist() {
+        assertEquals(2, allSenders.size());
+    }
+
+    @Test
+    void primaryIsEmail() {
+        assertDoesNotThrow(() -> alerts.pageOnCall("disk full"));
+    }
+}
+```
+
+```java
+// BUG that caused startup failure — remove duplicate @Primary
+// @Primary on both EmailNotificationSender AND SmsNotificationSender
+```
+
+**Senior takeaway:** Use `@Primary` for one production default; use `@Qualifier` for alternates and test doubles — never two `@Primary` beans of the same type.
+
+---
+
+# Part D — Security (EazyBank-style)
+
+## Exercise 39 — Custom JWT filter chain order
+
+**Difficulty:** Intermediate
+
+**Task:** Build stateless JWT API for EazyBank accounts: custom `OncePerRequestFilter` parses Bearer token, sets `SecurityContext`, placed before `UsernamePasswordAuthenticationFilter`. `/api/public/**` and `/actuator/health` permitAll; `/api/admin/**` requires `ROLE_ADMIN`. Prove filter order with a test that fails if JWT runs after authorization.
+
+**Solution:**
+
+```java
+@Configuration
+@EnableWebSecurity
+class SecurityConfig {
+    @Bean
+    SecurityFilterChain api(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+        http.securityMatcher("/api/**")
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a
+                .requestMatchers("/api/public/**", "/actuator/health").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated())
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+}
+
+@Component
+class JwtAuthFilter extends OncePerRequestFilter {
+    private final JwtService jwtService;
+    JwtAuthFilter(JwtService jwtService) { this.jwtService = jwtService; }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
+            throws ServletException, IOException {
+        String header = req.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
+            if (jwtService.isValid(token)) {
+                var auth = new UsernamePasswordAuthenticationToken(
+                    jwtService.subject(token), null, jwtService.authorities(token));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+        }
+        chain.doFilter(req, res);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/actuator/health");
+    }
+}
+```
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+class JwtFilterChainTest {
+    @Autowired MockMvc mvc;
+
+    @Test
+    void publicEndpointNoToken() throws Exception {
+        mvc.perform(get("/api/public/rates")).andExpect(status().isOk());
+    }
+
+    @Test
+    void adminForbiddenForCustomer() throws Exception {
+        mvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + TestTokens.customer()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminOkWithRole() throws Exception {
+        mvc.perform(get("/api/admin/users")
+                .header("Authorization", "Bearer " + TestTokens.admin()))
+                .andExpect(status().isOk());
+    }
+}
+```
+
+**Senior takeaway:** Custom JWT filters belong **before** `UsernamePasswordAuthenticationFilter` — log `org.springframework.security` DEBUG at startup and snapshot filter order in CI.
+
+---
+
+## Exercise 40 — BCrypt migration with `DelegatingPasswordEncoder`
+
+**Difficulty:** Intermediate
+
+**Task:** EazyBank legacy users have `{noop}plaintext` dev hashes or raw MD5. Configure `DelegatingPasswordEncoder` with `noop` (dev only) and `bcrypt` default. On successful login, re-encode password to `{bcrypt}` if not already. Prove legacy user can login once and DB hash changes.
+
+**Solution:**
+
+```java
+@Bean
+@Profile("!prod")
+PasswordEncoder passwordEncoder() {
+    Map<String, PasswordEncoder> encoders = new HashMap<>();
+    encoders.put("bcrypt", new BCryptPasswordEncoder(12));
+    encoders.put("noop", NoOpPasswordEncoder.getInstance()); // dev legacy only
+    return new DelegatingPasswordEncoder("bcrypt", encoders);
+}
+
+@Bean
+@Profile("prod")
+PasswordEncoder prodPasswordEncoder() {
+    return new BCryptPasswordEncoder(12);
+}
+
+@Component
+class PasswordUpgradeSuccessHandler implements AuthenticationSuccessHandler {
+    private final CustomerRepository customers;
+    private final PasswordEncoder encoder;
+    PasswordUpgradeSuccessHandler(CustomerRepository customers, PasswordEncoder encoder) {
+        this.customers = customers;
+        this.encoder = encoder;
+    }
+
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest req, HttpServletResponse res, Authentication auth) {
+        var email = auth.getName();
+        customers.findByEmail(email).ifPresent(c -> {
+            if (!c.getPasswordHash().startsWith("{bcrypt}")) {
+                c.setPasswordHash(encoder.encode((String) auth.getCredentials()));
+                customers.save(c);
+            }
+        });
+    }
+}
+```
+
+```java
+@SpringBootTest
+class BcryptMigrationTest {
+    @Autowired CustomerRepository customers;
+    @Autowired PasswordEncoder encoder;
+    @Autowired AuthenticationManager authManager;
+
+    @BeforeEach
+    void seedLegacy() {
+        var c = new Customer();
+        c.setEmail("legacy@eazybank.com");
+        c.setPasswordHash("{noop}password123");
+        customers.save(c);
+    }
+
+    @Test
+    void legacyLoginUpgradesHash() {
+        var token = new UsernamePasswordAuthenticationToken("legacy@eazybank.com", "password123");
+        authManager.authenticate(token);
+        var stored = customers.findByEmail("legacy@eazybank.com").orElseThrow().getPasswordHash();
+        assertTrue(stored.startsWith("{bcrypt}"));
+        assertTrue(encoder.matches("password123", stored));
+    }
+}
+```
+
+**Senior takeaway:** Never ship `noop` in prod — use delegating encoder for **time-bounded** migration with metrics on `password.reencoded` count.
+
+---
+
+## Exercise 41 — Keycloak realm setup for Spring Resource Server
+
+**Difficulty:** Hard
+
+**Task:** Document and execute Keycloak steps for EazyBank: create realm `eazybank`, public client `eazybank-ui` (PKCE), confidential client `accounts-api` (bearer-only), realm role `CUSTOMER`, client scope `accounts:read`, audience mapper on access token. Wire Spring `issuer-uri` and audience validator; obtain token via CLI and curl accounts API.
+
+**Solution:**
+
+```bash
+# 1. Start Keycloak (Docker)
+docker run -p 8080:8080 -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  quay.io/keycloak/keycloak:24.0 start-dev
+
+# 2. Admin console http://localhost:8080 — Create realm "eazybank"
+
+# 3. Clients:
+#    - eazybank-ui: OpenID Connect, public, Standard flow ON, PKCE S256 required,
+#      Valid redirect URIs http://localhost:3000/*
+#    - accounts-api: OpenID Connect, Client authentication ON, Service accounts OFF,
+#      Authorization OFF (resource server only validates tokens)
+
+# 4. Realm roles: CUSTOMER, TELLER — assign to test user
+
+# 5. Client scope "accounts:read" — assign to eazybank-ui as default scope
+
+# 6. Audience mapper on accounts-api client:
+#    Mapper type Audience, Included Client Audience: accounts-api,
+#    Add to access token ON
+
+# 7. Protocol mapper (optional): user attribute customer_id -> claim customer_id
+
+# 8. Create user jane@eazybank.com / password, assign CUSTOMER role
+```
+
+```yaml
+# application.yml — accounts-service
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/eazybank
+```
+
+```bash
+# Get token (direct grant — dev only; use PKCE in real SPA)
+TOKEN=$(curl -s -X POST "http://localhost:8080/realms/eazybank/protocol/openid-connect/token" \
+  -d "client_id=eazybank-ui" \
+  -d "username=jane@eazybank.com" \
+  -d "password=password" \
+  -d "grant_type=password" \
+  -d "scope=openid accounts:read" | jq -r .access_token)
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/accounts
+```
+
+```java
+@Bean
+JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer) {
+    var decoder = (NimbusJwtDecoder) JwtDecoders.fromIssuerLocation(issuer);
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+        JwtValidators.createDefaultWithIssuer(issuer),
+        new JwtClaimValidator<List<String>>("aud", aud -> aud != null && aud.contains("accounts-api"))));
+    return decoder;
+}
+```
+
+**Senior takeaway:** Realm export JSON in Git (`keycloak-config-cli` or Terraform) — manual console clicks do not survive DR.
+
+---
+
+## Exercise 42 — CORS + CSRF for EazyBank React SPA (session BFF)
+
+**Difficulty:** Intermediate
+
+**Task:** Spring BFF with session cookie login: enable CSRF (`CookieCsrfTokenRepository`), CORS allow `http://localhost:3000` with `allowCredentials(true)`. React must send `X-XSRF-TOKEN` on POST. JWT mobile chain on `/api/mobile/**` stays CSRF-off. Prove POST without CSRF header returns 403; OPTIONS preflight succeeds.
+
+**Solution:**
+
+```java
+@Bean
+CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(List.of("http://localhost:3000"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
+    config.setExposedHeaders(List.of("X-XSRF-TOKEN"));
+    config.setAllowCredentials(true);
+    var source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/teller/**", config);
+    return source;
+}
+
+@Bean
+@Order(1)
+SecurityFilterChain mobileApi(HttpSecurity http) throws Exception {
+    http.securityMatcher("/api/mobile/**")
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
+        .authorizeHttpRequests(a -> a.anyRequest().authenticated());
+    return http.build();
+}
+
+@Bean
+@Order(2)
+SecurityFilterChain tellerBff(HttpSecurity http) throws Exception {
+    http.securityMatcher("/teller/**")
+        .cors(c -> c.configurationSource(corsConfigurationSource()))
+        .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+        .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+        .formLogin(Customizer.withDefaults());
+    return http.build();
+}
+```
+
+```typescript
+// React — axios defaults for BFF
+axios.defaults.withCredentials = true;
+axios.interceptors.request.use((config) => {
+  const csrf = document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1];
+  if (csrf && config.method !== 'get') {
+    config.headers['X-XSRF-TOKEN'] = decodeURIComponent(csrf);
+  }
+  return config;
+});
+```
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+class CorsCsrfTest {
+    @Autowired MockMvc mvc;
+
+    @Test
+    @WithMockUser
+    void postWithoutCsrfForbidden() throws Exception {
+        mvc.perform(post("/teller/api/transfer").with(csrf().useInvalidToken()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void optionsPreflightOk() throws Exception {
+        mvc.perform(options("/teller/api/accounts")
+                .header("Origin", "http://localhost:3000")
+                .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+}
+```
+
+**Senior takeaway:** Split filter chains — CSRF-on for cookie BFF, CSRF-off for Bearer mobile API; never one global `csrf().disable()`.
+
+---
+
+## Exercise 43 — `@PreAuthorize` IDOR prevention test
+
+**Difficulty:** Intermediate
+
+**Task:** `AccountService.getAccount(id)` must deny customer A reading customer B's account. Implement `@accountSecurity.isOwner` SpEL bean. Write test with two `@WithMockUser` users proving 403/exception on cross-customer access.
+
+**Solution:**
+
+```java
+@Configuration
+@EnableMethodSecurity(prePostEnabled = true)
+class MethodSecurityConfig {}
+
+@Component("accountSecurity")
+class AccountSecurity {
+    private final AccountRepository accounts;
+    AccountSecurity(AccountRepository accounts) { this.accounts = accounts; }
+
+    public boolean isOwner(String email, Long accountId) {
+        return accounts.existsByIdAndCustomerEmail(accountId, email);
+    }
+}
+
+@Service
+class AccountService {
+    private final AccountRepository accounts;
+    AccountService(AccountRepository accounts) { this.accounts = accounts; }
+
+    @PreAuthorize("@accountSecurity.isOwner(authentication.name, #accountId)")
+    public AccountDto getAccount(Long accountId) {
+        return accounts.findById(accountId).map(AccountDto::from).orElseThrow();
+    }
+}
+```
+
+```java
+@SpringBootTest
+class PreAuthorizeIdorTest {
+    @Autowired AccountService accounts;
+    @Autowired AccountRepository repo;
+
+    @BeforeEach
+    void seed() {
+        repo.save(account(1L, "alice@eazybank.com"));
+        repo.save(account(2L, "bob@eazybank.com"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@eazybank.com", roles = "CUSTOMER")
+    void ownerCanRead() {
+        assertNotNull(accounts.getAccount(1L));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@eazybank.com", roles = "CUSTOMER")
+    void cannotReadOtherCustomerAccount() {
+        assertThrows(AccessDeniedException.class, () -> accounts.getAccount(2L));
+    }
+}
+```
+
+**Senior takeaway:** HTTP `authenticated()` is not enough for banking APIs — method security + repository `WHERE customer_id = ?` stops UUID guessing IDOR.
+
+---
+
 # Weekend challenge
 
 1. Run with `--debug` and read `ConditionEvaluationReport` — find why a `@ConditionalOnProperty` bean was skipped.
@@ -1652,4 +2356,4 @@ ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
 
 ---
 
-**Stats:** 33 exercises · 12 Basic · 12 Intermediate · 9 Hard · 5 weekend drills · Topics: `@Transactional`, security, actuator, test slices, config props, scheduling, graceful shutdown, error handling, production bugs, resilience4j, Testcontainers, layered JAR
+**Stats:** 43 exercises · 14 Basic · 14 Intermediate · 10 Hard · 5 Security · 5 weekend drills · Topics: `@Transactional`, security (JWT, BCrypt, Keycloak, CORS/CSRF, `@PreAuthorize`), actuator, test slices, config props, scheduling, graceful shutdown, error handling, production bugs, resilience4j, Testcontainers, layered JAR, AOP, Logback/MDC, MapStruct, HTTP Service Client, bean resolution

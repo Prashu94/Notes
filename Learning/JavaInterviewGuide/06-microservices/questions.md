@@ -2668,6 +2668,781 @@ class PricingConfig {
 
 ---
 
+### 59. Spring Cloud Config Server — git backend, encryption, `/actuator/refresh`, Bus refresh.
+
+**Short answer:** Spring Cloud Config Server centralizes configuration in a git (or Vault) backend; clients bootstrap via `spring.config.import=configserver:` and pull labeled profiles (`dev`, `prod`). Sensitive values use `{cipher}` encryption with symmetric/asymmetric keys on the server. Runtime updates require `/actuator/refresh` on each client (or `@RefreshScope` beans) — tedious at scale; Spring Cloud Bus broadcasts refresh events to all instances. Trade-off: git-native config workflow versus operating a HA config server and key management.
+
+#### What it is
+Configuration management for microservices — eazybytes Section 6. Replaces scattered `application.properties` per jar with a single git repo (`config-repo`) the server serves over HTTP. Clients are config consumers; server never runs business logic.
+
+#### How it works (internals)
+Config Server clones/pulls git repo, exposes `/{application}/{profile}/{label}`. Client `bootstrap.yml` points to server URL with credentials. `{cipher}AQA...` values decrypted server-side with `encrypt.key` or keystore. `@RefreshScope` beans recreate on refresh event. `POST /actuator/refresh` reloads environment from server. Bus (RabbitMQ/Kafka) publishes `RefreshRemoteApplicationEvent` so one POST refreshes fleet. `spring.cloud.config.fail-fast=true` prevents silent defaults on server down.
+
+#### When to use / when NOT to use
+Use on VM/brownfield Spring Cloud estates, course labs, and teams wanting PR-reviewed config in git. On Kubernetes-native stacks, prefer ConfigMaps/Secrets + External Secrets Operator — less JVM infrastructure. Hybrid: Config Server for non-K8s services, K8s for containerized.
+
+#### Production example
+Eazybank pattern: `accounts`, `loans`, `cards` services share `config-repo` with profile-specific JDBC URLs. Ops rotates DB password in git `{cipher}` value, merges PR, triggers Bus refresh — all pods pick up new datasource without redeploy. Staging uses `label=develop` branch; prod pinned to `main` tag.
+
+#### Common mistakes
+- Plaintext secrets in git — use cipher or Vault backend.
+- Forgetting `@RefreshScope` on beans caching config at startup.
+- Refresh without health check — bad config takes fleet down.
+- Config Server single instance — no HA.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Config Server vs Kubernetes ConfigMap?
+**A:** Config Server gives git history, encryption, profile labels, and works outside K8s. ConfigMaps are platform-native, GitOps via ArgoCD, no extra JVM service. On GKE/EKS I default ConfigMap+ESO; Config Server when teaching Spring Cloud or brownfield Netflix stack migration.
+
+**Q:** How encrypt secrets for Config Server?
+**A:** `encrypt.key` in env (not git) or RSA keypair — `curl /encrypt -d mysecret` produces `{cipher}` blob committed to repo. Server decrypts on serve. Rotate keys with dual-key period. Never commit `encrypt.key`.
+
+#### Scenario probe
+Developer pushes bad JDBC URL to config repo; all payment pods fail health checks simultaneously after Bus refresh.
+
+**Model answer:** Enable config PR review, staging refresh first, canary refresh by service name via Bus destination selector. Roll back git commit, re-refresh. Add smoke test job post-refresh. `fail-fast` only on startup — runtime refresh needs validation pipeline.
+
+#### Code / config (when useful)
+
+```yaml
+# config-server application.yml
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/org/config-repo
+          default-label: main
+encrypt:
+  key: ${CONFIG_ENCRYPT_KEY}
+```
+
+```yaml
+# client bootstrap.yml
+spring:
+  config:
+    import: "optional:configserver:http://configserver:8071/"
+  cloud:
+    config:
+      name: accounts
+      profile: prod
+```
+
+---
+
+### 60. Spring Cloud Bus — RabbitMQ/Kafka broadcast config refresh.
+
+**Short answer:** Spring Cloud Bus links microservices via a message broker so infrastructure events (config refresh, service registry heartbeat side-effects) fan out to all instances. Bind to RabbitMQ or Kafka; trigger `POST /actuator/busrefresh` on any node (or via Config Monitor webhook on git push) to reload `@RefreshScope` beans everywhere. Trade-off: operational simplicity of fleet-wide refresh versus blast radius of a bad message — validate config before broadcast.
+
+#### What it is
+Event bus for Spring Cloud management events — eazybytes links Config Server (Section 6) with Bus for automatic refresh on git push. Uses familiar AMQP or Kafka infrastructure already present for domain events.
+
+#### How it works (internals)
+Each app includes `spring-cloud-starter-bus-amqp` (or kafka), connects to broker, listens on `springCloudBus` topic/exchange. `RefreshRemoteApplicationEvent` carries destination service name (`destination` header filters). Config Monitor in Config Server polls git webhook → triggers bus refresh. Trace id propagates for debugging which instance refreshed. Requires actuator endpoint secured — not public internet.
+
+#### When to use / when NOT to use
+Use with Config Server on multi-instance VM/K8s deployments needing synchronized refresh. Skip if GitOps redeploys pods on config change (new image/env) — rolling restart is the refresh. Do not use Bus for domain events — separate exchanges/topics.
+
+#### Production example
+Git push to `config-repo` triggers GitHub webhook → Config Monitor → Bus refresh → 12 `accounts` pods reload interest rate property within 30s. Dashboard shows `refresh.last` timestamp per instance. Failed instances isolated via health check before ALB registration.
+
+#### Common mistakes
+- Public `/actuator/busrefresh` — attacker reloads malicious config.
+- Bus and domain traffic same Rabbit vhost without ACL — ops confusion.
+- Refresh storm on every commit — debounce webhook.
+- Non-refresh-scoped beans still hold old values — document which beans need `@RefreshScope`.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Bus over Kafka vs RabbitMQ?
+**A:** Course uses RabbitMQ for simplicity and Spring Cloud Stream alignment. Kafka works with `bus-kafka` for teams standardized on Kafka ops — higher latency acceptable for config refresh. Pick broker you already operate HA.
+
+**Q:** Refresh single service vs all?
+**A:** `spring.cloud.bus.destination` targets service name — `accounts:**` refresh without touching `loans`. Reduces blast radius during partial config changes.
+
+#### Scenario probe
+Bus refresh during peak — half of instances old rate, half new — inconsistent loan quotes.
+
+**Model answer:** Config change should be backward compatible or use feature flag with default. For breaking changes, rolling deploy instead of refresh. Add metric comparing config version across instances; alert on skew >0 during traffic.
+
+#### Code / config (when useful)
+
+```yaml
+spring:
+  rabbitmq:
+    host: rabbitmq
+  cloud:
+    bus:
+      enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: busrefresh,refresh
+```
+
+---
+
+### 61. Netflix Eureka + Spring Cloud — client-side discovery; why deprecated on Kubernetes.
+
+**Short answer:** Eureka is a service registry — instances register on startup, heartbeats maintain lease, clients cache registry and pick instances (client-side load balancing with Spring Cloud LoadBalancer). It solved dynamic VM IPs before Kubernetes. On K8s, **server-side discovery** via DNS (`service.namespace.svc.cluster.local`) and kube-proxy/Endpoints replaces Eureka — running both duplicates health signals and adds failure modes. Eureka enters maintenance mode; new greenfield K8s apps should not adopt it.
+
+#### What it is
+Netflix OSS service discovery integrated via `spring-cloud-starter-netflix-eureka-client` — eazybytes Section 8. Eureka Server dashboard shows registered `accounts`, `loans`, `cards` instances with AMIs/IPs.
+
+#### How it works (internals)
+Client registers `eureka.instance.hostname`, sends renew every 30s. Server evicts实例 missing heartbeats (self-preservation mode prevents mass eviction during network partition). `DiscoveryClient` supplies instance list to `@LoadBalanced RestTemplate` or Feign. Ribbon replaced by Spring Cloud LoadBalancer. Eureka peer replication for server HA.
+
+#### When to use / when NOT to use
+Use in course labs, legacy Spring Cloud on EC2 without K8s, or brownfield migration period. Do NOT add Eureka on Kubernetes — use K8s Service + Spring `spring.cloud.kubernetes.discovery`. Do NOT run triple discovery (Eureka + K8s + mesh).
+
+#### Production example
+2019 eazybank on EC2: Eureka cluster 3 nodes, services register IP:port. Migration 2024: remove Eureka client dependency, `spring.cloud.discovery.enabled=false`, URLs become K8s DNS names in Feign `@FeignClient(name="accounts")` resolving to K8s Service. Eureka decommissioned after traffic drain.
+
+#### Common mistakes
+- Eureka Server not HA — registry loss blocks new lookups.
+- Wrong `prefer-ip-address` in K8s — pod IP churn confuses clients.
+- Self-preservation hides unhealthy instances — stale routing.
+- Keeping Eureka "just in case" on K8s — operational tax.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Eureka vs Consul?
+**A:** Both client-side discovery. Consul adds KV, health checks, multi-datacenter — heavier ops. Eureka Spring integration mature in Netflix stack courses. Neither needed on K8s — say that clearly in senior interviews.
+
+**Q:** What replaces Eureka on K8s?
+**A:** Kubernetes Service + DNS, optional Spring Cloud Kubernetes discovery for `DiscoveryClient` abstraction. Istio/Linkerd add mesh-level routing. Load balancing by kube-proxy or eBPF — server-side.
+
+#### Scenario probe
+Team deploys Eureka Server on K8s alongside 40 microservices also using K8s Services — registry shows duplicate entries and flapping health.
+
+**Model answer:** Pick one discovery model. Remove Eureka clients; use native K8s service names. If Spring Cloud LoadBalancer needed, `spring-cloud-kubernetes-client-loadbalancer`. Document ADR; delete Eureka Helm chart. Save 3 FTE-hours/week on registry incidents.
+
+#### Code / config (when useful)
+
+```yaml
+# Eureka client — brownfield only
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eurekaserver:8761/eureka/
+  instance:
+    prefer-ip-address: true
+```
+
+---
+
+### 62. Spring Cloud OpenFeign — declarative HTTP, timeouts, error decoding, resilience integration.
+
+**Short answer:** OpenFeign turns REST clients into annotated interfaces (`@FeignClient(name="accounts")`) with Spring MVC-style mappings. Configure connect/read timeouts, retry (careful), custom `ErrorDecoder` mapping 404/409 to domain exceptions, and Resilience4j circuit breaker via `spring.cloud.openfeign.circuitbreaker.enabled=true`. Trade-off: less boilerplate than `RestClient`/`WebClient` versus opaque HTTP behavior if defaults left unchanged — always set timeouts.
+
+#### What it is
+Declarative HTTP client in Spring Cloud — eazybytes inter-service calls between accounts, loans, cards services. Integrates with Eureka/K8s discovery and LoadBalancer.
+
+#### How it works (internals)
+Feign builds dynamic proxy from interface at runtime. `Contract` maps annotations to HTTP. Encoder/decoder use Jackson. `RequestInterceptor` adds correlation id, JWT propagation. LoadBalancer chooses instance from discovery. Resilience4j wraps calls when enabled. Fallback factories (deprecated pattern) replaced by explicit exception handling in service layer.
+
+#### When to use / when NOT to use
+Use for synchronous inter-service calls in Spring Cloud microservices with moderate fan-out. Prefer `WebClient` for reactive stacks or streaming. Avoid Feign for high-throughput streaming or when you need fine-grained HTTP/2 control — use `RestClient`. Always pair with timeouts and circuit breaker on critical paths.
+
+#### Production example
+`AccountsFeignClient.getCustomer(id)` called from `loans-service` — 2s read timeout, Resilience4j breaker opens after 50% failures in 10s window. `ErrorDecoder` maps 404 to `CustomerNotFoundException` handled by `@ControllerAdvice`. Trace header `X-Correlation-ID` propagated via interceptor — visible in Grafana Tempo.
+
+#### Common mistakes
+- Default infinite timeout — thread pool exhaustion.
+- Retrying POST without idempotency — duplicate charges.
+- Feign client in domain entity — belongs in application service.
+- Missing contract tests — provider breaking change at deploy.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Feign vs RestClient (Spring 6)?
+**A:** RestClient is imperative, first-party, explicit — I prefer it for new Spring Boot 3 services without Spring Cloud. Feign remains valuable in Netflix-style estates with many declarative clients and discovery integration. Both need timeouts and resilience.
+
+**Q:** How propagate JWT with Feign?
+**A:** `RequestInterceptor` copies `Authorization` from incoming servlet request security context, or exchanges service account token for downstream call. Never forward user JWT to every service without scope validation — use token exchange or internal identity.
+
+#### Scenario probe
+Loans service thread pool exhausted — Feign calls to slow accounts service block all checkout threads.
+
+**Model answer:** Set aggressive timeouts (connect 500ms, read 2s), bulkhead thread pool for Feign, circuit breaker with fallback queue. Async where possible. Root fix: accounts p99 regression — but loans must fail fast. Dashboard on `feign.Client` metrics.
+
+#### Code / config (when useful)
+
+```java
+@FeignClient(name = "accounts", configuration = AccountsFeignConfig.class)
+public interface AccountsClient {
+    @GetMapping("/accounts/{id}")
+    AccountDto getAccount(@PathVariable("id") Long id);
+}
+
+@Configuration
+class AccountsFeignConfig {
+    @Bean
+    ErrorDecoder errorDecoder() {
+        return (methodKey, response) -> response.status() == 404
+            ? new CustomerNotFoundException()
+            : new FeignException.errorStatus(methodKey, response);
+    }
+}
+```
+
+```yaml
+spring.cloud.openfeign.client.config.accounts:
+  connectTimeout: 500
+  readTimeout: 2000
+spring.cloud.openfeign.circuitbreaker.enabled: true
+```
+
+---
+
+### 63. Spring Cloud Gateway — routes, predicates, filters, rate limiting, JWT validation at edge.
+
+**Short answer:** Spring Cloud Gateway is reactive API gateway (WebFlux) routing requests by predicates (`Path`, `Header`, `Method`) to downstream URIs (`lb://accounts`) with filter chain (strip prefix, add headers, circuit breaker, retry). Rate limiting via Redis `RequestRateLimiter` filter (Stripe token-bucket pattern from course). JWT validation at edge with `Spring Security` OAuth2 Resource Server — downstream services trust gateway-attested headers or validate JWT themselves. Trade-off: centralizing cross-cutting concerns versus gateway becoming god-object with business logic.
+
+#### What it is
+Edge router for eazybank — eazybytes Section 9. `gatewayserver` routes `/eazybank/accounts/**` to accounts service, applies CORS, security, request logging.
+
+#### How it works (internals)
+`RouteLocator` defines route id, URI, predicates, filters. `GlobalFilter` runs all routes — correlation id, auth. `GatewayFilter` per route — `RewritePath`, `CircuitBreaker` with Resilience4j. Redis rate limiter uses token bucket per key (IP, API key). JWT validated via JWKS; claims forwarded as headers only if downstream double-checks signature — prefer re-validation or mTLS internal.
+
+#### When to use / when NOT to use
+Use for single public entry, TLS termination, auth, rate limits, routing to K8s services. K8s Ingress + service mesh may replace some gateway duties — gateway still common for Spring-centric teams. Never put saga/checkout orchestration in gateway filters — belongs in domain services.
+
+#### Production example
+Gateway validates Keycloak JWT, enforces 100 req/min per client id via Redis, routes to `lb://LOANS`. `RequestRateLimiter` returns 429 with `Retry-After`. Global filter adds `X-Request-Id` consumed by Micrometer tracing. Apache Benchmark lab (`ab -n 10 -c 2`) verified rate limiter before prod.
+
+#### Common mistakes
+- Business logic in 800-line `GlobalFilter`.
+- Trusting `X-User-Id` header from client without gateway strip.
+- Retry filter on non-idempotent POST.
+- No timeout on routed requests — cascade hang.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Gateway vs BFF?
+**A:** Gateway is shared infrastructure — auth, routing, rate limit. BFF is client-specific aggregation service with business composition — still a deployable with tests. Course gateway is thin; mobile BFF would be separate Spring Boot app.
+
+**Q:** Rate limit key — IP vs API key?
+**A:** Stripe pattern: authenticated clients keyed by API key or JWT `sub`; anonymous by IP with lower quota. Redis cluster for HA. Return 429 JSON body with retry guidance.
+
+#### Scenario probe
+Marketing campaign spikes traffic — gateway Redis rate limiter exhausts connections; legitimate users get 503.
+
+**Model answer:** Scale Redis, connection pool tuning, separate rate limit Redis from session store. Pre-warm limiter keys. CDN cache public GETs. Load test before campaign. Circuit breaker to fail fast with friendly message.
+
+#### Code / config (when useful)
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: accounts
+          uri: lb://ACCOUNTS
+          predicates:
+            - Path=/eazybank/accounts/**
+          filters:
+            - RewritePath=/eazybank/accounts/(?<segment>.*), /${segment}
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+                key-resolver: "#{@userKeyResolver}"
+```
+
+---
+
+### 64. Spring Cloud Stream — binders, functions, RabbitMQ vs Kafka binder config.
+
+**Short answer:** Spring Cloud Stream abstracts messaging with **binders** (RabbitMQ, Kafka) binding functional beans (`Consumer`, `Function`, `Supplier`) or `@Bean` handlers to destinations via `spring.cloud.stream.bindings.*`. Course Section 13 (RabbitMQ) and 14 (Kafka) use function model over legacy `@StreamListener`. Trade-off: portability across brokers versus binder-specific tuning (Kafka partitions, Rabbit DLQ) still required in config.
+
+#### What it is
+Event-driven microservices foundation in eazybytes — publish `AccountCreated`, consume in notifications service. Builds on Spring Cloud Function programming model.
+
+#### How it works (internals)
+`spring-cloud-stream-binder-rabbit` or `kafka` maps `destination` to exchange/topic. `group` sets consumer group. `content-type: application/json`. Error handling: `max-attempts`, DLQ via `auto-bind-dlq` (Rabbit). Kafka binder sets `partition-key-expression`, `replication-factor`. Cloud Stream 4.x function-centric: `Consumer<Message<Event>>` beans. Observability via Micrometer binder metrics.
+
+#### When to use / when NOT to use
+Use for Spring teams standardizing event-driven patterns across Rabbit and Kafka. Raw `KafkaTemplate` when you need advanced transactions, exactly-once, or non-Spring consumers. Rabbit for task queues and lower ops overhead; Kafka for log retention and replay at scale.
+
+#### Production example
+Section 13 pattern: `accounts` publishes to `email-exchange`, `notifications` consumes with consumer group `email-group`. Retry 3x then DLQ `email-exchange.dlq`. Section 14 same flow on Kafka topic `email-topic` with 6 partitions keyed by `accountId`.
+
+#### Common mistakes
+- Same destination name across binders without namespace — collision.
+- No DLQ — poison messages infinite retry.
+- JSON without schema validation — breaking changes silent.
+- Consumer concurrency > partitions (Kafka) — idle threads.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Stream vs Spring Kafka `@KafkaListener`?
+**A:** Stream abstracts binder — swap Rabbit/Kafka with config change. `@KafkaListener` gives finer Kafka control (manual ack, batch). I use Stream in course-aligned greenfield; Kafka listener when team owns advanced Kafka semantics.
+
+**Q:** How configure Rabbit DLQ in Stream?
+**A:** `spring.cloud.stream.rabbit.bindings.input.consumer.auto-bind-dlq=true` and `republish-to-dlq=true`. Monitor DLQ depth alert. Replay tooling documented in runbook.
+
+#### Scenario probe
+Switching binder from Rabbit to Kafka for one service — developers hardcoded Rabbit exchange names in business code.
+
+**Model answer:** Bind destination names in config only; code references binding name `input`/`output`. Integration test both binders in CI matrix if multi-broker strategy. ADR picks Kafka for analytics path, Rabbit for task notifications.
+
+#### Code / config (when useful)
+
+```java
+@Bean
+Consumer<AccountCreatedEvent> emailConsumer() {
+    return event -> emailService.sendWelcome(event.getEmail());
+}
+```
+
+```yaml
+spring.cloud.stream:
+  bindings:
+    emailConsumer-in-0:
+      destination: email-topic
+      group: notifications
+  kafka:
+    binder:
+      brokers: kafka:9092
+```
+
+---
+
+### 65. Spring Cloud Kubernetes — ConfigMap/Secret reload, discovery, service account RBAC.
+
+**Short answer:** `spring-cloud-starter-kubernetes-client-config` loads ConfigMaps/Secrets as property sources with optional reload on change (`reload.enabled=true`, polling or event-driven). Discovery client resolves `@LoadBalanced` calls to K8s Service endpoints. Requires RBAC: ServiceAccount with `get/list/watch` on ConfigMaps/Secrets in namespace. Trade-off: Spring-native K8s integration versus plain `spring.config.import=kubernetes:` in Boot 3 — overlap increasing.
+
+#### What it is
+Run Spring microservices idiomatically on Kubernetes — eazybytes Sections 15–18 deploy eazybank to K8s with Helm. Spring Cloud Kubernetes bridges Spring abstractions to K8s API.
+
+#### How it works (internals)
+`KubernetesClientConfigProvider` watches ConfigMap `accounts-config` mounted or polled. `KubernetesCatalogWatch` triggers refresh on change. `KubernetesDiscoveryClient` lists endpoints for `accounts-service`. `spring.cloud.kubernetes.discovery.all-namespaces=false` scopes lookup. Fabric8 client uses in-cluster ServiceAccount token. Fail bootstrap if RBAC missing — `Forbidden` in logs.
+
+#### When to use / when NOT to use
+Use when staying on Spring Cloud discovery/load balancer APIs while running on K8s. Plain Boot Kubernetes config import sufficient for many apps without full Spring Cloud Kubernetes. Disable Eureka; enable K8s discovery only — not both.
+
+#### Production example
+Helm chart mounts `accounts-config` ConfigMap; interest rate change applied via `kubectl apply` — pods reload within poll interval without restart when `reload.strategy=refresh`. ServiceAccount `accounts-sa` Role allows read ConfigMap in `eazybank` namespace only.
+
+#### Common mistakes
+- Cluster-wide ConfigMap list permission — security audit fail.
+- Reload without `@RefreshScope` — beans stale.
+- Eureka + K8s discovery both enabled.
+- Secrets in ConfigMap instead of Secret resource.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Reload vs rolling restart on config change?
+**A:** Reload for non-breaking property tweaks (feature flags). Rolling restart for JDBC URL change requiring pool recycle — safer. Document which properties are reload-safe in runbook.
+
+**Q:** Spring Cloud Kubernetes vs Boot 3 `config import kubernetes:`?
+**A:** Boot native import is lighter for config only. Spring Cloud Kubernetes adds discovery, load balancing integration, catalog watch — pick minimal dependency set.
+
+#### Scenario probe
+Pod logs `Forbidden` accessing Secrets — service fails startup in new namespace.
+
+**Model answer:** Helm chart missing RoleBinding for `accounts-sa`. Add least-privilege RBAC template; CI `helm template` lint validates SA annotations. Never cluster-admin for app pods.
+
+#### Code / config (when useful)
+
+```yaml
+spring:
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+      reload:
+        enabled: true
+        strategy: refresh
+        monitoring-config-maps: true
+      secrets:
+        enable-api: true
+        name: accounts-secret
+```
+
+---
+
+### 66. 12-Factor and 15-Factor apps for Spring microservices — config, logs, admin processes.
+
+**Short answer:** **12-Factor** (Heroku) mandates config in environment, stateless processes, logs as event streams, disposability, admin tasks as one-off processes. **15-Factor** (beyond 12-factor book, eazybytes Section 5) adds API-first, telemetry, security, contracts — cloud-native maturity model. Spring Boot maps well: externalized config (`application.yml` + Config Server/K8s), Actuator health, stdout logging, `java -jar` stateless pods, Flyway as release phase. Trade-off: checklist compliance versus team actually running admin jobs and contract tests in CI.
+
+#### What it is
+Methodology for portable, scalable microservices — course links 12factor.net and O'Reilly "Beyond the Twelve-Factor App." Interviewers test whether you treat config as code in git but secrets in vault.
+
+#### How it works (internals)
+III Config: store in env, not jar — Spring `spring.config.import`. IX Disposability: fast startup, graceful shutdown (`server.shutdown=graceful`). XI Logs: JSON to stdout → Promtail → Loki. XII Admin: `kubectl run flyway-job` or K8s Job for migrations, not SSH. XV Factor: API-first OpenAPI, consumer-driven contracts, OTel traces — SpringDoc + Pact + Micrometer.
+
+#### When to use / when NOT to use
+Apply 12-factor baseline for every Spring microservice. 15-factor for enterprise cloud-native scorecards. Do not cargo-cult — stateful services (databases) violate pure statelessness by design — isolate state to backing services.
+
+#### Production example
+Eazybank: each service 12-factor compliant — config from Config Server, logs shipped to Loki stack (Section 11), database state only in MySQL container/PVC. Admin: one-off `accounts-backfill` K8s Job with same image, different `spring.main.web-application-type=none` entrypoint.
+
+#### Common mistakes
+- Config baked into Docker image at build time only.
+- Logging to file inside container without rotation.
+- Running Flyway manually from laptop against prod.
+- Ignoring factor X (dev/prod parity) — H2 in dev, Oracle in prod surprises.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Factor IV — backing services as attached resources?
+**A:** MySQL, RabbitMQ, Redis are attached via URLs from config — swappable per environment. Spring `DataSource` auto-config from env vars. Local docker-compose mirrors prod services (Testcontainers in CI).
+
+**Q:** What is 15th factor in course context?
+**A:** Course emphasizes cloud-native beyond 12: GitOps, security by default (Keycloak), observability stack, API-first. I cite telemetry and contract testing as differentiators from 2012 twelve-factor baseline.
+
+#### Scenario probe
+Team logs into prod pod to run data fix SQL — no audit trail.
+
+**Model answer:** Violates XII admin processes and security. Replace with reviewed K8s Job, migration script in git, break-glass audited. Factor XII: admin one-off, not SSH habit.
+
+#### Code / config (when useful)
+
+```yaml
+# Factor IX — graceful shutdown
+server:
+  shutdown: graceful
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+logging:
+  structured:
+    format:
+      console: ecs
+```
+
+---
+
+### 67. Dockerizing Spring Boot — Dockerfile layers vs Cloud Native Buildpacks vs Google Jib.
+
+**Short answer:** Three image-build paths from eazybytes Section 4: **Dockerfile** multi-stage (`eclipse-temurin` build + slim runtime) — full control. **Cloud Native Buildpacks** (`mvn spring-boot:build-image`) — opinionated, reproducible, no Dockerfile. **Google Jib** (`mvn compile jib:dockerBuild`) — layers dependencies separately for fast push/pull, no daemon required. Trade-off: Dockerfile flexibility versus buildpack/Jib cache efficiency and security patching automation.
+
+#### What it is
+Container packaging for microservices portability — course docker commands `docker build . -t eazybytes/accounts:s4` and Maven build-image/Jib alternatives in README.
+
+#### How it works (internals)
+Dockerfile: COPY jar, `ENTRYPOINT java -jar`. Layer caching: separate dependency layer from app code. Buildpacks: Paketo detects Spring Boot, creates OCI image with CA certs, JVM tuned. Jib splits dependencies/resources/classes layers pushed to registry directly. All produce images for `kubectl set image deployment`. Scan with Trivy in CI.
+
+#### When to use / when NOT to use
+Dockerfile when custom OS packages, agents, or glibc tweaks needed. Buildpacks/Jib for standard Spring Boot services in Java shops wanting fast iterative deploys. Avoid fat manual Dockerfile copying entire JDK — use distroless or slim base.
+
+#### Production example
+CI: Jib pushes `eazybytes/accounts:git-sha` — only 15MB app layer changes per commit, deploy 45s faster. Staging uses buildpacks for parity with Cloud Foundry heritage. Legacy service keeps Dockerfile until migration sprint.
+
+#### Common mistakes
+- Running as root in container — use `USER` non-root.
+- Baking secrets into image layers.
+- No `.dockerignore` — huge build context.
+- `latest` tag only — immutable tags per git SHA.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Jib vs buildpacks?
+**A:** Jib Maven plugin, explicit layer control, no Docker daemon in CI. Buildpacks Spring Boot optimized defaults, CNCF standard. I pick Jib in Maven shops; buildpacks in polyglot platform teams.
+
+**Q:** How optimize Dockerfile layer cache?
+**A:** Multi-stage: copy `pom.xml` + download deps layer first, then source, then package. Spring Boot layertools (`java -Djarmode=tools`) extracts layers for Docker COPY — course advanced pattern.
+
+#### Scenario probe
+Image size 800MB — developers COPY entire JDK and target/ with test classes.
+
+**Model answer:** Multi-stage build, Jib or buildpacks, distroless runtime. CI fails if image >300MB without exception ticket. Trivy scan gates merge.
+
+#### Code / config (when useful)
+
+```dockerfile
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY target/accounts-*.jar app.jar
+USER 1000
+ENTRYPOINT ["java","-XX:+UseContainerSupport","-jar","app.jar"]
+```
+
+```bash
+mvn spring-boot:build-image -Dspring-boot.build-image.imageName=eazybytes/accounts:s4
+mvn compile jib:dockerBuild -Dimage=eazybytes/accounts:s4
+```
+
+---
+
+### 68. ModelMapper/MapStruct in microservice boundaries — anti-corruption at API edge.
+
+**Short answer:** Microservices expose stable API DTOs — never leak internal entity shapes. **MapStruct** (compile-time, type-safe, course-linked) preferred over **ModelMapper** (reflection) for boundary mapping. Anti-corruption layer at API edge translates external contracts to domain models — mapper lives in `api` or `adapter` package, not scattered in controllers. Trade-off: mapper boilerplate versus breaking consumers when entity fields rename.
+
+#### What it is
+DTO pattern from eazybytes README links (Fowler DTO, ModelMapper, MapStruct). Each service owns its public contract; mapping isolates internal schema evolution.
+
+#### How it works (internals)
+MapStruct `@Mapper(componentModel="spring")` generates impl at compile — fails on unknown fields. ModelMapper `map(source, Dest.class)` runtime — silent nulls on mismatch. Anti-corruption: inbound REST DTO → domain command; outbound domain → response DTO; events use separate `*Event` records. Version mappers per API (`V1AccountMapper`, `V2AccountMapper`).
+
+#### When to use / when NOT to use
+MapStruct for all service boundaries and high-throughput paths. ModelMapper only for spikes — migrate off. For read-heavy, consider not mapping — build DTO in query projection inside service DB. Event schemas owned separately from REST DTOs.
+
+#### Production example
+`accounts` service: `AccountResponseMapper` maps internal `Account` entity to `AccountDto` excluding internal risk score. `loans` service has own `CustomerView` DTO from Feign response — does not import accounts entity jar. Breaking internal rename does not affect Feign if JSON fields stable.
+
+#### Common mistakes
+- Sharing entity jar across microservices — distributed monolith.
+- ModelMapper singleton without strict matching strategy.
+- One mega-mapper class 2000 lines — split by aggregate.
+- Mapping in Feign interface — belongs in service layer.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** MapStruct vs manual mapping in record constructor?
+**A:** Manual fine for 3-field DTO. MapStruct wins at 20+ fields, nested objects, enum mapping, cycle avoidance. Compile-time safety catches renames in CI.
+
+**Q:** Anti-corruption layer and hexagonal architecture?
+**A:** Incoming adapter (REST) maps DTO → domain port input. Outgoing adapter maps domain → external API. Keeps domain pure of Spring/Feign annotations. MapStruct in adapter layer only.
+
+#### Scenario probe
+Shared `common-models` jar with JPA entities used by five services — schema change breaks fleet deploy.
+
+**Model answer:** Split: publish `accounts-api` with DTOs and OpenAPI only. Each service maps locally. Deprecate entity sharing. Contract tests verify JSON stability. True microservice boundary restored.
+
+#### Code / config (when useful)
+
+```java
+@Mapper(componentModel = "spring")
+public interface AccountApiMapper {
+    AccountDto toDto(Account account);
+    Account toEntity(CreateAccountCommand cmd);
+}
+```
+
+---
+
+### 69. Keycloak securing microservices — realm per env, service accounts, mTLS optional.
+
+**Short answer:** Keycloak (eazybytes Section 12) provides OIDC/OAuth2 realms — separate `eazybank-dev` and `eazybank-prod` realms. User login gets JWT; microservices validate as OAuth2 Resource Servers via JWKS. **Service accounts** (client credentials) for service-to-service calls. mTLS via Istio (Section 19) optional second layer — JWT for user identity, mesh for transport identity. Trade-off: centralized IdP versus operating Keycloak HA and realm migration discipline.
+
+#### What it is
+Identity and access management for eazybank microservices — course runs Keycloak in Docker (`quay.io/keycloak/keycloak` start-dev). Gateway and resource servers integrate Spring Security OAuth2.
+
+#### How it works (internals)
+Realm exports JSON for GitOps. Clients: `public` mobile, `confidential` gateway. Roles mapped to JWT `realm_access.roles`. Resource server `spring.security.oauth2.resourceserver.jwt.issuer-uri` validates signature and expiry. Service account token from `client_credentials` grant — short-lived, scoped. Key rotation via JWKS kid — cache with refresh.
+
+#### When to use / when NOT to use
+Keycloak for lab and mid-size deployments wanting full IAM UI. Enterprise may use Auth0, Okta, Azure AD — same Spring Resource Server pattern. mTLS when zero-trust internal network required — complements JWT.
+
+#### Production example
+Dev realm allows password grant for Postman; prod disables direct grant, only authorization code + PKCE. `loans-service` accepts only `ROLE_USER` for `/loans/**`, `ROLE_SERVICE` for internal `/internal/**` with service account. Gateway validates JWT; downstream re-validates issuer — no trust of `X-Role` header alone.
+
+#### Common mistakes
+- Same realm dev/prod — test users in prod.
+- Long-lived JWT without refresh — stolen token window.
+- Skipping audience (`aud`) validation.
+- Keycloak `start-dev` in production — use optimized distro with Postgres.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Keycloak vs Spring Authorization Server?
+**A:** Keycloak is full IAM product with UI, user federation, social login. Spring Authorization Server embeds OAuth2 in your app — lighter, you operate security patches. Course uses Keycloak for teaching; greenfield might pick managed IdP.
+
+**Q:** Service account vs user JWT propagation?
+**A:** User JWT propagates user context for audit. Service account for batch and service-only endpoints — no user. Mix: gateway exchanges user token for internal scoped token (token exchange) — advanced pattern.
+
+#### Scenario probe
+Pen test finds `accounts` API accepts unsigned JWT if `Authorization` header malformed.
+
+**Model answer:** Resource server misconfigured — must use `oauth2ResourceServer().jwt()` with issuer validation only. Reject opaque tokens. Integration test with forged JWT must return 401. Security filter order audit.
+
+#### Code / config (when useful)
+
+```yaml
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://keycloak.example.com/realms/eazybank-prod
+```
+
+```bash
+docker run -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  quay.io/keycloak/keycloak:22.0.3 start-dev
+```
+
+---
+
+### 70. Spring Cloud Stream + RabbitMQ event-driven microservices (eazy-byte section 13 pattern).
+
+**Short answer:** Section 13 builds event-driven flow: domain action in `accounts` publishes message to RabbitMQ exchange; downstream `notifications` and `loans` consume via Spring Cloud Stream function bindings — loose coupling, async resilience. Use transactional outbox if DB write and publish must be atomic. Configure consumer groups, DLQ, and idempotent handlers. Trade-off: eventual consistency and debugging complexity versus synchronous Feign chains.
+
+#### What it is
+RabbitMQ-centric event architecture in eazybank course — Hookdeck/webhook patterns mentioned for external events; internal events via AMQP.
+
+#### How it works (internals)
+Producer: `StreamBridge.send("accountCreated-out-0", event)` or `Supplier` bean. Rabbit binder declares exchange, queue, binding from `destination` and `group`. Consumer `Consumer<AccountCreatedEvent>` processes message — manual ack after success. Retry with backoff; DLQ for poison pills. JSON `content-type`; consider schema registry for evolution.
+
+#### When to use / when NOT to use
+Use for notifications, audit, cross-context reactions where latency acceptable. Avoid synchronous-critical path (balance check) without compensations — or use request-reply pattern sparingly. Outbox mandatory when event must not be lost after DB commit.
+
+#### Production example
+`AccountCreated` event → `notifications` sends email, `loans` pre-qualifies offer — failures isolated per consumer. Consumer idempotency store keyed by `eventId` prevents duplicate emails on redelivery. Grafana dashboard on queue depth and consumer lag.
+
+#### Common mistakes
+- Publish before DB commit — lost or phantom events.
+- No idempotency — duplicate side effects.
+- Monolithic exchange for all events — unclear ownership.
+- Missing correlation id in message headers.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** RabbitMQ vs Kafka for Section 13 vs 14?
+**A:** Course teaches both: Rabbit simpler for task/work queue semantics, lower ops for small teams. Kafka for log retention, replay, high throughput analytics. Same Stream binding abstraction — different binder config.
+
+**Q:** How test Stream consumers?
+**A:** `@SpringBootTest` with Testcontainers RabbitMQ; send test message to destination; assert side effect (email stub). Contract test on event JSON schema. Test DLQ path with deliberately failing handler.
+
+#### Scenario probe
+Email sent twice after Rabbit redelivery — customer complains.
+
+**Model answer:** Add idempotency table `processed_events(event_id)` checked in transaction before send. Unique constraint on event id. Monitor redelivery rate. Handler must be at-least-once safe.
+
+#### Code / config (when useful)
+
+```java
+@Bean
+Supplier<AccountCreatedEvent> accountCreatedSupplier() {
+    return () -> new AccountCreatedEvent(/* ... */);
+}
+
+@Bean
+Consumer<AccountCreatedEvent> notificationHandler() {
+    return event -> {
+        if (processedEvents.exists(event.getId())) return;
+        emailService.send(event);
+        processedEvents.mark(event.getId());
+    };
+}
+```
+
+```yaml
+spring.cloud.stream.bindings:
+  notificationHandler-in-0:
+    destination: account-created
+    group: notifications
+```
+
+---
+
+### 71. Observability stack — Micrometer → Prometheus → Grafana + Loki + Tempo (course stack).
+
+**Short answer:** Eazybytes Section 11 wires **Micrometer** metrics from Spring Boot Actuator to **Prometheus** scrape, dashboards in **Grafana**; **Promtail** ships container logs to **Loki** for label-based log search; **Tempo** stores distributed traces (OTel/Micrometer Tracing) correlated with logs via trace id. Trade-off: full stack ops cost versus debugging microservices without correlated signals — mandatory for production on-call.
+
+#### What it is
+Unified observability for eazybank — metrics, logs, traces trilogy. Course uses Grafana Cloud docs quick-start patterns locally via docker-compose.
+
+#### How it works (internals)
+Actuator `/actuator/prometheus` exposes JVM, HTTP, Hikari, Resilience4j metrics. Prometheus `scrape_configs` targets each pod annotation `prometheus.io/scrape`. Loki ingests JSON logs with `trace_id` field from Logback MDC. Tempo receives OTLP from Micrometer Tracing bridge. Grafana dashboards link trace → logs → metrics. Alertmanager pages on SLO burn.
+
+#### When to use / when NOT to use
+Adopt full stack when >3 services and on-call rotation exists. Managed offerings (Grafana Cloud, Datadog) reduce ops. Minimum viable: metrics + centralized logs + trace id in MDC even before Tempo.
+
+#### Production example
+Checkout p99 spike: Grafana shows `http.server.requests` up on `loans-service`, Loki query `{app="loans"} |= "timeout"` filtered by `trace_id`, Tempo trace shows slow Feign call to `accounts`. Root cause: accounts pool exhaustion — fix pool size, add alert on `hikaricp.connections.pending`.
+
+#### Common mistakes
+- Metrics without labels cardinality explosion (`userId` tag).
+- Logs without `trace_id` — cannot correlate.
+- Dashboards nobody maintains — stale alerts.
+- Sampling traces 100% at high QPS — expensive.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Micrometer vs OpenTelemetry?
+**A:** Micrometer is Spring-native metrics facade; OTel is vendor-neutral traces/metrics/logs SDK. Boot 3 uses Micrometer Tracing with OTel exporter — bridge both. Course stack evolving toward OTel automatic instrumentation links in README.
+
+**Q:** RED vs USE methods?
+**A:** RED (Rate, Errors, Duration) for services — Micrometer HTTP metrics. USE (Utilization, Saturation, Errors) for resources — CPU, pool.pending. I dashboard both per service tier.
+
+#### Scenario probe
+On-call cannot find logs for failed payment — pods restarted, local files gone.
+
+**Model answer:** Violates 12-factor logs as streams. Deploy Promtail DaemonSet or sidecar shipping stdout to Loki with retention 30d. Never rely on `kubectl logs` alone for incidents. Post-mortem action item.
+
+#### Code / config (when useful)
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  tracing:
+    sampling:
+      probability: 0.1
+```
+
+```xml
+<!-- logback-spring.xml pattern -->
+<pattern>%d trace_id=%X{traceId} span_id=%X{spanId} %msg%n</pattern>
+```
+
+---
+
+### 72. Rate limiting with Spring Cloud Gateway + Redis (Stripe pattern from course).
+
+**Short answer:** Gateway `RequestRateLimiter` filter implements token-bucket rate limiting backed by **Redis** — `replenishRate` (steady tokens/sec) and `burstCapacity` (max bucket). Key resolver maps client identity (JWT `sub`, API key header, IP). Stripe blog pattern: separate rate limit tiers per API key class. Returns HTTP 429 with body explaining retry. Trade-off: Redis dependency and clock sync versus protecting downstream microservices from abuse and noisy neighbors.
+
+#### What it is
+Cross-cutting protection at gateway — eazybytes Section 9 references Stripe rate limiter blog. Course uses Apache Benchmark (`ab -n 10 -c 2`) to validate limits locally with Redis container.
+
+#### How it works (internals)
+`RedisRateLimiter` Lua script atomically decrements tokens. `KeyResolver` bean returns `Mono<String>` key. Multiple routes can share Redis cluster. Combine with Resilience4j bulkhead at downstream for defense in depth. Whitelist internal service CIDR via `DenyFilter` negation or separate route order.
+
+#### When to use / when NOT to use
+Use at public edge for all customer APIs. Internal service-to-service often uses mTLS + mesh policy instead of Redis limiter — or higher limits. Do not rate limit health/actuator paths used by K8s probes — separate route without limiter.
+
+#### Production example
+Free tier API key: 10 req/s, burst 20. Premium: 100/200. Redis `eazyredis` container from course docker command. Gateway returns `{"error":"rate_limit_exceeded","retry_after":1}`. Marketing campaign pre-raises burst after load test sign-off.
+
+#### Common mistakes
+- Rate limit by IP only behind NAT — unfair blocking.
+- Redis single node — limiter unavailable → fail open or closed? Document choice.
+- Limiting after expensive JWT crypto — order filters: cheap reject first.
+- No metric on 429 rate — blind to abuse.
+
+#### Interview follow-ups (with model answers)
+
+**Q:** Fail open vs closed when Redis down?
+**A:** Financial APIs often fail closed (reject) to prevent overload cascade. Internal tools may fail open with alert. Implement custom `RateLimiter` wrapper; test Redis outage in chaos drill.
+
+**Q:** Gateway limit vs API limit duplication?
+**A:** Gateway coarse global limit; service fine-grained per resource (e.g., transfer amount limits). Document layers. Avoid identical Redis keys in two places without coordination.
+
+#### Scenario probe
+Ab attack bypasses gateway limit hitting internal service directly via exposed pod IP.
+
+**Model answer:** NetworkPolicy deny ingress except from gateway namespace. mTLS mesh. Never expose microservice LoadBalancer publicly. Rate limit is edge defense — not sole security.
+
+#### Code / config (when useful)
+
+```java
+@Bean
+KeyResolver userKeyResolver() {
+    return exchange -> exchange.getRequest().getHeaders().getFirst("X-API-KEY") != null
+        ? Mono.just(exchange.getRequest().getHeaders().getFirst("X-API-KEY"))
+        : Mono.just(exchange.getRequest().getRemoteAddress().getAddress().getHostAddress());
+}
+```
+
+```yaml
+spring:
+  data:
+    redis:
+      host: eazyredis
+      port: 6379
+```
+
+---
+
 ## Scenario-based interview drills
 
 ### S1. Checkout stuck in PAYMENT_PENDING after Kafka outage

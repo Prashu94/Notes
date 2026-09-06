@@ -45,7 +45,7 @@ Each topic folder contains:
 | 01 | [java-core](./01-java-core/) | JVM, GC, memory, collections, generics, Java 8–21, J2EE leftovers |
 | 02 | [multithreading](./02-multithreading/) | Happens-before, locks, executors, virtual threads, concurrency bugs |
 | 03 | [design-patterns](./03-design-patterns/) | GoF + Spring/cloud patterns; **[181-pattern catalog](./03-design-patterns/pattern-catalog.md)** from [java-design-patterns.com](https://java-design-patterns.com/patterns/) |
-| 04 | [spring-boot](./04-spring-boot/) | Auto-config, AOP, transactions, security, actuators, internals |
+| 04 | [spring-boot](./04-spring-boot/) | Boot 4 / Security 6: IoC, AOP, JPA auditing, OAuth2/JWT/Keycloak, Spring Cloud (see also 06) |
 | 05 | [hibernate-jpa](./05-hibernate-jpa/) | Sessions, N+1, caching, dirty checking, locking, migrations |
 | 06 | [microservices](./06-microservices/) | Boundaries, sagas, resilience, service mesh, observability |
 | 07 | [rest-api](./07-rest-api/) | Contract design, versioning, idempotency, OpenAPI, errors |

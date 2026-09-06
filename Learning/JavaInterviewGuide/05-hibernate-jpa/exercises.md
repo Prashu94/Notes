@@ -1355,6 +1355,206 @@ Without partial index, second save throws `DataIntegrityViolationException`.
 
 ---
 
+## Exercise 34 — Spring Data Specification admin search
+
+**Difficulty:** Intermediate
+
+**Task:** Build dynamic admin order search: optional `status`, `createdAfter`, `customerEmailContains` filters using `JpaSpecificationExecutor`. Always AND a mandatory `tenantId` spec. Return `Page<OrderSummaryProjection>` with allowlisted sort fields.
+
+**Solution:**
+
+```java
+public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
+    @Query("""
+        SELECT o.id AS id, o.status AS status, o.total AS total
+        FROM Order o WHERE o.id IN :ids
+        """)
+    List<OrderSummaryProjection> findSummariesByIds(@Param("ids") List<Long> ids);
+}
+
+public final class OrderSpecs {
+    public static Specification<Order> hasTenant(UUID tenantId) {
+        return (root, q, cb) -> cb.equal(root.get("tenantId"), tenantId);
+    }
+    public static Specification<Order> statusEq(Status s) {
+        return (root, q, cb) -> cb.equal(root.get("status"), s);
+    }
+    public static Specification<Order> createdAfter(Instant after) {
+        return (root, q, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), after);
+    }
+    public static Specification<Order> customerEmailContains(String term) {
+        return (root, q, cb) -> cb.like(cb.lower(root.join("customer").get("email")),
+            "%" + term.toLowerCase() + "%");
+    }
+}
+
+@Service
+class OrderAdminService {
+    Page<OrderSummaryProjection> search(UUID tenantId, SearchCriteria c, Pageable pageable) {
+        var spec = Specification.where(OrderSpecs.hasTenant(tenantId));
+        if (c.status() != null) spec = spec.and(OrderSpecs.statusEq(c.status()));
+        if (c.createdAfter() != null) spec = spec.and(OrderSpecs.createdAfter(c.createdAfter()));
+        if (c.email() != null && !c.email().isBlank())
+            spec = spec.and(OrderSpecs.customerEmailContains(c.email()));
+        return orderRepo.findAll(spec, pageable).map(o -> /* map or use projection query */);
+    }
+}
+```
+
+```java
+@DataJpaTest
+class OrderSpecsIT {
+    @Test
+    void tenantSpecIsolatesRows() {
+        // seed tenant A + B orders; assert findAll(hasTenant(A)) size
+    }
+}
+```
+
+**Senior takeaway:** Specifications compose admin filters safely — always bolt on tenant spec server-side; never trust client to filter multi-tenant data.
+
+---
+
+## Exercise 35 — `@Modifying` bulk status update + persistence context
+
+**Difficulty:** Intermediate
+
+**Task:** Add repository method to expire open carts older than 24h. Verify `clearAutomatically` prevents stale reads in same transaction test. Assert returned row count.
+
+**Solution:**
+
+```java
+public interface CartRepository extends JpaRepository<Cart, Long> {
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Cart c SET c.status = com.app.CartStatus.EXPIRED WHERE c.status = OPEN AND c.updatedAt < :cutoff")
+    int expireStale(@Param("cutoff") Instant cutoff);
+}
+```
+
+```java
+@DataJpaTest
+class CartExpireIT {
+    @Autowired CartRepository carts;
+    @Autowired TestEntityManager em;
+
+    @Test
+    void expireUpdatesAndClearsContext() {
+        var cart = carts.save(new Cart(/* OPEN, updated 2 days ago */));
+        int updated = carts.expireStale(Instant.now().minus(24, ChronoUnit.HOURS));
+        assertThat(updated).isEqualTo(1);
+        assertThat(carts.findById(cart.getId())).get()
+            .extracting(Cart::getStatus).isEqualTo(CartStatus.EXPIRED);
+    }
+}
+```
+
+**Senior takeaway:** Bulk JPQL bypasses entity listeners — pair `@Modifying` clear with L2 eviction on hot entities if second-level cache enabled.
+
+---
+
+## Exercise 36 — Feign client with timeouts and error decoder
+
+**Difficulty:** Hard
+
+**Task:** From a Spring Boot app using JPA repositories, call an external `pricing-service` via OpenFeign to enrich `Product` listings. Configure timeouts; map 404 to `PriceNotFoundException`. Keep Feign DTOs separate from JPA entities.
+
+**Solution:**
+
+```java
+@FeignClient(name = "pricing", configuration = PricingFeignConfig.class)
+public interface PricingClient {
+    @GetMapping("/prices/{sku}")
+    PriceDto getPrice(@PathVariable String sku);
+}
+
+@Service
+class ProductCatalogService {
+    ProductCardDto enrich(Product p) {
+        var price = pricingClient.getPrice(p.getSku()); // DTO boundary — not Product entity
+        return productMapper.toCard(p, price);
+    }
+}
+```
+
+```yaml
+spring.cloud.openfeign.client.config.pricing:
+  connectTimeout: 500
+  readTimeout: 2000
+```
+
+**Senior takeaway:** JPA entities stay inside the persistence layer — Feign DTOs are anti-corruption at the integration boundary (eazybytes DTO pattern).
+
+---
+
+## Exercise 37 — Spring Cloud Config refresh + `@RefreshScope`
+
+**Difficulty:** Intermediate
+
+**Task:** Externalize `catalog.page-size` consumed by a JPA-backed paginated repository call. Use Config Server + `@RefreshScope` on `CatalogProperties`; refresh without restart and verify new page size in SQL `LIMIT`.
+
+**Solution:**
+
+```java
+@Component
+@RefreshScope
+@ConfigurationProperties(prefix = "catalog")
+class CatalogProperties {
+    private int pageSize = 20;
+    // getter/setter
+}
+
+@Service
+class CatalogService {
+    Page<Product> list(Pageable ignored) {
+        return productRepo.findAll(PageRequest.of(0, props.getPageSize()));
+    }
+}
+```
+
+```bash
+curl -X POST http://localhost:8080/actuator/refresh
+# verify smaller page-size changes rows returned
+```
+
+**Senior takeaway:** Pagination defaults belong in config, not hardcoded `@PageableDefault` only — refresh changes read patterns without redeploy.
+
+---
+
+## Exercise 38 — Gateway route + JWT filter protecting JPA API
+
+**Difficulty:** Hard
+
+**Task:** Place Spring Cloud Gateway in front of a JPA-backed `products` service. Route `/api/catalog/**` with JWT validation; unauthorized callers never hit the repository layer.
+
+**Solution:**
+
+```yaml
+spring.cloud.gateway.routes:
+  - id: catalog
+    uri: lb://CATALOG
+    predicates:
+      - Path=/api/catalog/**
+    filters:
+      - TokenRelay=
+spring.security.oauth2.resourceserver.jwt.issuer-uri: ${KEYCLOAK_ISSUER}
+```
+
+```java
+// catalog-service — resource server still validates JWT
+@RestController
+@RequestMapping("/products")
+class ProductController {
+    @GetMapping
+    Page<ProductDto> list(@AuthenticationPrincipal Jwt jwt, Pageable pageable) {
+        return catalogService.listForTenant(jwt.getClaim("tenant_id"), pageable);
+    }
+}
+```
+
+**Senior takeaway:** Gateway JWT filter is the first line; JPA queries still scope by tenant from token claims — defense in depth.
+
+---
+
 ## Weekend drill
 
 1. Disable OSIV in a sample app; fix every `LazyInitializationException` with DTOs or fetch joins.
