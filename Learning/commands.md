@@ -169,3 +169,7 @@ sudo systemctl disable neo4j
 
 rm /lib/systemd/system/neo4j.service
 rm -rf NEO4J_HOME
+____________________________________________________
+OLLAMA + Claude SDK
+_____________________
+Command:

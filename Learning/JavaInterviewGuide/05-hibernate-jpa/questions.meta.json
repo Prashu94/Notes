@@ -1,0 +1,188 @@
+{
+  "1": {
+    "bullets": [
+      "What is the difference between `EntityManagerFactory` and `EntityManager`?",
+      "How does Open Session In View extend the PC lifecycle?",
+      "Is the PC the same as the first-level cache?"
+    ],
+    "code": "```java\n@Service\npublic class OrderService {\n    @PersistenceContext\n    private EntityManager em;\n\n    @Transactional\n    public void placeOrder(Long customerId) {\n        Customer c = em.find(Customer.class, customerId);\n        Order o = new Order(c);\n        em.persist(o); // same PC, same TX\n    }\n}\n```"
+  },
+  "2": {
+    "bullets": [
+      "What happens to a detached entity's lazy collection?",
+      "Difference between `em.remove` and `DELETE` JPQL?",
+      "How does `Persistable` affect Spring Data `save`?"
+    ],
+    "code": "```java\nOrder o = new Order();           // TRANSIENT\nem.persist(o);                   // PERSISTENT\nem.detach(o);                    // DETACHED\nOrder managed = em.merge(o);       // o still DETACHED; managed is PERSISTENT\nem.remove(managed);              // REMOVED (DELETE on flush)\n```"
+  },
+  "3": {
+    "bullets": [
+      "Does dirty checking run on every query or only at flush?",
+      "How do embeddables participate in dirty checking?",
+      "Impact of `FlushMode.COMMIT` on dirty checking visibility?"
+    ],
+    "code": "```java\n@Entity\n@DynamicUpdate\npublic class Customer {\n    @Id private Long id;\n    private String email;\n    // setEmail() on managed instance \u2192 dirty at flush\n}\n```"
+  },
+  "4": {
+    "bullets": [
+      "Difference between `flush()` and `saveAndFlush()`?",
+      "How does flush interact with IDENTITY generators?",
+      "What is `FlushModeType` default in read-only transactions?"
+    ],
+    "code": "```java\nem.setFlushMode(FlushModeType.COMMIT);\nem.persist(order);\n// JPQL may not see order until commit\n```"
+  },
+  "5": {
+    "bullets": [
+      "How does `saveAll` differ from repeated `save`?",
+      "What is `EntityManager.getReference` vs `merge`?",
+      "Custom `isNew` with `AbstractAggregateRoot`?"
+    ],
+    "code": "```java\n// WRONG\nOrder detached = dtoMapper.toEntity(dto);\nrepository.save(detached); // merge \u2014 may orphan line items\n\n// BETTER\nOrder order = repository.findById(dto.getId()).orElseThrow();\ndtoMapper.updateEntity(dto, order);\n```"
+  },
+  "6": {
+    "bullets": [
+      "What is `hibernate.id.new_generator_mappings`?",
+      "Table generator vs sequence on Oracle?",
+      "How does `@GeneratedValue(strategy=AUTO)` pick?"
+    ],
+    "code": "```java\n@Id\n@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = \"order_gen\")\n@SequenceGenerator(name = \"order_gen\", sequenceName = \"order_seq\", allocationSize = 50)\nprivate Long id;\n```"
+  },
+  "7": {
+    "bullets": [
+      "Should equals be symmetric for Hibernate proxies?",
+      "How does Envers handle equals?",
+      "Difference between entity and embeddable equals?"
+    ],
+    "code": "```java\n@Override\npublic boolean equals(Object o) {\n    if (this == o) return true;\n    if (!(o instanceof Product p)) return false;\n    return sku != null && sku.equals(p.sku) && tenantId.equals(p.tenantId);\n}\n```"
+  },
+  "8": {
+    "bullets": [
+      "Can you have bidirectional `@ManyToMany`?",
+      "What SQL does unidirectional `@OneToMany` generate?",
+      "How does `orphanRemoval` interact with owning side?"
+    ],
+    "code": "```java\npublic void addLine(OrderLine line) {\n    lines.add(line);\n    line.setOrder(this); // owning side\n}\n```"
+  },
+  "9": {
+    "bullets": [
+      "Difference between `DELETE` JPQL and `REMOVE` cascade?",
+      "Does `orphanRemoval` work on detached collections?",
+      "Safe cascade for aggregate roots in DDD?"
+    ],
+    "code": "```java\n@OneToMany(mappedBy = \"order\", cascade = CascadeType.PERSIST, orphanRemoval = true)\nprivate List<OrderLine> lines = new ArrayList<>();\n```"
+  },
+  "10": {
+    "bullets": [
+      "Can you make `@ManyToOne` lazy in JPA without Hibernate property?",
+      "What is `FetchMode` vs `FetchType` in Hibernate?",
+      "How do `@EntityGraph` attribute paths work?"
+    ],
+    "code": "```java\n@ManyToOne(fetch = FetchType.LAZY)\n@JoinColumn(name = \"customer_id\")\nprivate Customer customer;\n```"
+  },
+  "11": {
+    "bullets": [
+      "`@Fetch(SUBSELECT)` vs BATCH?",
+      "Blaze-Persistence entity views?",
+      "N+1 in GraphQL resolvers?"
+    ]
+  },
+  "12": {
+    "bullets": [
+      "List vs Set domain modeling?",
+      "`@SqlRestriction` on collections?",
+      "Multiple `@OneToMany` redesign?"
+    ]
+  },
+  "13": {
+    "bullets": [
+      "Hibernate 6 DISTINCT semantics?",
+      "Window functions for pagination?",
+      "Read model denormalization?"
+    ]
+  },
+  "14": {
+    "bullets": [
+      "`@SortNatural`?",
+      "Immutable collections mapping?",
+      "Collection replacement vs diff?"
+    ]
+  },
+  "15": {
+    "bullets": [
+      "Unidirectional ManyToMany?",
+      "Replace with composite key entity?",
+      "GraphQL many-to-many exposure?"
+    ]
+  },
+  "16": {
+    "bullets": [
+      "`@MappedSuperclass` vs entity inheritance?",
+      "Polymorphic `@Query` pitfalls?",
+      "Hibernate `@DiscriminatorFormula`?"
+    ]
+  },
+  "17": {
+    "bullets": [
+      "`@AttributeOverride` column names?",
+      "Embeddable collections?",
+      "JSON embeddable mapping?"
+    ]
+  },
+  "18": {
+    "bullets": [
+      "Query cache vs entity cache?",
+      "`@NaturalId` cache?",
+      "Redis as L2 provider trade-offs?"
+    ]
+  },
+  "19": {
+    "bullets": [
+      "`@QueryHints` CACHEABLE?",
+      "Hibernate 6 query cache changes?",
+      "vs Spring `@Cacheable` on repository?"
+    ]
+  },
+  "20": {
+    "bullets": [
+      "`@OptimisticLocking` type TIMESTAMP?",
+      "Retry with exponential backoff?",
+      "Version on `@Embeddable`?"
+    ]
+  },
+  "21": {
+    "bullets": [
+      "Pessimistic vs optimistic choice matrix?",
+      "Oracle vs Postgres lock behavior?",
+      "`@NamedEntityGraph` with lock?"
+    ]
+  },
+  "22": {
+    "bullets": [
+      "Snapshot isolation vs serializable?",
+      "Lock ordering deadlock prevention?",
+      "`@Formula` fields and locking?"
+    ]
+  },
+  "23": {
+    "bullets": [
+      "`@NamedNativeQuery` maintenance?",
+      "ResultSet mapping to constructor?",
+      "Schema migration breaking natives?"
+    ]
+  },
+  "24": {
+    "bullets": [
+      "Hibernate 6 Criteria changes?",
+      "Type-safe query generators?",
+      "Specification AND/OR composition?"
+    ]
+  },
+  "25": {
+    "bullets": [
+      "`@Query countQuery separate optimization?",
+      "Hibernate `@PageableDefault`?",
+      "Blaze-Pagination?"
+    ],
+    "code": "```java\nPage<OrderSummary> findByCustomerId(Long customerId, Pageable pageable);\nSlice<OrderSummary> findRecent(Pageable pageable);\n```"
+  }
+}
