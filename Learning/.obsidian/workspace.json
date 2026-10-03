@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "054bf130aba37080",
+        "id": "38e8c012d3551530",
         "type": "tabs",
         "children": [
           {
-            "id": "fa560a467b62c15a",
+            "id": "2eac51f633ee6264",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "gcp-ace-cap/gcp-iam-ace-guide.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "gcp-iam-ace-guide"
             }
           }
         ]
@@ -76,8 +80,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5,
-    "collapsed": true
+    "width": 459.5
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -176,15 +179,22 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "fa560a467b62c15a",
+  "active": "2eac51f633ee6264",
   "lastOpenFiles": [
+    "gcp-ace-study-guide/00_Introduction_and_Exam_Overview.md",
+    "gcp-ace-study-guide/01_Setting_Up_Environment.md",
+    "gcp-ace-cap/practice-questions/pca-architecture-design-practice.md",
+    "gcp-ace-cap/mindmaps/05-Operations-Management.md",
+    "gcp-ace-cap/mindmaps/00-Master-Index.md",
+    "gcp-ace-cap/2026-UPDATES-SUMMARY.md",
+    "commands.md",
+    "JavaInterviewGuide/03-design-patterns/questions.md",
     "JavaInterviewGuide/01-java-core/questions.md",
     "JavaInterviewGuide/Concurrency.md",
     "Pasted image 20260905130019.png",
     "Untitled.md",
     "JavaInterviewGuide",
     "claude-certitication-learning/01-claude-api-fundamentals.md",
-    "commands.md",
     "aws-sa-c03/aws-dynamodb-saa-c03-guide.md",
     "claude-certitication-learning/02-tools-and-tool-use.md",
     "claude-certitication-learning/README.md",
@@ -199,16 +209,9 @@
     "aws-sa-c03/aws-ecs-eks-fargate-saa-c03-guide.md",
     "aws-sa-c03/aws-api-gateway-saa-c03-guide.md",
     "aws-sa-c03/aws-glue-saa-c03-guide.md",
-    "aws-sa-c03/aws-networking-saa-c03-guide.md",
     "Archive-Improved",
     "Archive-Improved.zip",
     "Archive 2.zip",
-    "aikit/outputs/well-production/review/tech-stack.md",
-    "aikit/outputs/well-production/review/stories.md",
-    "aikit/outputs/well-production/review/features.md",
-    "aikit/outputs/well-production/review/epics.md",
-    "aikit/outputs/well-production/review/clarifications.md",
-    "aikit/outputs/well-production/requirements/workflows.md",
     "aikit/outputs/well-production/requirements",
     "aikit/outputs/well-production/review",
     "aikit/outputs/well-production",

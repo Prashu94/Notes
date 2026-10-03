@@ -173,3 +173,22 @@ ____________________________________________________
 OLLAMA + Claude SDK
 _____________________
 Command:
+root@localhost: pwtshli;X0hW
+sudo mysql.server stop
+
+brew install mysql
+ - brew services stop mysql
+
+ - brew install mysql@8.4
+
+ - brew services start mysql@8.4
+
+ - brew services stop mysql@8.4
+
+ - brew services start mysql
+
+git init .
+git add .
+git commit -m "kashaksda"
+git remote add origin <repository-url>
+git push -u origin qs-development-improvements
