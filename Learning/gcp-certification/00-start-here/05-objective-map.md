@@ -61,3 +61,18 @@ Every bullet from the October 2026 exam guides, and where this pack teaches it. 
 | Case studies Altostrat, Cymbal, EHR, KnightMotives | `04-pca/case-studies.md` plus the official PDFs |
 
 Products that appear on the documentation home page and are not in a bullet above are still listed, with weight, in `02-services/16-full-product-catalog.md`.
+
+Mechanism that the short chapters only name is in:
+
+| File | Fills |
+| --- | --- |
+| `17-compute-engine-deep-dive.md` | Lifecycle, disk types, snapshots versus images, MIG updates, scopes, reservations |
+| `18-gke-deep-dive.md` | Private clusters, Workload Identity, upgrades, HPA/VPA, fleet policy |
+| `19-serverless-deep-dive.md` | Cloud Run CPU, ingress, VPC, jobs, functions gen2, App Engine region lock |
+| `20-networking-deep-dive.md` | Routes, firewall fields, HA VPN build, Shared VPC roles, PSC, DNS, LB objects |
+| `21-data-deep-dive.md` | Storage class billing, Cloud SQL failover, Spanner keys, Firestore, Bigtable, BigQuery, Pub/Sub |
+| `22-security-operations-deep-dive.md` | Conditions, deny, federation, VPC-SC, supply chain, alerting and SLOs |
+| `23-ai-deep-dive.md` | Which AI API, RAG filters, endpoints, training versus calling a model |
+| `24-cicd-deep-dive.md` | Cloud Build file, Cloud Deploy approval, Terraform state, scan versus block |
+| `25-observability-deep-dive.md` | Log router, sinks, SLI/SLO/burn, what to page on |
+| `26-cost-migration-deep-dive.md` | Budgets versus quotas versus CUDs, the migration plan headings |

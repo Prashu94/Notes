@@ -19,7 +19,7 @@ This pack is original study notes. It is not a copy of Google’s documentation.
 | --- | --- |
 | `00-start-here/` | Exam facts, full objective lists, 12-week plan |
 | `01-foundations/` | Hierarchy, IAM, billing, CLI, regions, quotas |
-| `02-services/` | Every product family: when to use it, architecture, commands, exam traps, exercises |
+| `02-services/` | Every product family. Files `01`–`16` are the map and the commands. Files `17`–`23` are the mechanism those chapters shortened: disks and MIGs, private GKE, Cloud Run settings, HA VPN and firewalls, storage and BigQuery behavior, IAM deny and VPC Service Controls, and the AI path. |
 | `03-ace/` | ACE section walkthrough, hands-on drills, practice exam |
 | `04-pca/` | Well-Architected Framework, design method, case studies, practice exam |
 | `05-labs/` | End-to-end labs you can run in a project |
@@ -62,8 +62,10 @@ Renewal (if you already hold the cert and are inside the renewal window): a shor
 
 ## Suggested order
 
+Follow `00-start-here/00-complete-reading-order.md`. That is the full guide in order. Files `02-services/01` through `16` are the map. Files `17` through `26` are the detail. Do not stop at the map.
+
 1. Read `00-start-here/02-ace-exam-blueprint.md` and `03-pca-exam-blueprint.md` so you know what is scored.
-2. Do foundations, then every file in `02-services/` in order. Do the exercises before you read the answers.
+2. Do foundations, then every file in `02-services/` in the reading-order list. Do the exercises before you read the answers.
 3. Run the labs in `05-labs/` in a real project or in the free tier. Reading commands is not the same as typing them.
 4. ACE candidates: `03-ace/` then the ACE practice exam. Sit ACE before PCA if IAM, VPC, and `gcloud` are not weekly work.
 5. PCA candidates: `04-pca/` after the service chapters. Read the four official case-study PDFs on the exam guide page. The notes here teach how to answer them. They do not replace the PDFs.

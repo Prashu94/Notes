@@ -21,9 +21,9 @@ You can: create a project under a folder, link billing, set a budget, enable an 
 
 Read:
 
-- `02-services/01-compute-engine.md`
-- `02-services/02-gke.md`
-- `02-services/03-cloud-run-and-app-engine.md`
+- `02-services/01-compute-engine.md` and `17-compute-engine-deep-dive.md`
+- `02-services/02-gke.md` and `18-gke-deep-dive.md`
+- `02-services/03-cloud-run-and-app-engine.md` and `19-serverless-deep-dive.md`
 
 Do labs 03, 04, and 05.
 
@@ -34,7 +34,8 @@ You can: instance template plus regional MIG, private GKE Autopilot plus a Deplo
 Read:
 
 - `02-services/05-vpc-and-hybrid-networking.md`
-- `02-services/06-load-balancing-dns-cdn-armor.md`
+- `02-services/06-load-balancing-cdn-armor.md`
+- `02-services/20-networking-deep-dive.md`
 
 Do lab 06.
 
@@ -46,6 +47,7 @@ Read:
 
 - `02-services/07-cloud-storage-and-file.md`
 - `02-services/08-databases.md`
+- `02-services/21-data-deep-dive.md`
 
 Do labs 07 and 08.
 
@@ -55,10 +57,11 @@ You can: lifecycle a bucket, load a CSV into BigQuery, choose Cloud SQL versus A
 
 Read:
 
-- `02-services/09-analytics-and-pipelines.md`
+- `02-services/09-analytics-and-pipelines.md` (BigQuery and Pub/Sub detail is in `21-data-deep-dive.md`)
 - `02-services/11-observability-and-operations.md`
 - `02-services/12-cicd-iac-and-deployment.md`
 - `02-services/15-integration-apis-and-eventing.md`
+- `02-services/22-security-operations-deep-dive.md`
 
 Do labs 09 and 10.
 
@@ -72,7 +75,7 @@ Read:
 
 - `04-pca/well-architected-framework.md`
 - `04-pca/design-decisions.md`
-- `02-services/13-ai-ml-and-gemini.md`
+- `02-services/13-ai-ml-and-gemini.md` and `23-ai-deep-dive.md`
 - `02-services/14-migration-hybrid-multicloud.md`
 - `02-services/16-full-product-catalog.md` (recognition pass)
 
