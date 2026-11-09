@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gcp-ace-cap/gcp-iam-ace-guide.md",
+                "file": "commands.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "gcp-iam-ace-guide"
+              "title": "commands"
             }
           }
         ]
@@ -80,8 +80,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 459.5,
-    "collapsed": true
+    "width": 459.5
   },
   "right": {
     "id": "21a432287b352ea2",
@@ -182,6 +181,8 @@
   },
   "active": "2eac51f633ee6264",
   "lastOpenFiles": [
+    "gcp-ace-cap/gcp-iam-pca-guide.md",
+    "gcp-ace-cap/gcp-iam-ace-guide.md",
     "aws-certification/01-foundations/06-encryption-kms-certificates-secrets.md",
     "aws-certification/01-foundations/05-networking-foundations-for-architects.md",
     "aws-certification/01-foundations/04-accounts-organizations-control-tower.md",
@@ -209,8 +210,6 @@
     "aws-certification/README.md",
     "aws-certification/03-saa/06-saa-practice-exam.md",
     "aws-certification/03-saa/06-saa-practice-exam-answers.md",
-    "aws-certification/03-saa/05-saa-exercises.md",
-    "aws-certification/03-saa/04-domain-4-cost.md",
     "aws-certification/03-saa",
     "aws-certification/00-start-here",
     "aws-certification/05-labs",

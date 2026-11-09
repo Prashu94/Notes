@@ -13,6 +13,7 @@ brew services start redis
 redis-server
 brew services stop redis
 redis-cli
+java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar -sharedDb
 # Simple POC that:
 # 1) pulls rows from Postgres
 # 2) renders narrative documents
